@@ -3,6 +3,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 use toml;
 
+use spec::*;
+
 type PathV = String;
 
 #[derive(Clone, Debug)]
@@ -11,11 +13,20 @@ struct Package {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum PkgVer {
+    RegSpec(Spec),
+    Registry { version: Spec, /* TODO More here */ },
+    Git { url: String, commit: String }
+}
+
+#[derive(Deserialize)]
 struct Manifest {
     meta: Meta,
     dependencies: BTreeMap<String, String>,
     dev_dependencies: BTreeMap<String, String>,
     // TODO targets
+    // TODO features
 }
 
 #[derive(Deserialize)]

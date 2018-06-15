@@ -7,14 +7,15 @@ extern crate serde_derive;
 extern crate structopt;
 extern crate toml;
 
-mod manifest;
+mod compiler;
+mod file;
 mod spec;
 
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(name = "ipman", about = "An Idris toolchain & package manager")]
-struct Ipman {
+struct Olwen {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u8,
     #[structopt(subcommand)]
@@ -44,5 +45,5 @@ enum Cmd {
 }
 
 fn main() {
-    let opt = Ipman::from_args();
+    let opt = Olwen::from_args();
 }
