@@ -2,6 +2,7 @@
 name = "olwen"
 version = "0.1.0"
 authors = ["David Cao <dcao@protonmail.com>"]
+license = "MIT"
 
 [dependencies]
 failure = "0.1"
