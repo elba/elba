@@ -1,4 +1,4 @@
 //! spec.rs - package name + version parsing.
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct Spec(String);

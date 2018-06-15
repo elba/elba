@@ -11,3 +11,11 @@ serde_derive = "1.0"
 serde_ignored = "0.0.4"
 structopt = "0.2"
 toml = "0.4"
+
+[lib]
+name = "olwen"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "olwen"
+path = "src/bin/main.rs"

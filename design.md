@@ -1,27 +1,6 @@
 # A possible design for this tool:
 
-Everything is installed with the install command.
-
-```
-$ olwen install idris // installs the idris compiler
-$ olwen install idris-lsp // future lsp server for idris
-$ olwen install lightyear
-```
-
-Packages are of two types: normal or tooling.
-
-All packages must depend on a proper version of the Idris compiler, except for
-the Idris compiler itself, which is special-cased.
-
-A normal package is simply copied to the pkgdir of the chosen Idris compiler's
-install.
-
-- [ ] TODO figure out tooling package's privileges
-
-
 ## The manifest
-All package dependencies, whether normal or tooling, are listed under
-[dependencies].
 Example:
 
 ```toml
@@ -50,3 +29,6 @@ mod = "A.Main"
 name = "bin2"
 mod = "A.B.Main"
 ```
+
+## Unsolved questions
+- [ ] for "mod", should it be by idris module (dot) or file (slash)?

@@ -1,15 +1,9 @@
 extern crate failure;
 extern crate nom;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
+extern crate olwen;
 #[macro_use]
 extern crate structopt;
 extern crate toml;
-
-mod compiler;
-mod file;
-mod spec;
 
 use structopt::StructOpt;
 
@@ -35,13 +29,9 @@ enum Cmd {
         name: String,
     },
     #[structopt(name = "install")]
-    Install {
-        specifier: String,
-    },
+    Install { specifier: String },
     #[structopt(name = "uninstall")]
-    Uninstall {
-        name: String,
-    }
+    Uninstall { name: String },
 }
 
 fn main() {
