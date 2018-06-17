@@ -1,5 +1,5 @@
 [package]
-name = "olwen"
+name = "matic"
 version = "0.1.0"
 authors = ["David Cao <dcao@protonmail.com>"]
 license = "MIT"
@@ -14,9 +14,9 @@ structopt = "0.2"
 toml = "0.4"
 
 [lib]
-name = "olwen"
+name = "matic"
 path = "src/lib/lib.rs"
 
 [[bin]]
-name = "olwen"
+name = "matic"
 path = "src/bin/main.rs"

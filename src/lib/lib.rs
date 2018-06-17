@@ -6,7 +6,9 @@ extern crate serde;
 extern crate serde_derive;
 extern crate toml;
 
+mod cli;
 mod compiler;
 mod err;
-mod file;
+mod package;
+mod registry;
 mod spec;

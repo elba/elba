@@ -5,10 +5,18 @@ use std::{collections::BTreeMap, str::FromStr};
 use toml;
 
 use err::*;
-use spec::*;
 
 /// A relative file path (not module path)
 type PathV = String;
+
+#[derive(Deserialize, Debug, Serialize)]
+pub struct Spec(Name, Version);
+
+#[derive(Deserialize, Debug, Serialize)]
+pub struct Name(String);
+
+#[derive(Deserialize, Debug, Serialize)]
+pub struct Version(String);
 
 fn default_empty_vec<T>() -> Vec<T> {
     vec![]
@@ -22,9 +30,9 @@ fn default_empty_map<K: Ord, V>() -> BTreeMap<K, V> {
 struct Manifest {
     package: Package,
     #[serde(default = "default_empty_map")]
-    dependencies: BTreeMap<String, DepSpec>,
+    dependencies: BTreeMap<Name, DepSpec>,
     #[serde(default = "default_empty_map")]
-    dev_dependencies: BTreeMap<String, DepSpec>,
+    dev_dependencies: BTreeMap<Name, DepSpec>,
     targets: Targets,
     #[serde(default)]
     features: Features,
@@ -40,8 +48,8 @@ impl FromStr for Manifest {
 
 #[derive(Deserialize, Debug)]
 struct Package {
-    name: String,
-    version: Spec,
+    name: Name,
+    version: Version,
     authors: Vec<String>,
     license: Option<String>,
 }
@@ -49,9 +57,9 @@ struct Package {
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum DepSpec {
-    RegSpec(Spec),
+    RegSpec(Version),
     Registry {
-        version: Spec,
+        version: Version,
         #[serde(default = "default_empty_vec")]
         features: Vec<String>,
     },
@@ -131,18 +139,18 @@ mod tests {
     fn valid_manifest() {
         let manifest = "
 [package]
-name = 'olwen'
+name = 'cool/beans'
 version = '1.0.0'
 authors = ['me']
 license = 'MIT'
 
 [dependencies]
-a = '1.0.0'
-b = { git = 'https://github.com/super/cool', branch = 'this_one', tag = '1.0.0' }
-c = { path = 'here/right/now' }
+'awesome/a' = '1.0.0'
+'cool/b' = { git = 'https://github.com/super/cool', branch = 'this_one', tag = '1.0.0' }
+'great/c' = { path = 'here/right/now' }
 
 [dev_dependencies]
-d = '2.0'
+'ayy/x' = '2.0'
 
 [[targets.bin]]
 name = 'bin1'

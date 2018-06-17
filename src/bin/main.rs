@@ -1,6 +1,6 @@
 extern crate failure;
 extern crate nom;
-extern crate olwen;
+extern crate matic;
 #[macro_use]
 extern crate structopt;
 extern crate toml;
@@ -8,8 +8,8 @@ extern crate toml;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(name = "ipman", about = "An Idris toolchain & package manager")]
-struct Olwen {
+#[structopt(name = "matic", about = "An Idris toolchain & package manager")]
+struct Matic {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u8,
     #[structopt(subcommand)]
@@ -35,5 +35,5 @@ enum Cmd {
 }
 
 fn main() {
-    let opt = Olwen::from_args();
+    let opt = Matic::from_args();
 }
