@@ -1,8 +1,13 @@
-//! `lockfile.rs` - logic for creating and reading Lockfiles.
+//! Module `package/lockfile` contains logic for (de)serializing lockfiles.
 //!
 //! Lockfiles are created based on dependency constraints, and ensure that builds are repeatable
 
-use spec::*;
+// TODO: The representation of a package in a lockfile might end up being the canonical rep we use
+//       in code...
+
+use semver::Version;
+
+use super::types::*;
 
 #[derive(Deserialize, Debug, Serialize)]
 struct Lockfile {
@@ -11,7 +16,7 @@ struct Lockfile {
 
 #[derive(Deserialize, Debug, Serialize)]
 struct LockedPkg {
-    name: String,
-    version: Spec,
-    // TODO: Other things
+    name: Name,
+    version: Version,
+    // TODO: checksum, deps, src?
 }

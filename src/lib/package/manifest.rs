@@ -1,22 +1,15 @@
-//! `manifest.rs` - Parsing package manifests: Pkg.toml
+//! Module `package/manifest` deals with package manifest files.
 
 use failure::ResultExt;
+use semver::{Version, VersionReq};
 use std::{collections::BTreeMap, str::FromStr};
 use toml;
 
+use super::types::*;
 use err::*;
 
 /// A relative file path (not module path)
 type PathV = String;
-
-#[derive(Deserialize, Debug, Serialize)]
-pub struct Spec(Name, Version);
-
-#[derive(Deserialize, Debug, Serialize)]
-pub struct Name(String);
-
-#[derive(Deserialize, Debug, Serialize)]
-pub struct Version(String);
 
 fn default_empty_vec<T>() -> Vec<T> {
     vec![]
@@ -30,9 +23,9 @@ fn default_empty_map<K: Ord, V>() -> BTreeMap<K, V> {
 struct Manifest {
     package: Package,
     #[serde(default = "default_empty_map")]
-    dependencies: BTreeMap<Name, DepSpec>,
+    dependencies: BTreeMap<Name, DepReq>,
     #[serde(default = "default_empty_map")]
-    dev_dependencies: BTreeMap<Name, DepSpec>,
+    dev_dependencies: BTreeMap<Name, DepReq>,
     targets: Targets,
     #[serde(default)]
     features: Features,
@@ -42,7 +35,9 @@ impl FromStr for Manifest {
     type Err = Error; // TODO
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
-        toml::from_str(raw).context(ErrorKind::InvalidManifest).map_err(Error::from)
+        toml::from_str(raw)
+            .context(ErrorKind::InvalidManifestFile)
+            .map_err(Error::from)
     }
 }
 
@@ -56,10 +51,10 @@ struct Package {
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-enum DepSpec {
-    RegSpec(Version),
+enum DepReq {
+    ShortReq(VersionReq),
     Registry {
-        version: Version,
+        version: VersionReq,
         #[serde(default = "default_empty_vec")]
         features: Vec<String>,
     },

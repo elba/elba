@@ -1,6 +1,6 @@
 extern crate failure;
-extern crate nom;
 extern crate matic;
+extern crate nom;
 #[macro_use]
 extern crate structopt;
 extern crate toml;

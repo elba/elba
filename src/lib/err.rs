@@ -32,8 +32,10 @@ impl Display for Error {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
+    #[fail(display = "Invalid version specifier in manifest.")]
+    InvalidManifestVer,
     #[fail(display = "Invalid manifest file.")]
-    InvalidManifest,
+    InvalidManifestFile,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,
@@ -41,7 +43,9 @@ pub enum ErrorKind {
 
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Error {
-        Error { inner: Context::new(kind) }
+        Error {
+            inner: Context::new(kind),
+        }
     }
 }
 
