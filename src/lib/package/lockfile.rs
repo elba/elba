@@ -7,7 +7,7 @@
 
 use semver::Version;
 
-use super::types::*;
+use super::*;
 
 #[derive(Deserialize, Debug, Serialize)]
 struct Lockfile {

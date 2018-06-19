@@ -7,12 +7,15 @@ license = "MIT"
 [dependencies]
 failure = "0.1"
 nom = "4.0"
+petgraph = "0.4"
 semver = { version = "0.9", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
-serde_ignored = "0.0.4"
+serde_json = "1.0"
 structopt = "0.2"
 toml = "0.4"
+url = "1.7"
+url_serde = "0.2"
 
 [lib]
 name = "matic"

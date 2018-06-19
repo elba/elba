@@ -3,6 +3,8 @@
 use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Display};
 
+pub type Res<T> = Result<T, Error>;
+
 #[derive(Debug)]
 pub struct Error {
     inner: Context<ErrorKind>,
@@ -32,10 +34,10 @@ impl Display for Error {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(display = "Invalid version specifier in manifest.")]
-    InvalidManifestVer,
     #[fail(display = "Invalid manifest file.")]
     InvalidManifestFile,
+    #[fail(display = "Invalid source url.")]
+    InvalidSourceUrl,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,

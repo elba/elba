@@ -5,7 +5,7 @@ use semver::{Version, VersionReq};
 use std::{collections::BTreeMap, str::FromStr};
 use toml;
 
-use super::types::*;
+use super::*;
 use err::*;
 
 /// A relative file path (not module path)
@@ -65,22 +65,23 @@ enum DepReq {
     },
     Git {
         git: String,
-        #[serde(default = "default_dep_spec_branch")]
-        branch: String,
         #[serde(flatten)]
-        spec: Option<PkgGitSpecifier>,
+        #[serde(default = "default_git_specifier")]
+        spec: PkgGitSpecifier,
         #[serde(default = "default_empty_vec")]
         features: Vec<String>,
     },
 }
 
-fn default_dep_spec_branch() -> String {
-    "master".to_owned()
+fn default_git_specifier() -> PkgGitSpecifier {
+    PkgGitSpecifier::Branch("master".to_string())
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum PkgGitSpecifier {
+    #[serde(rename = "branch")]
+    Branch(String),
     #[serde(rename = "commit")]
     Commit(String),
     #[serde(rename = "tag")]
@@ -141,7 +142,7 @@ license = 'MIT'
 
 [dependencies]
 'awesome/a' = '1.0.0'
-'cool/b' = { git = 'https://github.com/super/cool', branch = 'this_one', tag = '1.0.0' }
+'cool/b' = { git = 'https://github.com/super/cool', branch = 'this_one' }
 'great/c' = { path = 'here/right/now' }
 
 [dev_dependencies]
