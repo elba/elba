@@ -22,33 +22,23 @@ use std::collections::BTreeMap;
 use std::{
     fs, io::{self, BufRead}, path::PathBuf,
 };
-use toml;
 use url::Url;
+use url_serde;
 
 use err::{Error, ErrorKind};
 use package::*;
 
-pub struct IndexSet {
-    /// Indicates identifying information about the index
-    ixs: Vec<Index>,
-    /// Contains a mapping of versioned packages to checksums
-    hashes: BTreeMap<Name, BTreeMap<Version, Checksum>>,
-    cache: BTreeMap<Name, BTreeMap<Version, (Index, Summary<Dep>)>>,
-}
+pub type Indices = Vec<Index>;
 
-impl IndexSet {
-    pub fn query(&mut self, pkg: &PackageId, f: &mut FnMut(&Summary<Dep>)) -> Result<(), Error> {
-        if !self.cache.contains_key(pkg.name()) {
-            self.cache.insert(pkg.name().clone(), BTreeMap::new());
-            for ix in &mut self.ixs {
-                ix.query(pkg, &mut |e| {
-                    unimplemented!()
-                })?;
-            }
-        }
-
-        Ok(())
-    }
+#[derive(Debug, Deserialize, Serialize)]
+struct IndexEntry {
+    name: Name,
+    version: Version,
+    dependencies: Vec<Dep>,
+    yanked: bool,
+    checksum: Checksum,
+    #[serde(with = "url_serde")]
+    url: Url,
 }
 
 /// Struct `Index` defines a single index.
@@ -60,62 +50,84 @@ pub struct Index {
     /// Indicates where this index is stored on-disk.
     path: PathBuf,
     /// Contains a mapping of versioned packages to checksums
-    hashes: BTreeMap<Name, BTreeMap<Version, Checksum>>,
+    checksums: BTreeMap<Name, BTreeMap<Version, Checksum>>,
     cache: BTreeMap<Name, Vec<Summary<Dep>>>,
 }
 
 impl Index {
     /// Method `Index::new` creates a new empty package index directly from a Url and a local path.
-    pub fn new(&self, url: Url, path: PathBuf) -> Self {
+    pub fn new(url: Url, path: PathBuf) -> Self {
         let id = Source::Index { url };
-        let hashes = BTreeMap::new();
+        let checksums = BTreeMap::new();
         let cache = BTreeMap::new();
         Index {
             id,
             path,
-            hashes,
+            checksums,
             cache,
         }
     }
 
-    pub fn load(&mut self, sum: Summary<Dep>) {
-        let name = sum.id().name().clone();
-        if !self.cache.contains_key(&name) {
-            let vers = sum.id().version().clone();
-            let mut v = BTreeMap::new();
-            v.insert(vers, sum.checksum().clone());
-            self.hashes.insert(name.clone(), v);
+    pub fn checksum(&mut self, pkg: PackageId) -> Result<Checksum, Error> {
+        let name = pkg.name();
+        let vers = pkg.version();
 
-            self.cache.insert(name, vec![sum]);
+        if let Some(s) = self.checksums.get(name).and_then(|v| v.get(vers)) {
+            return Ok(s.clone());
         }
+
+        self.summaries(name)?;
+        Ok(self.checksums[name][vers].clone())
+    }
+
+    pub fn summaries(&mut self, name: &Name) -> Result<&Vec<Summary<Dep>>, Error> {
+        if !self.cache.contains_key(&name) {
+            let summaries = self.load_summaries(name)?;
+            self.cache.insert(name.clone(), summaries);
+        }
+
+        Ok(&self.cache[name])
     }
 
     /// Method `Index::find` searches for a package within the index, invoking a callback on its
     /// contents.
-    pub fn query(&mut self, pkg: &PackageId, f: &mut FnMut(&Summary<Dep>)) -> Result<(), Error> {
-        if !self.cache.contains_key(pkg.name()) {
-            let mut path = self.path.clone();
-            path.push(pkg.name().group());
-            path.push(pkg.name().as_str());
+    pub fn load_summaries(&mut self, name: &Name) -> Result<Vec<Summary<Dep>>, Error> {
+        let mut res = Vec::new();
+        let mut path = self.path.clone();
+        path.push(name.group());
+        path.push(name.name());
 
-            let file = fs::File::open(path).context(ErrorKind::InvalidIndex)?;
-            let r = io::BufReader::new(&file);
+        self.checksums.insert(name.clone(), BTreeMap::new());
 
-            for line in r.lines() {
-                let line = line.context(ErrorKind::InvalidIndex)?;
-                let sum: Summary<Dep> =
-                    serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
+        let file = fs::File::open(path).context(ErrorKind::InvalidIndex)?;
+        let r = io::BufReader::new(&file);
 
-                self.load(sum);
-            }
+        for line in r.lines() {
+            let line = line.context(ErrorKind::InvalidIndex)?;
+            let sum: Summary<Dep> = self.parse_index_entry(&line)?;
+
+            res.push(sum);
         }
 
-        for p in self.cache.get(pkg.name()) {
-            for s in p {
-                f(s);
-            }
-        }
+        Ok(res)
+    }
 
-        Ok(())
+    // TODO: What to do with unused fields
+    fn parse_index_entry(&mut self, line: &str) -> Result<Summary<Dep>, Error> {
+        let IndexEntry {
+            name,
+            version,
+            dependencies,
+            checksum,
+            yanked: _yanked,
+            url: _url,
+        } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
+
+        let pkg = PackageId::new(name, version.clone(), self.id.clone());
+        let sum = Summary::new(pkg, checksum.clone(), dependencies);
+
+        self.checksums.get_mut(sum.id().name()).unwrap().insert(version, checksum);
+
+        Ok(sum)
     }
 }

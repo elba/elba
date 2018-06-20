@@ -15,10 +15,10 @@ extern crate toml;
 extern crate url;
 extern crate url_serde;
 
-mod cli;
-mod compiler;
-mod config;
-mod err;
-mod index;
-mod package;
-mod resolve;
+pub mod cli;
+pub mod compiler;
+pub mod config;
+pub mod err;
+pub mod index;
+pub mod package;
+pub mod resolve;

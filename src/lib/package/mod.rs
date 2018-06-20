@@ -15,6 +15,7 @@ use err::*;
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
 // TODO: Legal characters?
+// TODO: Rc<Inner> to avoid costly copying?
 /// Struct `Name` represents the name of a package. All packages in matic are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -270,6 +271,10 @@ pub struct Summary<T> {
 }
 
 impl<T> Summary<T> {
+    pub fn new(id: PackageId, checksum: Checksum, dependencies: Vec<T>) -> Self {
+        Summary { id, checksum, dependencies }
+    }
+
     pub fn id(&self) -> &PackageId {
         &self.id
     }
