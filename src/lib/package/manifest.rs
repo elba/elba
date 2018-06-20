@@ -11,24 +11,14 @@ use err::*;
 /// A relative file path (not module path)
 type PathV = String;
 
-fn default_empty_vec<T>() -> Vec<T> {
-    vec![]
-}
-
-fn default_empty_map<K: Ord, V>() -> BTreeMap<K, V> {
-    BTreeMap::new()
-}
-
 #[derive(Deserialize, Debug)]
 struct Manifest {
     package: Package,
-    #[serde(default = "default_empty_map")]
+    #[serde(default = "BTreeMap::new")]
     dependencies: BTreeMap<Name, DepReq>,
-    #[serde(default = "default_empty_map")]
+    #[serde(default = "BTreeMap::new")]
     dev_dependencies: BTreeMap<Name, DepReq>,
     targets: Targets,
-    #[serde(default)]
-    features: Features,
 }
 
 impl FromStr for Manifest {
@@ -49,27 +39,19 @@ struct Package {
     license: Option<String>,
 }
 
+// TODO: Url type
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum DepReq {
-    ShortReq(VersionReq),
-    Registry {
-        version: VersionReq,
-        #[serde(default = "default_empty_vec")]
-        features: Vec<String>,
-    },
+    Registry(VersionReq),
     Local {
         path: String,
-        #[serde(default = "default_empty_vec")]
-        features: Vec<String>,
     },
     Git {
         git: String,
-        #[serde(flatten)]
         #[serde(default = "default_git_specifier")]
+        #[serde(flatten)]
         spec: PkgGitSpecifier,
-        #[serde(default = "default_empty_vec")]
-        features: Vec<String>,
     },
 }
 
@@ -78,24 +60,21 @@ fn default_git_specifier() -> PkgGitSpecifier {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
+#[serde(rename_all = "lowercase")]
 enum PkgGitSpecifier {
-    #[serde(rename = "branch")]
     Branch(String),
-    #[serde(rename = "commit")]
     Commit(String),
-    #[serde(rename = "tag")]
     Tag(String),
 }
 
 #[derive(Deserialize, Debug)]
 struct Targets {
     lib: Option<LibTarget>,
-    #[serde(default = "default_empty_vec")]
+    #[serde(default = "Vec::new")]
     bin: Vec<Target>,
-    #[serde(default = "default_empty_vec")]
+    #[serde(default = "Vec::new")]
     test: Vec<Target>,
-    #[serde(default = "default_empty_vec")]
+    #[serde(default = "Vec::new")]
     bench: Vec<Target>,
 }
 
@@ -133,16 +112,16 @@ mod tests {
 
     #[test]
     fn valid_manifest() {
-        let manifest = "
+        let manifest = r#"
 [package]
-name = 'cool/beans'
+name = 'ring_ding/test'
 version = '1.0.0'
 authors = ['me']
 license = 'MIT'
 
 [dependencies]
 'awesome/a' = '1.0.0'
-'cool/b' = { git = 'https://github.com/super/cool', branch = 'this_one' }
+'cool/b' = { git = 'https://github.com/super/cool', tag = "v1.0.0" }
 'great/c' = { path = 'here/right/now' }
 
 [dev_dependencies]
@@ -157,12 +136,7 @@ name = 'lib1'
 exports = [
     'src/lib/This.idr',
     'src/lib/That.idr',
-]
-
-[features]
-default = ['all']
-all = []
-        ";
+]"#;
 
         println!("{:#?}", Manifest::from_str(manifest));
 

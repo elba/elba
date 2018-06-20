@@ -9,8 +9,8 @@ extern crate nom;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 extern crate semver;
+extern crate serde_json;
 extern crate toml;
 extern crate url;
 extern crate url_serde;
@@ -19,5 +19,6 @@ mod cli;
 mod compiler;
 mod config;
 mod err;
+mod index;
 mod package;
-mod registry;
+mod resolve;

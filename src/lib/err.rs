@@ -34,10 +34,18 @@ impl Display for Error {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
+    #[fail(display = "Invalid lockfile.")]
+    InvalidLockfile,
     #[fail(display = "Invalid manifest file.")]
     InvalidManifestFile,
     #[fail(display = "Invalid source url.")]
     InvalidSourceUrl,
+    #[fail(display = "Invalid package id.")]
+    InvalidPackageId,
+    #[fail(display = "Index is missing a valid `index.toml` file.")]
+    IndexInvalidConfig,
+    #[fail(display = "Invalid index structure.")]
+    InvalidIndex,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,
