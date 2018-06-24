@@ -6,6 +6,6 @@
 
 // TODO: A Config file. Should deal with registries, etc.
 #[derive(Deserialize, Serialize)]
-struct Config;
+struct Config {}
 
 // TODO: Config file unification

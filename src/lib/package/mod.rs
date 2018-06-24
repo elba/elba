@@ -96,23 +96,40 @@ impl AsRef<str> for Name {
 }
 
 /// Struct `Dep` represents a requirement or a dependency.
-#[derive(Debug, Deserialize, Hash, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Dep {
     name: Name,
     req: VersionReq,
 }
 
-/// Enum `Source` represents the possible places from which a package originated.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(tag = "source")]
-pub enum Source {
+#[serde(rename_all = "lowercase")]
+pub enum GitTag {
+    Commit(String),
+    Tag(String),
+}
+
+// TODO: Custom (de)serialization?
+/// Enum `Resolution` represents the possible places from which a package can be resolved. A package
+/// can be manually set to be located in a git repo or a local file directory, or it can be
+/// resolved with a package index.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum Resolution {
     /// Git: the package originated from a git repository.
     Git {
         #[serde(with = "url_serde")]
-        url: Url, /* TODO More */
+        repo: Url,
+        #[serde(flatten)]
+        tag: GitTag,
     },
     /// Dir: the package is on disk in a folder directory.
     Dir {
+        #[serde(with = "url_serde")]
+        url: Url,
+    },
+    /// Tar: the package originated from an archive stored somewhere.
+    Tar {
         #[serde(with = "url_serde")]
         url: Url,
     },
@@ -123,7 +140,7 @@ pub enum Source {
     },
 }
 
-impl FromStr for Source {
+impl FromStr for Resolution {
     type Err = Error;
 
     fn from_str(url: &str) -> Result<Self, Self::Err> {
@@ -135,32 +152,46 @@ impl FromStr for Source {
             "git" => unimplemented!(),
             "dir" => {
                 let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(Source::Dir { url })
+                Ok(Resolution::Dir { url })
+            }
+            "tar" => {
+                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                Ok(Resolution::Tar { url })
             }
             "index" => {
                 let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(Source::Index { url })
+                Ok(Resolution::Index { url })
             }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
     }
 }
 
-impl fmt::Display for Source {
+impl fmt::Display for Resolution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Source::Git { url } => unimplemented!(),
-            Source::Dir { url } => {
+            Resolution::Git {
+                repo: _repo,
+                tag: _tag,
+            } => unimplemented!(),
+            Resolution::Dir { url } => {
                 let url = url.as_str();
                 let mut s = String::with_capacity(url.len() + 5);
                 s.push_str("dir+");
                 s.push_str(url);
                 write!(f, "{}", s)
             }
-            Source::Index { url } => {
+            Resolution::Index { url } => {
                 let url = url.as_str();
                 let mut s = String::with_capacity(url.len() + 10);
                 s.push_str("index+");
+                s.push_str(url);
+                write!(f, "{}", s)
+            }
+            Resolution::Tar { url } => {
+                let url = url.as_str();
+                let mut s = String::with_capacity(url.len() + 10);
+                s.push_str("tar+");
                 s.push_str(url);
                 write!(f, "{}", s)
             }
@@ -172,15 +203,15 @@ impl fmt::Display for Source {
 pub struct PackageId {
     name: Name,
     version: Version,
-    source: Source,
+    resolution: Resolution,
 }
 
 impl PackageId {
-    pub fn new(name: Name, version: Version, source: Source) -> Self {
+    pub fn new(name: Name, version: Version, resolution: Resolution) -> Self {
         PackageId {
             name,
             version,
-            source,
+            resolution,
         }
     }
 
@@ -192,8 +223,8 @@ impl PackageId {
         &self.version
     }
 
-    pub fn source(&self) -> &Source {
-        &self.source
+    pub fn resolution(&self) -> &Resolution {
+        &self.resolution
     }
 }
 
@@ -208,12 +239,12 @@ impl FromStr for PackageId {
 
         let name = Name::from_str(name)?;
         let version = Version::parse(version).context(ErrorKind::InvalidPackageId)?;
-        let source = Source::from_str(url)?;
+        let resolution = Resolution::from_str(url)?;
 
         Ok(PackageId {
             name,
             version,
-            source,
+            resolution,
         })
     }
 }
@@ -232,7 +263,7 @@ impl Serialize for PackageId {
     {
         let name = self.name.as_str();
         let vers = &self.version.to_string();
-        let src = &self.source.to_string();
+        let src = &self.resolution.to_string();
 
         let mut s = String::with_capacity(name.len() + vers.len() + src.len() + 5);
 
@@ -255,7 +286,7 @@ pub enum ChecksumFmt {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Checksum {
     fmt: ChecksumFmt,
-    checksum: String,
+    hash: String,
 }
 
 /// Struct `Summary` defines the summarized version of a package.
@@ -272,7 +303,11 @@ pub struct Summary<T> {
 
 impl<T> Summary<T> {
     pub fn new(id: PackageId, checksum: Checksum, dependencies: Vec<T>) -> Self {
-        Summary { id, checksum, dependencies }
+        Summary {
+            id,
+            checksum,
+            dependencies,
+        }
     }
 
     pub fn id(&self) -> &PackageId {

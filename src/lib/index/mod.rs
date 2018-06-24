@@ -14,6 +14,8 @@
 //! Only packages which rely solely on the official index and depend on packages in the official
 //! registry can be published to the official registry.
 //! This can be manually checked for by unofficial registries.
+//!
+//! Indices can also act like Purescript package sets, in that they can refer to git repositories.
 
 use failure::ResultExt;
 use semver::Version;
@@ -30,6 +32,7 @@ use package::*;
 
 pub type Indices = Vec<Index>;
 
+// TODO: We could separate source out into a special thing for IndexEntry. But needless duplication...
 #[derive(Debug, Deserialize, Serialize)]
 struct IndexEntry {
     name: Name,
@@ -37,18 +40,20 @@ struct IndexEntry {
     dependencies: Vec<Dep>,
     yanked: bool,
     checksum: Checksum,
-    #[serde(with = "url_serde")]
-    url: Url,
+    #[serde(flatten)]
+    source: Resolution, // TODO: Recursive sources. One registry points to another points to...
 }
 
+// TODO: Dealing with where to download the Index, using the Config to get that info.
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.
 pub struct Index {
     /// Indicates identifying information about the index
-    id: Source,
+    id: Resolution,
     /// Indicates where this index is stored on-disk.
     path: PathBuf,
+    // TODO: Should this hold urls too?
     /// Contains a mapping of versioned packages to checksums
     checksums: BTreeMap<Name, BTreeMap<Version, Checksum>>,
     cache: BTreeMap<Name, Vec<Summary<Dep>>>,
@@ -57,7 +62,7 @@ pub struct Index {
 impl Index {
     /// Method `Index::new` creates a new empty package index directly from a Url and a local path.
     pub fn new(url: Url, path: PathBuf) -> Self {
-        let id = Source::Index { url };
+        let id = Resolution::Index { url };
         let checksums = BTreeMap::new();
         let cache = BTreeMap::new();
         Index {
@@ -99,7 +104,7 @@ impl Index {
 
         self.checksums.insert(name.clone(), BTreeMap::new());
 
-        let file = fs::File::open(path).context(ErrorKind::InvalidIndex)?;
+        let file = fs::File::open(path).context(ErrorKind::NotInIndex)?;
         let r = io::BufReader::new(&file);
 
         for line in r.lines() {
@@ -120,14 +125,22 @@ impl Index {
             dependencies,
             checksum,
             yanked: _yanked,
-            url: _url,
+            source: _source,
         } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
         let pkg = PackageId::new(name, version.clone(), self.id.clone());
         let sum = Summary::new(pkg, checksum.clone(), dependencies);
 
-        self.checksums.get_mut(sum.id().name()).unwrap().insert(version, checksum);
+        self.checksums
+            .get_mut(sum.id().name())
+            .unwrap()
+            .insert(version, checksum);
 
         Ok(sum)
+    }
+
+    /// Method `Index::retrieve` returns a Url from which you can download or find a package.
+    pub fn retrieve(&self, pkg: &PackageId) -> Result<Url, Error> {
+        unimplemented!()
     }
 }

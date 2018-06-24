@@ -4,6 +4,7 @@
 
 #[macro_use]
 extern crate failure;
+extern crate im;
 #[macro_use]
 extern crate nom;
 extern crate serde;

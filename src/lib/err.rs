@@ -46,6 +46,8 @@ pub enum ErrorKind {
     IndexInvalidConfig,
     #[fail(display = "Invalid index structure.")]
     InvalidIndex,
+    #[fail(display = "Package doesn't exist in index.")]
+    NotInIndex,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,

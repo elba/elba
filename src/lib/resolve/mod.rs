@@ -13,17 +13,14 @@
 // Rust's resolver (https://github.com/rust-lang/cargo/blob/master/src/cargo/core/resolver)
 
 pub mod context;
-pub mod types;
 
 use package::PackageId;
 use std::collections::HashSet;
 
-use self::context::*;
-use self::types::*;
 use index::Index;
 
 pub fn resolve(packages: &[PackageId], index: &mut Index, locked: &HashSet<PackageId>) {
-    let mut ctx = Context::new();
+    // let mut ctx = Context::new();
 
     unimplemented!()
 }
