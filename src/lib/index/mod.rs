@@ -30,7 +30,19 @@ use url_serde;
 use err::{Error, ErrorKind};
 use package::*;
 
-pub type Indices = Vec<Index>;
+pub struct Indices(Vec<Index>);
+
+impl Indices {
+    pub fn select(&mut self, name: &Name, version: &Version) -> Result<PackageId, Error> {
+        for ix in &mut self.0 {
+            if let Ok(r) = ix.select(name, version) {
+                return Ok(r);
+            }
+        }
+
+        return Err(ErrorKind::NotInIndex)?;
+    }
+}
 
 // TODO: We could separate source out into a special thing for IndexEntry. But needless duplication...
 #[derive(Debug, Deserialize, Serialize)]
@@ -137,6 +149,18 @@ impl Index {
             .insert(version, checksum);
 
         Ok(sum)
+    }
+
+    pub fn select(&mut self, name: &Name, version: &Version) -> Result<PackageId, Error> {
+        let sums = self.summaries(name)?;
+
+        for s in sums {
+            if s.id().version() == version {
+                return Ok(s.id().clone());
+            }
+        }
+
+        return Err(ErrorKind::NotInIndex)?;
     }
 
     /// Method `Index::retrieve` returns a Url from which you can download or find a package.

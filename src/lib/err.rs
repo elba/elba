@@ -32,6 +32,10 @@ impl Display for Error {
     }
 }
 
+// TODO: More principled error handling.
+//       Manifests and VersionReqs and whatever all have their own error enums. This kind enum just
+//       provides context as to the error. So we'd have `ReqError::InvalidSigil` contextualized
+//       with an `ErrorKind::InvalidLockfile`, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
     #[fail(display = "Invalid lockfile.")]
