@@ -24,11 +24,12 @@
 
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
 
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use self::Interval::{Closed, Open, Unbounded};
 use err::{Error, ErrorKind};
 use nom::types::CompleteStr;
 use semver::Version;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 // TODO: Implement lul
 /// A newtype wrapper for a `Version` which changes the ordering behavior such that the "greatest"
@@ -61,9 +62,9 @@ pub struct Range {
 impl Range {
     /// Creates a new `Range`.
     ///
-    /// All `Range`s have to be valid, potentially true constraints. If a nonsensical range is
+    /// All `Range`s have to be valid, potentially true constraints. That is to say, the lower a If a nonsensical range is
     /// suggested, `None` is returned.
-    pub fn new(lower: Interval, upper: Interval) -> Option<Self> {
+    pub fn new(lower: Interval, upper: Interval) -> Option<Range> {
         match (lower, upper) {
             (Open(lower), Open(upper)) => {
                 if lower >= upper {
@@ -90,7 +91,17 @@ impl Range {
                     None
                 } else {
                     Some(Range {
-                        lower: Open(lower),
+                        lower: Closed(lower),
+                        upper: Open(upper),
+                    })
+                }
+            }
+            (Closed(lower), Closed(upper)) => {
+                if lower > upper {
+                    None
+                } else {
+                    Some(Range {
+                        lower: Closed(lower),
                         upper: Closed(upper),
                     })
                 }
@@ -135,10 +146,43 @@ impl FromStr for Range {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: Don't lose all error info
         // We throw away the original error because of 'static lifetime bs...
         let p = parse::range(CompleteStr(s)).map(|o| o.1).map_err(|_| ErrorKind::InvalidRange)?;
 
         Ok(p)
+    }
+}
+
+impl fmt::Display for Range {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match (&self.lower, &self.upper) {
+            (Open(l), Open(u))     => write!(f, "> {} < {}", l, u),
+            (Open(l), Closed(u))   => write!(f, "> {} <= {}", l, u),
+            (Open(l), Unbounded)   => write!(f, "> {}", l),
+            (Closed(l), Open(u))   => write!(f, ">= {} < {}", l, u),
+            (Closed(l), Closed(u)) => write!(f, ">= {} <= {}", l, u),
+            (Closed(l), Unbounded) => write!(f, ">= {}", l),
+            (Unbounded, Open(u))   => write!(f, "< {}", u),
+            (Unbounded, Closed(u)) => write!(f, "< {}", u),
+            (Unbounded, Unbounded) => write!(f, "any"),
+        }
+    }
+}
+
+impl Serialize for Range {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Range {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
@@ -255,8 +299,13 @@ mod parse {
         (build_range(lower, upper).unwrap())
     )));
 
+    named!(range_any<CompleteStr, Range>, do_parse!(
+        tag_s!("any") >>
+        (Range::new(Interval::Unbounded, Interval::Unbounded).unwrap())
+    ));
+
     named!(pub range<CompleteStr, Range>,
-        alt!(range_caret | range_tilde | range_interval)
+        alt!(range_caret | range_tilde | range_interval | range_any)
     );
 }
 
