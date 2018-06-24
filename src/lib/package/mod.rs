@@ -2,6 +2,7 @@
 
 pub mod lockfile;
 pub mod manifest;
+pub mod version;
 
 use failure::ResultExt;
 use semver::{Version, VersionReq};

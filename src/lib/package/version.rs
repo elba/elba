@@ -24,21 +24,333 @@
 
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
 
+use self::Interval::{Closed, Open, Unbounded};
+use err::{Error, ErrorKind};
+use nom::types::CompleteStr;
 use semver::Version;
+use std::str::FromStr;
 
+// TODO: Implement lul
 /// A newtype wrapper for a `Version` which changes the ordering behavior such that the "greatest"
 /// version is the one that a user would most likely prefer (the latest not-prerelease version)
 pub struct OrderedVersion(Version);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Interval {
-    Open(u16),
-    Closed(u16),
+    Open(Version),
+    Closed(Version),
     Unbounded,
 }
 
-// TODO: Document syntax (ignore whitespace)
-/// Defines a requirment for a version.
-pub struct VersionReq {
-    lower: Version,
-    upper: Version,
+/// A range in which a version can fall into. Syntax for ranges mirrors that of something like
+/// Pub or Cargo, but is substantially stricter. Whitespace is ignored, but clauses must be
+/// separated by commas. Multiple clauses are only allowed when specifying less-than/greater-than
+/// constraints. The following are all the valid cases the parser will accept (not including
+/// variations in whitespace):
+///
+/// ```none
+/// ~1
+/// ~1.4
+/// ~1.5.3
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Range {
+    lower: Interval,
+    upper: Interval,
+}
+
+impl Range {
+    /// Creates a new `Range`.
+    ///
+    /// All `Range`s have to be valid, potentially true constraints. If a nonsensical range is
+    /// suggested, `None` is returned.
+    pub fn new(lower: Interval, upper: Interval) -> Option<Self> {
+        match (lower, upper) {
+            (Open(lower), Open(upper)) => {
+                if lower >= upper {
+                    None
+                } else {
+                    Some(Range {
+                        lower: Open(lower),
+                        upper: Open(upper),
+                    })
+                }
+            }
+            (Open(lower), Closed(upper)) => {
+                if lower >= upper {
+                    None
+                } else {
+                    Some(Range {
+                        lower: Open(lower),
+                        upper: Closed(upper),
+                    })
+                }
+            }
+            (Closed(lower), Open(upper)) => {
+                if lower >= upper {
+                    None
+                } else {
+                    Some(Range {
+                        lower: Open(lower),
+                        upper: Closed(upper),
+                    })
+                }
+            }
+            (lower, upper) => Some(Range { lower, upper }),
+        }
+    }
+
+    /// Checks if a version satisfies this `Range`. When dealing with pre-release versions,
+    /// pre-releases can only satisfy ranges if the range explicitly mentions a pre-release in either
+    /// the upper or lower bound (or if it's unbounded in the upper direction)
+    pub fn satisfied(&self, version: &Version) -> bool {
+        let upper_pre_ok = match &self.upper {
+            Open(u) => u.is_prerelease(),
+            Closed(u) => u.is_prerelease(),
+            Unbounded => true,
+        };
+        let lower_pre_ok = match &self.lower {
+            Open(l) => l.is_prerelease(),
+            Closed(l) => l.is_prerelease(),
+            Unbounded => false,
+        };
+        let pre_ok = upper_pre_ok || lower_pre_ok;
+
+        let satisfies_upper = match &self.upper {
+            Open(u) => version < u,
+            Closed(u) => version <= u,
+            Unbounded => true,
+        };
+        let satisfies_lower = match &self.lower {
+            Open(l) => version > l,
+            Closed(l) => version >= l,
+            Unbounded => true,
+        };
+        let satisfies_pre = pre_ok || !version.is_prerelease();
+
+        satisfies_upper && satisfies_lower && satisfies_pre
+    }
+}
+
+impl FromStr for Range {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // We throw away the original error because of 'static lifetime bs...
+        let p = parse::range(CompleteStr(s)).map(|o| o.1).map_err(|_| ErrorKind::InvalidRange)?;
+
+        Ok(p)
+    }
+}
+
+mod parse {
+    use super::*;
+    use nom::{digit, types::CompleteStr};
+    use semver::Version;
+    use std::str::FromStr;
+
+    fn increment_caret(v: Version, minor_specified: bool, patch_specified: bool) -> Version {
+        let mut v = v;
+
+        if v.major > 0 || (!minor_specified && !patch_specified) {
+            v.increment_major();
+        } else {
+            if v.minor > 0 {
+                v.increment_minor();
+            } else {
+                v.increment_patch();
+            }
+        }
+
+        v
+    }
+
+    fn increment_tilde(v: Version, minor_specified: bool, patch_specified: bool) -> Version {
+        let mut v = v;
+
+        if !minor_specified && !patch_specified {
+            v.increment_major();
+        } else {
+            v.increment_minor();
+        }
+
+        v
+    }
+
+    fn build_range(lower: Interval, upper: Interval) -> Option<Range> {
+        if lower == Interval::Unbounded && upper == Interval::Unbounded {
+            None
+        } else {
+            Range::new(lower, upper)
+        }
+    }
+
+    named!(to_u64<CompleteStr, u64>,
+        map_res!(
+          ws!(digit),
+          |s: CompleteStr| { FromStr::from_str(s.0) }
+        )
+    );
+
+    named!(bare_version_major<CompleteStr, (Version, bool, bool)>, do_parse!(
+        major: to_u64 >>
+        ((Version::new(major, 0, 0), false, false))
+    ));
+
+    named!(bare_version_minor<CompleteStr, (Version, bool, bool)>, do_parse!(
+        major: to_u64 >>
+        tag_s!(".") >>
+        minor: to_u64 >>
+        ((Version::new(major, minor, 0), true, false))
+    ));
+
+    named!(bare_version_from_str<CompleteStr, (Version, bool, bool)>, do_parse!(
+        vers: parse_to!(Version) >>
+        (vers, true, true)
+    ));
+
+    named!(pub bare_version<CompleteStr, (Version, bool, bool)>,
+        alt!(bare_version_from_str | bare_version_minor | bare_version_major)
+    );
+
+    // TODO: Unwrapping is Bad
+    named!(range_caret<CompleteStr, Range>, ws!(do_parse!(
+        opt!(tag_s!("^")) >>
+        version: bare_version >>
+        (Range::new(Interval::Closed(version.0.clone()), Interval::Open(increment_caret(version.0, version.1, version.2))).unwrap())
+    )));
+
+    named!(range_tilde<CompleteStr, Range>, ws!(do_parse!(
+        tag_s!("~") >>
+        version: bare_version >>
+        (Range::new(Interval::Closed(version.0.clone()), Interval::Open(increment_tilde(version.0, version.1, version.2))).unwrap())
+    )));
+
+    named!(interval_lt<CompleteStr, Interval>, ws!(do_parse!(
+        tag_s!("<") >>
+        version: bare_version >>
+        (Interval::Open(version.0))
+    )));
+
+    named!(interval_le<CompleteStr, Interval>, ws!(do_parse!(
+        tag_s!("<=") >>
+        version: bare_version >>
+        (Interval::Closed(version.0))
+    )));
+
+    named!(interval_gt<CompleteStr, Interval>, ws!(do_parse!(
+        tag_s!(">") >>
+        version: bare_version >>
+        (Interval::Open(version.0))
+    )));
+
+    named!(interval_ge<CompleteStr, Interval>, ws!(do_parse!(
+        tag_s!(">=") >>
+        version: bare_version >>
+        (Interval::Closed(version.0))
+    )));
+
+    named!(range_interval<CompleteStr, Range>, ws!(do_parse!(
+        lower: alt!(interval_gt | interval_ge | value!(Interval::Unbounded)) >>
+        upper: alt!(interval_lt | interval_le | value!(Interval::Unbounded)) >>
+        (build_range(lower, upper).unwrap())
+    )));
+
+    named!(pub range<CompleteStr, Range>,
+        alt!(range_caret | range_tilde | range_interval)
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse::*;
+    use super::*;
+    use nom::types::CompleteStr;
+    use semver::Version;
+
+    macro_rules! new_range {
+        ($a:tt... $b:tt) => {
+            Range::new(
+                Interval::Open(Version::parse($a).unwrap()),
+                Interval::Open(Version::parse($b).unwrap()),
+            )
+        };
+        ($a:tt = .. $b:tt) => {
+            Range::new(
+                Interval::Closed(Version::parse($a).unwrap()),
+                Interval::Open(Version::parse($b).unwrap()),
+            )
+        };
+        ($a:tt..= $b:tt) => {
+            Range::new(
+                Interval::Open(Version::parse($a).unwrap()),
+                Interval::Closed(Version::parse($b).unwrap()),
+            )
+        };
+        ($a:tt = . = $b:tt) => {
+            Range::new(
+                Interval::Closed(Version::parse($a).unwrap()),
+                Interval::Closed(Version::parse($b).unwrap()),
+            )
+        };
+    }
+
+    #[test]
+    fn test_parse_bare() {
+        let vs: Vec<CompleteStr> = vec![
+            "1",
+            "1.0",
+            "1.0.0",
+            "1.0.0-alpha.1",
+            "1.0.0+b1231231",
+            "1.0.0-alpha.1+b1231231",
+        ].into_iter()
+            .map(CompleteStr)
+            .collect();
+
+        for v in vs {
+            assert!(bare_version(v).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_parse_range_caret() {
+        let vs = vec!["1", "1.4", "1.4.3", "0", "0.2", "0.2.3", "0.0.2"]
+            .into_iter()
+            .map(CompleteStr)
+            .map(|s| range(s).unwrap().1)
+            .collect::<Vec<_>>();
+
+        let ns = vec![
+            new_range!("1.0.0" = .."2.0.0").unwrap(),
+            new_range!("1.4.0" = .."2.0.0").unwrap(),
+            new_range!("1.4.3" = .."2.0.0").unwrap(),
+            new_range!("0.0.0" = .."1.0.0").unwrap(),
+            new_range!("0.2.0" = .."0.3.0").unwrap(),
+            new_range!("0.2.3" = .."0.3.0").unwrap(),
+            new_range!("0.0.2" = .."0.0.3").unwrap(),
+        ];
+
+        assert_eq!(ns, vs);
+    }
+
+    #[test]
+    fn test_parse_range_tilde() {
+        let vs = vec!["~1", "~1.4", "~1.4.3", "~0", "~0.2", "~0.2.3", "~0.0.2"]
+            .into_iter()
+            .map(CompleteStr)
+            .map(|s| range(s).unwrap().1)
+            .collect::<Vec<_>>();
+
+        let ns = vec![
+            new_range!("1.0.0" = .."2.0.0").unwrap(),
+            new_range!("1.4.0" = .."1.5.0").unwrap(),
+            new_range!("1.4.3" = .."1.5.0").unwrap(),
+            new_range!("0.0.0" = .."1.0.0").unwrap(),
+            new_range!("0.2.0" = .."0.3.0").unwrap(),
+            new_range!("0.2.3" = .."0.3.0").unwrap(),
+            new_range!("0.0.2" = .."0.1.0").unwrap(),
+        ];
+
+        assert_eq!(ns, vs);
+    }
 }

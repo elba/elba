@@ -46,6 +46,8 @@ pub enum ErrorKind {
     InvalidSourceUrl,
     #[fail(display = "Invalid package id.")]
     InvalidPackageId,
+    #[fail(display = "Invalid range.")]
+    InvalidRange,
     #[fail(display = "Index is missing a valid `index.toml` file.")]
     IndexInvalidConfig,
     #[fail(display = "Invalid index structure.")]

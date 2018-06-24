@@ -8,9 +8,9 @@
 
 pub mod types;
 
+use self::types::{Assignment, Incompatibility};
 use err::Error;
 use package::PackageId;
-use self::types::{Assignment, Incompatibility};
 use std::collections::HashSet;
 
 use index::Index;
@@ -24,13 +24,23 @@ pub struct Resolver {
 
 impl Resolver {
     pub fn new() -> Self {
-        let step = 1;
-        let assignments = vec![];
-        let incompatibilities = vec![];
-        Resolver { step, assignments, incompatibilities }
+        Self::default()
     }
 
     pub fn solve(&mut self) -> Result<(), Error> {
         unimplemented!()
+    }
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        let step = 1;
+        let assignments = vec![];
+        let incompatibilities = vec![];
+        Resolver {
+            step,
+            assignments,
+            incompatibilities,
+        }
     }
 }
