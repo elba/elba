@@ -7,7 +7,7 @@ pub mod version;
 use failure::ResultExt;
 use semver::{Version, VersionReq};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, str::FromStr};
+use std::{fmt, rc::Rc, str::FromStr};
 use url::Url;
 use url_serde;
 
@@ -21,6 +21,11 @@ use err::*;
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name {
+    inner: Rc<NameInner>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct NameInner {
     /// The serialized form of a name: "group/name"
     serialization: String,
     group: String,
@@ -34,22 +39,24 @@ impl Name {
         s.push('/');
         s.push_str(&name);
         Name {
-            serialization: s,
-            group,
-            name,
+            inner: Rc::new(NameInner {
+                serialization: s,
+                group,
+                name,
+            })
         }
     }
 
     pub fn group(&self) -> &str {
-        &self.group
+        &self.inner.group
     }
 
     pub fn name(&self) -> &str {
-        &self.name
+        &self.inner.name
     }
 
     pub fn as_str(&self) -> &str {
-        &self.serialization
+        &self.inner.serialization
     }
 }
 
@@ -65,11 +72,7 @@ impl FromStr for Name {
 
         let (group, name) = (v[0].to_owned(), v[1].to_owned());
 
-        Ok(Name {
-            serialization: s.to_owned(),
-            group,
-            name,
-        })
+        Ok(Name::new(group, name))
     }
 }
 
@@ -78,7 +81,7 @@ impl Serialize for Name {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.serialization)
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -92,7 +95,7 @@ impl<'de> Deserialize<'de> for Name {
 impl AsRef<str> for Name {
     #[inline]
     fn as_ref(&self) -> &str {
-        &self.serialization
+        self.as_str()
     }
 }
 

@@ -27,10 +27,11 @@
 use self::Interval::{Closed, Open, Unbounded};
 use err::{Error, ErrorKind};
 use indexmap::IndexSet;
+use itertools::Itertools;
 use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{cmp, collections::HashSet, fmt, str::FromStr};
+use std::{cmp, fmt, str::FromStr};
 
 // TODO: Implement lul
 /// A newtype wrapper for a `Version` which changes the ordering behavior such that the "greatest"
@@ -134,7 +135,6 @@ pub struct Range {
 }
 
 impl Range {
-    // TODO: Allow impossible constraints in general?
     /// Creates a new `Range`.
     ///
     /// All `Range`s have to be valid, potentially true constraints. If a nonsensical range is
@@ -201,6 +201,10 @@ impl Range {
         &self.lower
     }
 
+    pub fn take(self) -> (Interval, Interval) {
+        (self.lower, self.upper)
+    }
+
     /// Checks if a version satisfies this `Range`. When dealing with pre-release versions,
     /// pre-releases can only satisfy ranges if the range explicitly mentions a pre-release in either
     /// the upper or lower bound (or if it's unbounded in the upper direction)
@@ -259,12 +263,20 @@ impl Constraint {
         Constraint { set: ranges }
     }
 
+    /// Creates a new `Constraint` from a single `Range`.
+    pub fn single(r: Range) -> Constraint {
+        let mut set = IndexSet::new();
+        set.insert(r);
+
+        Constraint { set }
+    }
+
     /// Inserts a `Range` into the set.
     pub fn insert(&mut self, range: Range) {
         self.set.insert(range);
     }
 
-    /// Retrieves the set of `Range`s, unifying it in the process.
+    /// Borrows the set of `Range`s from this struct, unifying it in the process.
     pub fn retrieve(&mut self) -> &IndexSet<Range> {
         self.unify();
         &self.set
@@ -278,8 +290,55 @@ impl Constraint {
 
     /// Unifies all of the ranges in the set such that all of the ranges are disjoint.
     pub fn unify(&mut self) {
-        // Algorithm: sort_by lower, progressively combining overlaps with `itertools::coalesce`.
-        unimplemented!()
+        // Note: we take &mut self here because it's more convenient for using with other functions.
+        // Turning it back into just self would just be turning sort_by into sorted_by and removing
+        // the .cloned() call.
+        self.set.sort_by(|a, b| a.lower().cmp(b.lower(), true));
+
+        self.set = self.set.iter().cloned().coalesce(|a, b| {
+            if a.upper().cmp(b.lower(), false) == cmp::Ordering::Greater {
+                let lower = a.take().0;
+                let upper = b.take().1;
+                let r = Range::new(lower, upper).unwrap();
+                Ok(r)
+            } else if a.upper().cmp(b.lower(), false) == cmp::Ordering::Equal {
+                if let (Interval::Open(_), Interval::Open(_)) = (a.upper(), b.lower()) {
+                    Err((a, b))
+                } else {
+                    let lower = a.take().0;
+                    let upper = b.take().1;
+                    let r = Range::new(lower, upper).unwrap();
+                    Ok(r)
+                }
+            } else {
+                let (a2, b2) = (a.clone(), b.clone());
+                let (al, au) = a.take();
+                let (bl, bu) = b.take();
+                if let (Interval::Open(v), Interval::Closed(w)) = (au, bl) {
+                    if v == w {
+                        let r = Range::new(al, bu).unwrap();
+                        Ok(r)
+                    } else {
+                        Err((a2, b2))
+                    }
+                } else {
+                    Err((a2, b2))
+                }
+            }
+        }).collect();
+    }
+
+    /// Checks if a `Version` satisfies this `Constraint`.
+    pub fn satisfied(&mut self, v: &Version) -> bool {
+        self.unify();
+
+        for s in &self.set {
+            if !s.satisfied(v) {
+                return false;
+            }
+        }
+
+        true
     }
 
     pub fn intersection(&self, other: &Constraint) -> Constraint {
@@ -313,7 +372,7 @@ impl Constraint {
                     //    ======r====== //
                     // ======s======    //
                     //------------------//
-                    // OR
+                    //        OR        //
                     //------------------//
                     //      ===r===     //
                     // ======s======    //
@@ -328,7 +387,7 @@ impl Constraint {
                     // ======r======    //
                     //  =======s======= //
                     //------------------//
-                    // OR
+                    //        OR        //
                     //------------------//
                     // =======r=======  //
                     //   =====s=====    //
