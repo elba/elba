@@ -4,19 +4,18 @@ pub mod lockfile;
 pub mod manifest;
 pub mod version;
 
+use self::version::Constraint;
+use err::*;
 use failure::ResultExt;
-use semver::{Version, VersionReq};
+use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
 use url::Url;
 use url_serde;
 
-use err::*;
-
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
 // TODO: Legal characters?
-// TODO: Rc<Inner> to avoid costly copying?
 /// Struct `Name` represents the name of a package. All packages in matic are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -43,7 +42,7 @@ impl Name {
                 serialization: s,
                 group,
                 name,
-            })
+            }),
         }
     }
 
@@ -103,7 +102,7 @@ impl AsRef<str> for Name {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Dep {
     name: Name,
-    req: VersionReq,
+    req: Constraint,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -316,6 +315,14 @@ impl<T> Summary<T> {
 
     pub fn id(&self) -> &PackageId {
         &self.id
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.id.name
+    }
+
+    pub fn version(&self) -> &Version {
+        &self.id.version
     }
 
     pub fn checksum(&self) -> &Checksum {

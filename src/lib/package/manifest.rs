@@ -1,12 +1,12 @@
 //! Module `package/manifest` deals with package manifest files.
 
-use failure::ResultExt;
-use semver::{Version, VersionReq};
-use std::{collections::BTreeMap, str::FromStr};
-use toml;
-
+use self::version::Constraint;
 use super::*;
 use err::*;
+use failure::ResultExt;
+use semver::Version;
+use std::{collections::BTreeMap, str::FromStr};
+use toml;
 
 /// A relative file path (not module path)
 type PathV = String;
@@ -43,7 +43,7 @@ struct Package {
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 enum DepReq {
-    Registry(VersionReq),
+    Registry(Constraint),
     Local {
         path: String,
     },
@@ -120,7 +120,7 @@ authors = ['me']
 license = 'MIT'
 
 [dependencies]
-'awesome/a' = '>= 1.0.0, < 2.0.0'
+'awesome/a' = '>= 1.0.0 < 2.0.0'
 'cool/b' = { git = 'https://github.com/super/cool', tag = "v1.0.0" }
 'great/c' = { path = 'here/right/now' }
 

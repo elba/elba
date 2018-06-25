@@ -31,7 +31,9 @@ use itertools::Itertools;
 use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{cmp, fmt, str::FromStr};
+use std::{
+    cmp, fmt, hash::{Hash, Hasher}, str::FromStr,
+};
 
 // TODO: Implement lul
 /// A newtype wrapper for a `Version` which changes the ordering behavior such that the "greatest"
@@ -116,18 +118,12 @@ impl Interval {
     }
 }
 
-// TODO: Unpub fields?
-/// A range in which a version can fall into. Syntax for ranges mirrors that of something like
-/// Pub or Cargo, but is substantially stricter. Whitespace is ignored, but clauses must be
-/// separated by commas. Multiple clauses are only allowed when specifying less-than/greater-than
-/// constraints. The following are all the valid cases the parser will accept (not including
-/// variations in whitespace):
-///
-/// ```none
-/// ~1
-/// ~1.4
-/// ~1.5.3
-/// ```
+/// A continguous range in which a version can fall into. Syntax for ranges mirrors that of
+/// Pub or Cargo. Ranges can accept caret and tilde syntax, as well as less-than/greater-than
+/// specifications (just like Cargo). Like Pub, the `any` Range is completely unbounded on
+/// both sides. Pre-release `Version`s can satisfy a `Range` iff the `Range`
+/// mentions a pre-release `Version` on either bound, or if the `Range` is unbounded on the upper
+/// side.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Range {
     lower: Interval,
@@ -248,187 +244,6 @@ impl Range {
     }
 }
 
-/// A set of `Range`s combines to make a `Constraint`. `Constraint`s can contain multiple disjoint
-/// `Range`s. `Constraint`s are only unified (i.e. non-disjoint `Range`s are combined) when the
-/// set is queried. Insertion and creation operations do not cause unification.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Constraint {
-    set: IndexSet<Range>
-}
-
-impl Constraint {
-    /// Creates a new `Constraint` from a set of `Range`s. We unify this set lazily (i.e. only when
-    /// it's accessed).
-    pub fn new(ranges: IndexSet<Range>) -> Constraint {
-        Constraint { set: ranges }
-    }
-
-    /// Creates a new `Constraint` from a single `Range`.
-    pub fn single(r: Range) -> Constraint {
-        let mut set = IndexSet::new();
-        set.insert(r);
-
-        Constraint { set }
-    }
-
-    /// Inserts a `Range` into the set.
-    pub fn insert(&mut self, range: Range) {
-        self.set.insert(range);
-    }
-
-    /// Borrows the set of `Range`s from this struct, unifying it in the process.
-    pub fn retrieve(&mut self) -> &IndexSet<Range> {
-        self.unify();
-        &self.set
-    }
-
-    /// Takes the set of `Range`s from this struct, unifying it in the process.
-    pub fn take(mut self) -> IndexSet<Range> {
-        self.unify();
-        self.set
-    }
-
-    /// Unifies all of the ranges in the set such that all of the ranges are disjoint.
-    pub fn unify(&mut self) {
-        // Note: we take &mut self here because it's more convenient for using with other functions.
-        // Turning it back into just self would just be turning sort_by into sorted_by and removing
-        // the .cloned() call.
-        self.set.sort_by(|a, b| a.lower().cmp(b.lower(), true));
-
-        self.set = self.set.iter().cloned().coalesce(|a, b| {
-            if a.upper().cmp(b.lower(), false) == cmp::Ordering::Greater {
-                let lower = a.take().0;
-                let upper = b.take().1;
-                let r = Range::new(lower, upper).unwrap();
-                Ok(r)
-            } else if a.upper().cmp(b.lower(), false) == cmp::Ordering::Equal {
-                if let (Interval::Open(_), Interval::Open(_)) = (a.upper(), b.lower()) {
-                    Err((a, b))
-                } else {
-                    let lower = a.take().0;
-                    let upper = b.take().1;
-                    let r = Range::new(lower, upper).unwrap();
-                    Ok(r)
-                }
-            } else {
-                let (a2, b2) = (a.clone(), b.clone());
-                let (al, au) = a.take();
-                let (bl, bu) = b.take();
-                if let (Interval::Open(v), Interval::Closed(w)) = (au, bl) {
-                    if v == w {
-                        let r = Range::new(al, bu).unwrap();
-                        Ok(r)
-                    } else {
-                        Err((a2, b2))
-                    }
-                } else {
-                    Err((a2, b2))
-                }
-            }
-        }).collect();
-    }
-
-    /// Checks if a `Version` satisfies this `Constraint`.
-    pub fn satisfied(&mut self, v: &Version) -> bool {
-        self.unify();
-
-        for s in &self.set {
-            if !s.satisfied(v) {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub fn intersection(&self, other: &Constraint) -> Constraint {
-        let mut set = IndexSet::new();
-
-        for r in &self.set {
-            for s in &other.set {
-                if let Some(r) = r.intersection(&s) {
-                    set.insert(r);
-                }
-            }
-        }
-
-        Constraint::new(set)
-    }
-
-    pub fn union(&self, other: &Constraint) -> Constraint {
-        let mut new = self.set.clone();
-        new.extend(other.set.clone());
-
-        Constraint::new(new)
-    }
-
-    pub fn difference(&self, other: &Constraint) -> Constraint {
-        let mut set = IndexSet::new();
-
-        for r in &self.set {
-            for s in &other.set {
-                if r.lower().cmp(s.lower(), true) != cmp::Ordering::Less {
-                    //------------------//
-                    //    ======r====== //
-                    // ======s======    //
-                    //------------------//
-                    //        OR        //
-                    //------------------//
-                    //      ===r===     //
-                    // ======s======    //
-                    //------------------//
-                    let lower = s.upper().clone().flip();
-                    let upper = r.upper().clone().flip();
-                    if let Some(range) = Range::new(lower, upper) {
-                        set.insert(range);
-                    }
-                } else {
-                    //------------------//
-                    // ======r======    //
-                    //  =======s======= //
-                    //------------------//
-                    //        OR        //
-                    //------------------//
-                    // =======r=======  //
-                    //   =====s=====    //
-                    //------------------//
-                    if r.upper().cmp(s.upper(), false) != cmp::Ordering::Greater {
-                        // Top situation
-                        let lower = r.lower().clone();
-                        let upper = s.lower().clone().flip();
-                        if let Some(range) = Range::new(lower, upper) {
-                            set.insert(range);
-                        }
-                    } else {
-                        // Bottom situation
-                        let l1 = r.lower().clone();
-                        let u1 = s.lower().clone().flip();
-
-                        let l2 = s.upper().clone().flip();
-                        let u2 = r.upper().clone();
-
-                        if let Some(r1) = Range::new(l1, u1) {
-                            set.insert(r1);
-                        }
-
-                        if let Some(r2) = Range::new(l2, u2) {
-                            set.insert(r2);
-                        }
-                    }
-                }
-            }
-        }
-
-        Constraint::new(set)
-    }
-}
-
-impl Default for Constraint {
-    fn default() -> Self {
-        Constraint { set: IndexSet::new() }
-    }
-}
-
 impl FromStr for Range {
     type Err = Error;
 
@@ -437,7 +252,7 @@ impl FromStr for Range {
         // We throw away the original error because of 'static lifetime bs...
         let p = parse::range(CompleteStr(s))
             .map(|o| o.1)
-            .map_err(|_| ErrorKind::InvalidRange)?;
+            .map_err(|_| ErrorKind::InvalidConstraint)?;
 
         Ok(p)
     }
@@ -469,6 +284,317 @@ impl Serialize for Range {
 }
 
 impl<'de> Deserialize<'de> for Range {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
+/// A set of `Range`s combines to make a `Constraint`. `Constraint`s are the union of multiple
+/// `Range`s. Upon manual creation or updating of a `Constraint`, the `Constraint` will unify all
+/// of its `Range`s such that all of the `Range`s are disjoint. Unification is eager: it's done
+/// whenever the set is modified to keep the internal representation of the set unified at all
+/// times (this is useful for converting the `Constraint` to a string, since the `Display` trait
+/// doesn't allow mutating self).
+///
+/// Syntax-wise, a `Constraint` is just a list of comma-separated ranges.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Constraint {
+    set: IndexSet<Range>,
+}
+
+impl Constraint {
+    /// Creates a new `Constraint` from a set of `Range`s.
+    pub fn new(ranges: IndexSet<Range>) -> Constraint {
+        let mut c = Constraint { set: ranges };
+        c.unify();
+        c
+    }
+
+    /// Inserts a `Range` into the set.
+    pub fn insert(&mut self, range: Range) {
+        self.set.insert(range);
+        self.unify();
+    }
+
+    /// Borrows the set of `Range`s from this struct, unifying it in the process.
+    pub fn retrieve(&self) -> &IndexSet<Range> {
+        &self.set
+    }
+
+    /// Takes the set of `Range`s from this struct, unifying it in the process.
+    pub fn take(self) -> IndexSet<Range> {
+        self.set
+    }
+
+    /// Unifies all of the ranges in the set such that all of the ranges are disjoint.
+    pub fn unify(&mut self) {
+        // Note: we take &mut self here because it's more convenient for using with other functions.
+        // Turning it back into just self would just be turning sort_by into sorted_by and removing
+        // the .cloned() call.
+        self.set.sort_by(|a, b| a.lower().cmp(b.lower(), true));
+
+        self.set = self
+            .set
+            .iter()
+            .cloned()
+            .coalesce(|a, b| {
+                if a.upper().cmp(b.lower(), false) == cmp::Ordering::Greater {
+                    let lower = a.take().0;
+                    let upper = b.take().1;
+                    let r = Range::new(lower, upper).unwrap();
+                    Ok(r)
+                } else if a.upper().cmp(b.lower(), false) == cmp::Ordering::Equal {
+                    if let (Interval::Open(_), Interval::Open(_)) = (a.upper(), b.lower()) {
+                        Err((a, b))
+                    } else {
+                        let lower = a.take().0;
+                        let upper = b.take().1;
+                        let r = Range::new(lower, upper).unwrap();
+                        Ok(r)
+                    }
+                } else {
+                    let (a2, b2) = (a.clone(), b.clone());
+                    let (al, au) = a.take();
+                    let (bl, bu) = b.take();
+                    if let (Interval::Open(v), Interval::Closed(w)) = (au, bl) {
+                        if v == w {
+                            let r = Range::new(al, bu).unwrap();
+                            Ok(r)
+                        } else {
+                            Err((a2, b2))
+                        }
+                    } else {
+                        Err((a2, b2))
+                    }
+                }
+            })
+            .collect();
+    }
+
+    /// Checks if a `Version` satisfies this `Constraint`.
+    pub fn satisfied(&mut self, v: &Version) -> bool {
+        if self.set.is_empty() {
+            return false;
+        }
+
+        for s in &self.set {
+            if !s.satisfied(v) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn intersection(&self, other: &Constraint) -> Constraint {
+        let mut set = IndexSet::new();
+
+        for r in &self.set {
+            for s in &other.set {
+                if let Some(r) = r.intersection(&s) {
+                    set.insert(r);
+                }
+            }
+        }
+
+        // We skip unification because we already know that the set will be unified.
+        // The only time we might not be unified is during creation or arbitrary insertion.
+        Constraint { set }
+    }
+
+    pub fn union(&self, other: &Constraint) -> Constraint {
+        let mut set = self.set.clone();
+        set.extend(other.set.clone());
+
+        Constraint { set }
+    }
+
+    pub fn difference(&self, other: &Constraint) -> Constraint {
+        let mut set = IndexSet::new();
+
+        for r in &self.set {
+            for s in &other.set {
+                if r.lower().cmp(s.lower(), true) != cmp::Ordering::Less {
+                    //------------------//
+                    //         [=r=]    //
+                    // [==s==]          //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    //         [=r=]    //
+                    // [===s===]        //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    //         [=r=]    //
+                    // [====s====]      //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    //         [=r=]    //
+                    // [======s======]  //
+                    //------------------//
+                    match r.lower().cmp(s.upper(), false) {
+                        cmp::Ordering::Greater => {
+                            // Situation 1
+                            set.insert(r.clone());
+                        }
+                        cmp::Ordering::Equal => {
+                            // Situation 2
+                            // If they're the same, the lower bound will always be open no matter
+                            // what
+                            let lower = if let Interval::Open(_) = s.upper() {
+                                s.upper().clone()
+                            } else {
+                                s.upper().clone().flip()
+                            };
+                            let upper = r.upper().clone();
+                            set.insert(Range::new(lower, upper).unwrap());
+                        }
+                        cmp::Ordering::Less => {
+                            // Situation 3 & 4
+                            let lower = s.upper().clone().flip();
+                            let upper = r.upper().clone();
+                            // We have to do the if let because in Situation 4 there is no valid
+                            // Range
+                            if let Some(range) = Range::new(lower, upper) {
+                                set.insert(range);
+                            }
+                        }
+                    }
+                } else {
+                    //------------------//
+                    // [=r=]            //
+                    //       [==s==]    //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    // [==r==]          //
+                    //       [==s==]    //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    // [====r====]      //
+                    //       [==s==]    //
+                    //------------------//
+                    //        OR        //
+                    //------------------//
+                    // [======r======]  //
+                    //       [==s==]    //
+                    //------------------//
+                    // Situations 1-3
+                    match r.upper().cmp(s.lower(), false) {
+                        cmp::Ordering::Less => {
+                            // Situation 1
+                            set.insert(r.clone());
+                        }
+                        cmp::Ordering::Equal => {
+                            // Situation 2
+                            let lower = if let Interval::Open(_) = r.upper() {
+                                r.upper().clone()
+                            } else {
+                                r.upper().clone().flip()
+                            };
+                            let upper = s.lower().clone().flip();
+                            set.insert(Range::new(lower, upper).unwrap());
+                        }
+                        cmp::Ordering::Greater => {
+                            // Situations 3 & 4
+                            if r.upper().cmp(s.upper(), false) != cmp::Ordering::Greater {
+                                // Situation 3
+                                let lower = r.lower().clone();
+                                let upper = s.lower().clone().flip();
+                                set.insert(Range::new(lower, upper).unwrap());
+                            } else {
+                                // Situation 4
+                                let l1 = r.lower().clone();
+                                let u1 = s.lower().clone().flip();
+
+                                let l2 = s.upper().clone().flip();
+                                let u2 = r.upper().clone();
+
+                                set.insert(Range::new(l1, u1).unwrap());
+                                set.insert(Range::new(l2, u2).unwrap());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Constraint { set }
+    }
+
+    pub fn complement(&self) -> Constraint {
+        let any: Constraint = Range::new(Interval::Unbounded, Interval::Unbounded).unwrap().into();
+        any.difference(self)
+    }
+
+    pub fn is_subset(&self, superset: &Constraint) -> bool {
+        &self.intersection(superset) == self
+    }
+
+    pub fn is_superset(&self, subset: &Constraint) -> bool {
+        subset.is_subset(self)
+    }
+}
+
+impl Default for Constraint {
+    fn default() -> Self {
+        Constraint {
+            set: IndexSet::new(),
+        }
+    }
+}
+
+impl Hash for Constraint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for r in &self.set {
+            r.hash(state);
+        }
+    }
+}
+
+impl From<Range> for Constraint {
+    fn from(r: Range) -> Constraint {
+        let mut set = IndexSet::new();
+        set.insert(r);
+
+        Constraint { set }
+    }
+}
+
+impl FromStr for Constraint {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: Don't lose all error info
+        // We throw away the original error because of 'static lifetime bs...
+        let p = parse::constraint(CompleteStr(s))
+            .map(|o| o.1)
+            .map_err(|_| ErrorKind::InvalidConstraint)?;
+
+        Ok(p)
+    }
+}
+
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.set.iter().map(|r| r.to_string()).join(", "))
+    }
+}
+
+impl Serialize for Constraint {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Constraint {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
@@ -596,6 +722,10 @@ mod parse {
     named!(pub range<CompleteStr, Range>,
         alt!(range_caret | range_tilde | range_interval | range_any)
     );
+
+    named!(pub constraint<CompleteStr, Constraint>,
+        alt!(map!(separated_list!(tag!(","), range), |v| { Constraint::new(v.into_iter().collect()) }) | value!(Constraint::default()))
+    );
 }
 
 #[cfg(test)]
@@ -606,29 +736,29 @@ mod tests {
     use semver::Version;
 
     macro_rules! new_range {
-        ($a:tt... $b:tt) => {
+        ($a:tt ... $b:tt) => {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap()),
                 Interval::Open(Version::parse($b).unwrap()),
-            )
+            ).unwrap()
         };
-        ($a:tt = .. $b:tt) => {
+        ($a:tt ~.. $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap()),
                 Interval::Open(Version::parse($b).unwrap()),
-            )
+            ).unwrap()
         };
-        ($a:tt..= $b:tt) => {
+        ($a:tt ..~ $b:tt) => {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap()),
                 Interval::Closed(Version::parse($b).unwrap()),
-            )
+            ).unwrap()
         };
-        ($a:tt = . = $b:tt) => {
+        ($a:tt ~.~ $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap()),
                 Interval::Closed(Version::parse($b).unwrap()),
-            )
+            ).unwrap()
         };
     }
 
@@ -659,13 +789,13 @@ mod tests {
             .collect::<Vec<_>>();
 
         let ns = vec![
-            new_range!("1.0.0" = .."2.0.0").unwrap(),
-            new_range!("1.4.0" = .."2.0.0").unwrap(),
-            new_range!("1.4.3" = .."2.0.0").unwrap(),
-            new_range!("0.0.0" = .."1.0.0").unwrap(),
-            new_range!("0.2.0" = .."0.3.0").unwrap(),
-            new_range!("0.2.3" = .."0.3.0").unwrap(),
-            new_range!("0.0.2" = .."0.0.3").unwrap(),
+            new_range!("1.0.0" ~.. "2.0.0"),
+            new_range!("1.4.0" ~.. "2.0.0"),
+            new_range!("1.4.3" ~.. "2.0.0"),
+            new_range!("0.0.0" ~.. "1.0.0"),
+            new_range!("0.2.0" ~.. "0.3.0"),
+            new_range!("0.2.3" ~.. "0.3.0"),
+            new_range!("0.0.2" ~.. "0.0.3"),
         ];
 
         assert_eq!(ns, vs);
@@ -680,13 +810,13 @@ mod tests {
             .collect::<Vec<_>>();
 
         let ns = vec![
-            new_range!("1.0.0" = .."2.0.0").unwrap(),
-            new_range!("1.4.0" = .."1.5.0").unwrap(),
-            new_range!("1.4.3" = .."1.5.0").unwrap(),
-            new_range!("0.0.0" = .."1.0.0").unwrap(),
-            new_range!("0.2.0" = .."0.3.0").unwrap(),
-            new_range!("0.2.3" = .."0.3.0").unwrap(),
-            new_range!("0.0.2" = .."0.1.0").unwrap(),
+            new_range!("1.0.0" ~.. "2.0.0"),
+            new_range!("1.4.0" ~.. "1.5.0"),
+            new_range!("1.4.3" ~.. "1.5.0"),
+            new_range!("0.0.0" ~.. "1.0.0"),
+            new_range!("0.2.0" ~.. "0.3.0"),
+            new_range!("0.2.3" ~.. "0.3.0"),
+            new_range!("0.0.2" ~.. "0.1.0"),
         ];
 
         assert_eq!(ns, vs);

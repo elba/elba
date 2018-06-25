@@ -10,10 +10,8 @@ pub mod types;
 
 use self::types::{Assignment, Incompatibility};
 use err::Error;
-use package::PackageId;
-use std::collections::HashSet;
-
 use index::Index;
+use package::{Dep, PackageId, Summary};
 
 pub struct Resolver {
     /// The current step.
@@ -27,9 +25,12 @@ impl Resolver {
         Self::default()
     }
 
-    pub fn solve(&mut self) -> Result<(), Error> {
+    pub fn solve(&mut self, root: Summary<Dep>) -> Result<(), Error> {
+        // First, make a few decisions: choose root package, add incompats for each of its deps
         unimplemented!()
     }
+
+    // TODO: Resolver::{decision, derivation, incompatibility}?
 }
 
 impl Default for Resolver {

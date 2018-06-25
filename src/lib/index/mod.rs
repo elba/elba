@@ -144,7 +144,7 @@ impl Index {
         let sum = Summary::new(pkg, checksum.clone(), dependencies);
 
         self.checksums
-            .get_mut(sum.id().name())
+            .get_mut(sum.name())
             .unwrap()
             .insert(version, checksum);
 
@@ -155,7 +155,7 @@ impl Index {
         let sums = self.summaries(name)?;
 
         for s in sums {
-            if s.id().version() == version {
+            if s.version() == version {
                 return Ok(s.id().clone());
             }
         }

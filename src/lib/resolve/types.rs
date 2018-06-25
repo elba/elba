@@ -4,8 +4,8 @@
 
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
-use package::{Dep, PackageId};
-use std::collections::HashSet;
+use indexmap::IndexMap;
+use package::{Dep, Name, version::Range, PackageId};
 
 pub enum DepMatch {
     Satisfies,
@@ -13,7 +13,7 @@ pub enum DepMatch {
     Inconclusive,
 }
 
-pub struct DepSet(HashSet<Dep>);
+pub struct DepSet(IndexMap<Name, Range>);
 
 impl DepSet {
     pub fn check(&self, dep: &Dep) -> DepMatch {
@@ -23,7 +23,8 @@ impl DepSet {
 
 pub struct Incompatibility {
     step: u16,
-    deps: HashSet<Dep>,
+    deps: IndexMap<Name, Range>,
+    // TODO: Maybe just Option<usize> to point to the index of the other incompatibility
     /// One possible parent incompatibility which lead to the creation of this one. The `left`
     /// incompatibility is always the first to be created.
     left: Option<Box<Incompatibility>>,
@@ -41,7 +42,7 @@ pub enum IncompatMatch {
 impl Incompatibility {
     pub fn new(
         step: u16,
-        deps: HashSet<Dep>,
+        deps: IndexMap<Name, Range>,
         left: Option<Box<Incompatibility>>,
         right: Option<Box<Incompatibility>>,
     ) -> Self {
