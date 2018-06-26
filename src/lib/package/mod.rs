@@ -16,6 +16,7 @@ use url_serde;
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
 // TODO: Legal characters?
+// TODO: Treat hyphens and underscores the same?
 /// Struct `Name` represents the name of a package. All packages in matic are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -101,8 +102,8 @@ impl AsRef<str> for Name {
 /// Struct `Dep` represents a requirement or a dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Dep {
-    name: Name,
-    req: Constraint,
+    pub name: Name,
+    pub req: Constraint,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -204,9 +205,9 @@ impl fmt::Display for Resolution {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PackageId {
-    name: Name,
-    version: Version,
-    resolution: Resolution,
+    pub name: Name,
+    pub version: Version,
+    pub resolution: Resolution,
 }
 
 impl PackageId {
@@ -298,10 +299,10 @@ pub struct Checksum {
 /// dependencies.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Summary<T> {
-    id: PackageId,
-    checksum: Checksum,
+    pub id: PackageId,
+    pub checksum: Checksum,
     #[serde(default = "Vec::new")]
-    dependencies: Vec<T>,
+    pub dependencies: Vec<T>,
 }
 
 impl<T> Summary<T> {

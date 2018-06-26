@@ -19,6 +19,8 @@ toml = "0.4"
 url = "1.7"
 url_serde = "0.2"
 
+[dev-dependencies]
+
 [lib]
 name = "matic"
 path = "src/lib/lib.rs"

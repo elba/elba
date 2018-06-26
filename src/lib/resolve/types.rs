@@ -5,7 +5,7 @@
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
 use indexmap::IndexMap;
-use package::{Dep, Name, version::Range, PackageId};
+use package::{Dep, Name, version::Constraint, PackageId};
 
 pub enum DepMatch {
     Satisfies,
@@ -13,7 +13,7 @@ pub enum DepMatch {
     Inconclusive,
 }
 
-pub struct DepSet(IndexMap<Name, Range>);
+pub struct DepSet(IndexMap<Name, Constraint>);
 
 impl DepSet {
     pub fn check(&self, dep: &Dep) -> DepMatch {
@@ -23,14 +23,13 @@ impl DepSet {
 
 pub struct Incompatibility {
     step: u16,
-    deps: IndexMap<Name, Range>,
-    // TODO: Maybe just Option<usize> to point to the index of the other incompatibility
+    deps: IndexMap<Name, Constraint>,
     /// One possible parent incompatibility which lead to the creation of this one. The `left`
     /// incompatibility is always the first to be created.
-    left: Option<Box<Incompatibility>>,
+    left: Option<usize>,
     /// The other possible parent incompatibility of this one. If there's only one parent, this is
     /// `None`.
-    right: Option<Box<Incompatibility>>,
+    right: Option<usize>,
 }
 
 pub enum IncompatMatch {
@@ -42,9 +41,9 @@ pub enum IncompatMatch {
 impl Incompatibility {
     pub fn new(
         step: u16,
-        deps: IndexMap<Name, Range>,
-        left: Option<Box<Incompatibility>>,
-        right: Option<Box<Incompatibility>>,
+        deps: IndexMap<Name, Constraint>,
+        left: Option<usize>,
+        right: Option<usize>,
     ) -> Self {
         Incompatibility {
             step,
@@ -73,5 +72,5 @@ impl Assignment {
 
 pub enum AssignmentType {
     Decision { selected: PackageId },
-    Derivation { dep: Dep, cause: u16 },
+    Derivation { dep: Dep, cause: Option<u16> },
 }

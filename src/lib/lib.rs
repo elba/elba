@@ -4,6 +4,7 @@
 
 #[macro_use]
 extern crate failure;
+#[macro_use]
 extern crate indexmap;
 extern crate itertools;
 #[macro_use]
