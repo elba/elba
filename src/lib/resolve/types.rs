@@ -5,7 +5,7 @@
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
 use indexmap::IndexMap;
-use package::{Dep, Name, version::Constraint, PackageId};
+use package::{Dep, version::Constraint, PackageId};
 
 pub enum DepMatch {
     Satisfies,
@@ -13,7 +13,7 @@ pub enum DepMatch {
     Inconclusive,
 }
 
-pub struct DepSet(IndexMap<Name, Constraint>);
+pub struct DepSet(IndexMap<PackageId, Constraint>);
 
 impl DepSet {
     pub fn check(&self, dep: &Dep) -> DepMatch {
@@ -23,7 +23,7 @@ impl DepSet {
 
 pub struct Incompatibility {
     step: u16,
-    deps: IndexMap<Name, Constraint>,
+    deps: IndexMap<PackageId, Constraint>,
     /// One possible parent incompatibility which lead to the creation of this one. The `left`
     /// incompatibility is always the first to be created.
     left: Option<usize>,
@@ -41,7 +41,7 @@ pub enum IncompatMatch {
 impl Incompatibility {
     pub fn new(
         step: u16,
-        deps: IndexMap<Name, Constraint>,
+        deps: IndexMap<PackageId, Constraint>,
         left: Option<usize>,
         right: Option<usize>,
     ) -> Self {

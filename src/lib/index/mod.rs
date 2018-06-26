@@ -25,17 +25,17 @@ use std::{
     fs, io::{self, BufRead}, path::PathBuf,
 };
 use url::Url;
-use url_serde;
 
 use err::{Error, ErrorKind};
 use package::*;
 
+// TODO: IndexMap<Resolution, Index> so we can select faster?
 pub struct Indices(Vec<Index>);
 
 impl Indices {
-    pub fn select(&mut self, name: &Name, version: &Version) -> Result<PackageId, Error> {
+    pub fn select(&mut self, pkg: Summary) -> Result<IndexEntry, Error> {
         for ix in &mut self.0 {
-            if let Ok(r) = ix.select(name, version) {
+            if let Ok(r) = ix.select(&pkg) {
                 return Ok(r);
             }
         }
@@ -45,15 +45,14 @@ impl Indices {
 }
 
 // TODO: We could separate source out into a special thing for IndexEntry. But needless duplication...
-#[derive(Debug, Deserialize, Serialize)]
-struct IndexEntry {
-    name: Name,
-    version: Version,
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub struct IndexEntry {
+    #[serde(flatten)]
+    sum: Summary,
     dependencies: Vec<Dep>,
     yanked: bool,
     checksum: Checksum,
-    #[serde(flatten)]
-    source: Resolution, // TODO: Recursive sources. One registry points to another points to...
+    location: Resolution,
 }
 
 // TODO: Dealing with where to download the Index, using the Config to get that info.
@@ -68,7 +67,7 @@ pub struct Index {
     // TODO: Should this hold urls too?
     /// Contains a mapping of versioned packages to checksums
     checksums: BTreeMap<Name, BTreeMap<Version, Checksum>>,
-    cache: BTreeMap<Name, Vec<Summary<Dep>>>,
+    cache: BTreeMap<Name, Vec<IndexEntry>>,
 }
 
 impl Index {
@@ -85,21 +84,20 @@ impl Index {
         }
     }
 
-    pub fn checksum(&mut self, pkg: PackageId) -> Result<Checksum, Error> {
+    pub fn checksum(&mut self, pkg: PackageId, vers: &Version) -> Result<Checksum, Error> {
         let name = pkg.name();
-        let vers = pkg.version();
 
         if let Some(s) = self.checksums.get(name).and_then(|v| v.get(vers)) {
             return Ok(s.clone());
         }
 
-        self.summaries(name)?;
+        self.entries(name)?;
         Ok(self.checksums[name][vers].clone())
     }
 
-    pub fn summaries(&mut self, name: &Name) -> Result<&Vec<Summary<Dep>>, Error> {
+    pub fn entries(&mut self, name: &Name) -> Result<&Vec<IndexEntry>, Error> {
         if !self.cache.contains_key(&name) {
-            let summaries = self.load_summaries(name)?;
+            let summaries = self.load_entries(name)?;
             self.cache.insert(name.clone(), summaries);
         }
 
@@ -108,7 +106,7 @@ impl Index {
 
     /// Method `Index::find` searches for a package within the index, invoking a callback on its
     /// contents.
-    pub fn load_summaries(&mut self, name: &Name) -> Result<Vec<Summary<Dep>>, Error> {
+    pub fn load_entries(&mut self, name: &Name) -> Result<Vec<IndexEntry>, Error> {
         let mut res = Vec::new();
         let mut path = self.path.clone();
         path.push(name.group());
@@ -121,50 +119,38 @@ impl Index {
 
         for line in r.lines() {
             let line = line.context(ErrorKind::InvalidIndex)?;
-            let sum: Summary<Dep> = self.parse_index_entry(&line)?;
+            let entry = self.parse_index_entry(&line)?;
 
-            res.push(sum);
+            res.push(entry);
         }
 
         Ok(res)
     }
 
     // TODO: What to do with unused fields
-    fn parse_index_entry(&mut self, line: &str) -> Result<Summary<Dep>, Error> {
+    fn parse_index_entry(&mut self, line: &str) -> Result<IndexEntry, Error> {
         let IndexEntry {
-            name,
-            version,
+            sum,
             dependencies,
             checksum,
-            yanked: _yanked,
-            source: _source,
+            yanked,
+            location,
         } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
-        let pkg = PackageId::new(name, version.clone(), self.id.clone());
-        let sum = Summary::new(pkg, checksum.clone(), dependencies);
+        self.checksums.get_mut(sum.name()).unwrap().insert(sum.version().clone(), checksum.clone());
 
-        self.checksums
-            .get_mut(sum.name())
-            .unwrap()
-            .insert(version, checksum);
-
-        Ok(sum)
+        Ok(IndexEntry { sum, dependencies, checksum, yanked, location })
     }
 
-    pub fn select(&mut self, name: &Name, version: &Version) -> Result<PackageId, Error> {
-        let sums = self.summaries(name)?;
+    pub fn select(&mut self, pkg: &Summary) -> Result<IndexEntry, Error> {
+        let sums = self.entries(pkg.name())?;
 
         for s in sums {
-            if s.version() == version {
-                return Ok(s.id().clone());
+            if &s.sum == pkg {
+                return Ok(s.clone());
             }
         }
 
         return Err(ErrorKind::NotInIndex)?;
-    }
-
-    /// Method `Index::retrieve` returns a Url from which you can download or find a package.
-    pub fn retrieve(&self, pkg: &PackageId) -> Result<Url, Error> {
-        unimplemented!()
     }
 }

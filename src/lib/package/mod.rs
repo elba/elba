@@ -117,29 +117,23 @@ pub enum GitTag {
 /// Enum `Resolution` represents the possible places from which a package can be resolved. A package
 /// can be manually set to be located in a git repo or a local file directory, or it can be
 /// resolved with a package index.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Resolution {
     /// Git: the package originated from a git repository.
     Git {
-        #[serde(with = "url_serde")]
         repo: Url,
-        #[serde(flatten)]
         tag: GitTag,
     },
     /// Dir: the package is on disk in a folder directory.
     Dir {
-        #[serde(with = "url_serde")]
         url: Url,
     },
     /// Tar: the package originated from an archive stored somewhere.
     Tar {
-        #[serde(with = "url_serde")]
         url: Url,
     },
     /// Index: the package was resolved from an index (can be local or remote).
     Index {
-        #[serde(with = "url_serde")]
         url: Url, /* TODO More */
     },
 }
@@ -203,28 +197,38 @@ impl fmt::Display for Resolution {
     }
 }
 
+impl Serialize for Resolution {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Resolution {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PackageId {
     pub name: Name,
-    pub version: Version,
     pub resolution: Resolution,
 }
 
 impl PackageId {
-    pub fn new(name: Name, version: Version, resolution: Resolution) -> Self {
+    pub fn new(name: Name, resolution: Resolution) -> Self {
         PackageId {
             name,
-            version,
             resolution,
         }
     }
 
     pub fn name(&self) -> &Name {
         &self.name
-    }
-
-    pub fn version(&self) -> &Version {
-        &self.version
     }
 
     pub fn resolution(&self) -> &Resolution {
@@ -236,18 +240,15 @@ impl FromStr for PackageId {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.splitn(3, ' ');
+        let mut s = s.splitn(2, ' ');
         let name = s.next().unwrap();
-        let version = s.next().ok_or_else(|| ErrorKind::InvalidPackageId)?;
         let url = s.next().ok_or_else(|| ErrorKind::InvalidPackageId)?;
 
         let name = Name::from_str(name)?;
-        let version = Version::parse(version).context(ErrorKind::InvalidPackageId)?;
         let resolution = Resolution::from_str(url)?;
 
         Ok(PackageId {
             name,
-            version,
             resolution,
         })
     }
@@ -266,14 +267,11 @@ impl Serialize for PackageId {
         S: Serializer,
     {
         let name = self.name.as_str();
-        let vers = &self.version.to_string();
         let src = &self.resolution.to_string();
 
-        let mut s = String::with_capacity(name.len() + vers.len() + src.len() + 5);
+        let mut s = String::with_capacity(name.len() + src.len() + 5);
 
         s.push_str(name);
-        s.push(' ');
-        s.push_str(vers);
         s.push(' ');
         s.push_str(src);
 
@@ -293,24 +291,22 @@ pub struct Checksum {
     hash: String,
 }
 
+// TODO: Should Summaries have checksums?
 /// Struct `Summary` defines the summarized version of a package.
 ///
 /// The type parameter `T` allows us to use this struct for both resolved and unresolved
 /// dependencies.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-pub struct Summary<T> {
+pub struct Summary {
     pub id: PackageId,
-    pub checksum: Checksum,
-    #[serde(default = "Vec::new")]
-    pub dependencies: Vec<T>,
+    pub version: Version,
 }
 
-impl<T> Summary<T> {
-    pub fn new(id: PackageId, checksum: Checksum, dependencies: Vec<T>) -> Self {
+impl Summary {
+    pub fn new(id: PackageId, version: Version) -> Self {
         Summary {
             id,
-            checksum,
-            dependencies,
+            version,
         }
     }
 
@@ -323,15 +319,7 @@ impl<T> Summary<T> {
     }
 
     pub fn version(&self) -> &Version {
-        &self.id.version
-    }
-
-    pub fn checksum(&self) -> &Checksum {
-        &self.checksum
-    }
-
-    pub fn dependencies(&self) -> &[T] {
-        &self.dependencies
+        &self.version
     }
 }
 

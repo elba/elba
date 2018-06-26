@@ -12,7 +12,13 @@ pub struct Lockfile {
     package: HashSet<LockedPkg>,
 }
 
-pub type LockedPkg = Summary<PackageId>;
+#[derive(Deserialize, Debug, Serialize, PartialEq, Eq, Hash)]
+pub struct LockedPkg {
+    #[serde(flatten)]
+    sum: Summary,
+    #[serde(default = "Vec::new")]
+    dependencies: Vec<Summary>,
+}
 
 impl FromStr for Lockfile {
     type Err = Error; // TODO
@@ -32,13 +38,15 @@ mod tests {
     fn valid_lockfile() {
         let lockfile = r#"
 [[package]]
-id = "terminator/one 0.2.4 dir+file:///right/here"
+id = "terminator/one dir+file:///right/here"
+version = "0.1.4"
 checksum = { fmt = "sha512", hash = "334d016f755cd6dc58c53a86e183882f8ec14f52fb05345887c8a5edd42c87b7" }
 
 [[package]]
-id = "good/package 1.0.5-alpha.5-zeta.15 dir+file:///right/there"
+id = "good/package dir+file:///right/there"
+version = "1.0.5-alpha.5-zeta.15"
 dependencies = [
-    "better/package 92.4.24 index+https://matic.io/pkg"
+    { id = "terminator/one index+https://matic.io/pkg", version = "0.1.4" }
 ]
 checksum = { fmt = "sha512", hash = "4a7d6d3e8888a86b41c710f1d44c43d9ec7a4f97dce4f1ec3c0fb124ca0188de" }
         "#;

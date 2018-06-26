@@ -10,12 +10,12 @@ pub mod types;
 
 use self::types::{Assignment, AssignmentType, Incompatibility};
 use err::Error;
-use indexmap::{IndexMap, IndexSet};
-use package::{Dep, Name, PackageId, Summary, version::Constraint};
+use indexmap::IndexMap;
+use package::{Dep, PackageId, Summary, version::Constraint};
 
 enum Propagated {
     Satisfied,
-    Almost(Name),
+    Almost(PackageId),
     None,
 }
 
@@ -26,7 +26,7 @@ pub struct Resolver {
     step: u16,
     assignments: Vec<Assignment>,
     incompats: Vec<Incompatibility>,
-    incompat_ixs: IndexMap<Name, Vec<usize>>,
+    incompat_ixs: IndexMap<PackageId, Vec<usize>>,
 }
 
 impl Resolver {
@@ -34,8 +34,8 @@ impl Resolver {
         Self::default()
     }
 
-    pub fn solve(&mut self, root: Summary<Dep>) -> Result<(), Error> {
-        let pkgs = indexmap!(root.name().clone() => root.version().clone().into());
+    pub fn solve(&mut self, root: Summary) -> Result<(), Error> {
+        let pkgs = indexmap!(root.id().clone() => root.version().clone().into());
         self.incompatibility(pkgs, None, None);
 
         let mut next = root.id.name;
@@ -44,8 +44,8 @@ impl Resolver {
         unimplemented!()
     }
 
-    fn propagate(&mut self, name: Name) {
-        let mut changed = indexset!(name);
+    fn propagate(&mut self, pkg: PackageId) {
+        let mut changed = indexset!(pkg);
 
         while let Some(package) = changed.pop() {
             // Yeah, I hate cloning too, but unfortunately it's necessary here
@@ -89,7 +89,7 @@ impl Resolver {
         self.step += 1;
     }
 
-    fn incompatibility(&mut self, pkgs: IndexMap<Name, Constraint>, left: Option<usize>, right: Option<usize>) {
+    fn incompatibility(&mut self, pkgs: IndexMap<PackageId, Constraint>, left: Option<usize>, right: Option<usize>) {
         let new_ix = self.incompats.len();
         for (n, _) in &pkgs {
             self.incompat_ixs.entry(n.clone()).or_insert_with(Vec::new).push(new_ix);
