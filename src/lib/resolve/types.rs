@@ -1,26 +1,12 @@
 //! Module `resolve/types` provides supplementary types for the `Resolver`.
 
-// `Term` in Pubgrub is just our Dep.
-
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
 use indexmap::IndexMap;
-use package::{Dep, version::Constraint, PackageId};
+use package::{version::Constraint, PackageId};
+use semver::Version;
 
-pub enum DepMatch {
-    Satisfies,
-    Contradicts,
-    Inconclusive,
-}
-
-pub struct DepSet(IndexMap<PackageId, Constraint>);
-
-impl DepSet {
-    pub fn check(&self, dep: &Dep) -> DepMatch {
-        unimplemented!()
-    }
-}
-
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Incompatibility {
     step: u16,
     deps: IndexMap<PackageId, Constraint>,
@@ -33,9 +19,9 @@ pub struct Incompatibility {
 }
 
 pub enum IncompatMatch {
-    Satisfies,
-    Almost,
-    Contradicts,
+    Satisfied,
+    Almost(PackageId),
+    Contradicted,
 }
 
 impl Incompatibility {
@@ -53,11 +39,12 @@ impl Incompatibility {
         }
     }
 
-    pub fn check(&self, dep: &Dep) -> IncompatMatch {
-        unimplemented!()
+    pub fn deps(&self) -> &IndexMap<PackageId, Constraint> {
+        &self.deps
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assignment {
     step: u16,
     level: u16,
@@ -70,7 +57,8 @@ impl Assignment {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AssignmentType {
-    Decision { selected: PackageId },
-    Derivation { dep: Dep, cause: Option<u16> },
+    Decision { pkg: PackageId, version: Version },
+    Derivation { pkg: PackageId, constraint: Constraint, cause: Option<usize> },
 }

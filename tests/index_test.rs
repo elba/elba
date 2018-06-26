@@ -15,7 +15,7 @@ fn index_success() {
 
     let mut i = Index::new(url, path);
 
-    let vs = i.summaries(&Name::from_str("a/a").unwrap());
+    let vs = i.entries(&Name::from_str("a/a").unwrap());
 
     println!("{:#?}", vs);
 

@@ -17,7 +17,9 @@
 //!
 //! Indices can also act like Purescript package sets, in that they can refer to git repositories.
 
+use err::{Error, ErrorKind};
 use failure::ResultExt;
+use package::{*, version::Constraint};
 use semver::Version;
 use serde_json;
 use std::collections::BTreeMap;
@@ -26,8 +28,12 @@ use std::{
 };
 use url::Url;
 
-use err::{Error, ErrorKind};
-use package::*;
+/// A dependency.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub struct Dep {
+    pub name: PackageId,
+    pub req: Constraint,
+}
 
 // TODO: IndexMap<Resolution, Index> so we can select faster?
 pub struct Indices(Vec<Index>);

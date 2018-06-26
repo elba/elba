@@ -99,13 +99,6 @@ impl AsRef<str> for Name {
     }
 }
 
-/// Struct `Dep` represents a requirement or a dependency.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-pub struct Dep {
-    pub name: Name,
-    pub req: Constraint,
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum GitTag {

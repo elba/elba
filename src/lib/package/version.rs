@@ -43,6 +43,14 @@ pub struct OrderedVersion(Version);
 // TODO: Interval struct with side? That way, we don't have this cmp crap and we can implement
 // switching from upper to lower
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum Relation {
+    Superset,
+    Subset,
+    Overlapping,
+    Disjoint,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Interval {
     Closed(Version),
@@ -181,12 +189,20 @@ impl Range {
         }
     }
 
-    /// Creates the empty Range, which is satisfied by no versions.
+    /// Creates the empty Range, which satisfies nothing.
     pub fn empty() -> Range {
         let lower = Interval::Open(Version::new(1, 0, 0));
         let upper = Interval::Open(Version::new(1, 0, 0));
 
         Range { lower, upper }
+    }
+
+    pub fn any() -> Range {
+        let lower = Interval::Unbounded;
+        let upper = Interval::Unbounded;
+
+        Range { lower, upper }
+
     }
 
     pub fn upper(&self) -> &Interval {
@@ -201,10 +217,10 @@ impl Range {
         (self.lower, self.upper)
     }
 
-    /// Checks if a version satisfies this `Range`. When dealing with pre-release versions,
+    /// Checks if a version is satisfied by this `Range`. When dealing with pre-release versions,
     /// pre-releases can only satisfy ranges if the range explicitly mentions a pre-release in either
     /// the upper or lower bound (or if it's unbounded in the upper direction)
-    pub fn satisfied(&self, version: &Version) -> bool {
+    pub fn satisfies(&self, version: &Version) -> bool {
         let upper_pre_ok = match &self.upper {
             Open(u) => u.is_prerelease(),
             Closed(u) => u.is_prerelease(),
@@ -319,6 +335,14 @@ impl Constraint {
         c
     }
 
+    pub fn empty() -> Constraint {
+        Constraint { set: indexset!() }
+    }
+
+    pub fn any() -> Constraint {
+        Range::any().into()
+    }
+
     /// Inserts a `Range` into the set.
     pub fn insert(&mut self, range: Range) {
         self.set.insert(range);
@@ -380,14 +404,14 @@ impl Constraint {
             .collect();
     }
 
-    /// Checks if a `Version` satisfies this `Constraint`.
-    pub fn satisfied(&mut self, v: &Version) -> bool {
+    /// Checks if a `Version` is satisfied by this `Constraint`.
+    pub fn satisfies(&mut self, v: &Version) -> bool {
         if self.set.is_empty() {
             return false;
         }
 
         for s in &self.set {
-            if !s.satisfied(v) {
+            if !s.satisfies(v) {
                 return false;
             }
         }
@@ -562,20 +586,23 @@ impl Constraint {
         any.difference(self)
     }
 
-    pub fn is_subset(&self, superset: &Constraint) -> bool {
-        &self.intersection(superset) == self
-    }
-
-    pub fn is_superset(&self, subset: &Constraint) -> bool {
-        subset.is_subset(self)
+    pub fn relation(&self, other: &Constraint) -> Relation {
+        let i = &self.intersection(other);
+        if i == other {
+            Relation::Superset
+        } else if i == self {
+            Relation::Subset
+        } else if i.set.is_empty() {
+            Relation::Disjoint
+        } else {
+            Relation::Overlapping
+        }
     }
 }
 
 impl Default for Constraint {
     fn default() -> Self {
-        Constraint {
-            set: IndexSet::new(),
-        }
+        Constraint::any()
     }
 }
 
