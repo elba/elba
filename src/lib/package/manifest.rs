@@ -49,14 +49,10 @@ enum DepReq {
     },
     Git {
         git: String,
-        #[serde(default = "default_git_specifier")]
+        #[serde(default)]
         #[serde(flatten)]
         spec: PkgGitSpecifier,
     },
-}
-
-fn default_git_specifier() -> PkgGitSpecifier {
-    PkgGitSpecifier::Branch("master".to_string())
 }
 
 #[derive(Deserialize, Debug)]
@@ -65,6 +61,12 @@ enum PkgGitSpecifier {
     Branch(String),
     Commit(String),
     Tag(String),
+}
+
+impl Default for PkgGitSpecifier {
+    fn default() -> Self {
+        PkgGitSpecifier::Branch("master".to_string())
+    }
 }
 
 #[derive(Deserialize, Debug)]

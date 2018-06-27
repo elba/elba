@@ -8,7 +8,6 @@ use semver::Version;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Incompatibility {
-    step: u16,
     deps: IndexMap<PackageId, Constraint>,
     /// One possible parent incompatibility which lead to the creation of this one. The `left`
     /// incompatibility is always the first to be created.
@@ -26,13 +25,11 @@ pub enum IncompatMatch {
 
 impl Incompatibility {
     pub fn new(
-        step: u16,
         deps: IndexMap<PackageId, Constraint>,
         left: Option<usize>,
         right: Option<usize>,
     ) -> Self {
         Incompatibility {
-            step,
             deps,
             left,
             right,
@@ -42,23 +39,70 @@ impl Incompatibility {
     pub fn deps(&self) -> &IndexMap<PackageId, Constraint> {
         &self.deps
     }
+
+    pub fn left(&self) -> Option<usize> {
+        self.left
+    }
+
+    pub fn right(&self) -> Option<usize> {
+        self.right
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assignment {
-    step: u16,
-    level: u16,
-    ty: AssignmentType,
+    pub step: u16,
+    pub level: u16,
+    pub ty: AssignmentType,
+    pub pkg: PackageId,
 }
 
 impl Assignment {
-    pub fn new(step: u16, level: u16, ty: AssignmentType) -> Self {
-        Assignment { step, level, ty }
+    pub fn new(step: u16, level: u16, pkg: PackageId, ty: AssignmentType) -> Self {
+        Assignment { step, level, ty, pkg }
+    }
+
+    pub fn ty(&self) -> &AssignmentType {
+        &self.ty
+    }
+
+    pub fn pkg(&self) -> &PackageId {
+        &self.pkg
+    }
+
+    pub fn step(&self) -> u16 {
+        self.step
+    }
+
+    pub fn level(&self) -> u16 {
+        self.level
+    }
+
+    pub fn cause(&self) -> Option<usize> {
+        match &self.ty {
+            AssignmentType::Decision { version: _version } => {
+                None
+            }
+            AssignmentType::Derivation { cause, constraint: _constraint } => {
+                Some(*cause)
+            }
+        }
+    }
+
+    pub fn constraint(&self) -> Constraint {
+        match &self.ty {
+            AssignmentType::Decision { version } => {
+                version.clone().into()
+            }
+            AssignmentType::Derivation { constraint, cause: _cause } => {
+                constraint.clone()
+            }
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AssignmentType {
-    Decision { pkg: PackageId, version: Version },
-    Derivation { pkg: PackageId, constraint: Constraint, cause: Option<usize> },
+    Decision { version: Version },
+    Derivation { constraint: Constraint, cause: usize },
 }

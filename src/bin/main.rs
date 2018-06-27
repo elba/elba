@@ -7,7 +7,7 @@ extern crate toml;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(name = "matic", about = "An Idris toolchain & package manager")]
+#[structopt(name = "matic", about = "An Idris package manager")]
 struct Matic {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u8,

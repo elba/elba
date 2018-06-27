@@ -1,3 +1,5 @@
+#![feature(nll)]
+
 //! Library `matic` defines a package manager for the Idris language.
 //!
 //! Human-editable configuration files are in TOML. Things that people shouldn't touch are in JSON.

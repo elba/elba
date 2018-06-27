@@ -19,7 +19,7 @@
 
 use err::{Error, ErrorKind};
 use failure::ResultExt;
-use package::{*, version::Constraint};
+use package::{version::Constraint, *};
 use semver::Version;
 use serde_json;
 use std::collections::BTreeMap;
@@ -143,9 +143,18 @@ impl Index {
             location,
         } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
-        self.checksums.get_mut(sum.name()).unwrap().insert(sum.version().clone(), checksum.clone());
+        self.checksums
+            .get_mut(sum.name())
+            .unwrap()
+            .insert(sum.version().clone(), checksum.clone());
 
-        Ok(IndexEntry { sum, dependencies, checksum, yanked, location })
+        Ok(IndexEntry {
+            sum,
+            dependencies,
+            checksum,
+            yanked,
+            location,
+        })
     }
 
     pub fn select(&mut self, pkg: &Summary) -> Result<IndexEntry, Error> {

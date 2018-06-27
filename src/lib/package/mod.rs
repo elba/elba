@@ -4,14 +4,12 @@ pub mod lockfile;
 pub mod manifest;
 pub mod version;
 
-use self::version::Constraint;
 use err::*;
 use failure::ResultExt;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
 use url::Url;
-use url_serde;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
@@ -113,22 +111,13 @@ pub enum GitTag {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Resolution {
     /// Git: the package originated from a git repository.
-    Git {
-        repo: Url,
-        tag: GitTag,
-    },
+    Git { repo: Url, tag: GitTag },
     /// Dir: the package is on disk in a folder directory.
-    Dir {
-        url: Url,
-    },
+    Dir { url: Url },
     /// Tar: the package originated from an archive stored somewhere.
-    Tar {
-        url: Url,
-    },
+    Tar { url: Url },
     /// Index: the package was resolved from an index (can be local or remote).
-    Index {
-        url: Url, /* TODO More */
-    },
+    Index { url: Url /* TODO More */ },
 }
 
 impl FromStr for Resolution {
@@ -214,10 +203,7 @@ pub struct PackageId {
 
 impl PackageId {
     pub fn new(name: Name, resolution: Resolution) -> Self {
-        PackageId {
-            name,
-            resolution,
-        }
+        PackageId { name, resolution }
     }
 
     pub fn name(&self) -> &Name {
@@ -240,10 +226,7 @@ impl FromStr for PackageId {
         let name = Name::from_str(name)?;
         let resolution = Resolution::from_str(url)?;
 
-        Ok(PackageId {
-            name,
-            resolution,
-        })
+        Ok(PackageId { name, resolution })
     }
 }
 
@@ -297,10 +280,7 @@ pub struct Summary {
 
 impl Summary {
     pub fn new(id: PackageId, version: Version) -> Self {
-        Summary {
-            id,
-            version,
-        }
+        Summary { id, version }
     }
 
     pub fn id(&self) -> &PackageId {

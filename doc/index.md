@@ -11,9 +11,14 @@ name from different indices as different packages. Because we have a
 namespacing system, this might not be necessary; if an index has a package with
 the same namespace and name as a package in another index, this is presumably
 on purpose, because they want to "patch" this package. Implementing this change
-would simply mean changing references to `PackageId` to `Name` in all files in
-the `resolve` module and modifying `index::Dep` to use only `Name` rather than
-`PackageId` (which includes `Resolution`).
+would need the following steps:
+
+  - Change references to `PackageId` to `Name` in all files in the `resolve`
+    module
+  - Modify `index::Dep` to use only `Name` rather than `PackageId` (which
+    includes `Resolution`).
+  - Modify the loop in `Resolver::satisfier` so that it compares `Name`s instead
+    of `PackageId`s (see the method in Pub)
 
 `index::Index::select` compares Summaries rather than just `Name`s and
 `Version`s since it deals with selecting a specific version of a package from a

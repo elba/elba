@@ -202,7 +202,6 @@ impl Range {
         let upper = Interval::Unbounded;
 
         Range { lower, upper }
-
     }
 
     pub fn upper(&self) -> &Interval {
@@ -582,7 +581,9 @@ impl Constraint {
     }
 
     pub fn complement(&self) -> Constraint {
-        let any: Constraint = Range::new(Interval::Unbounded, Interval::Unbounded).unwrap().into();
+        let any: Constraint = Range::new(Interval::Unbounded, Interval::Unbounded)
+            .unwrap()
+            .into();
         any.difference(self)
     }
 
@@ -801,25 +802,25 @@ mod tests {
     use semver::Version;
 
     macro_rules! new_range {
-        ($a:tt ... $b:tt) => {
+        ($a:tt... $b:tt) => {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap()),
                 Interval::Open(Version::parse($b).unwrap()),
             ).unwrap()
         };
-        ($a:tt ~.. $b:tt) => {
+        ($a:tt ~ .. $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap()),
                 Interval::Open(Version::parse($b).unwrap()),
             ).unwrap()
         };
-        ($a:tt ..~ $b:tt) => {
+        ($a:tt.. ~ $b:tt) => {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap()),
                 Interval::Closed(Version::parse($b).unwrap()),
             ).unwrap()
         };
-        ($a:tt ~.~ $b:tt) => {
+        ($a:tt ~ . ~ $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap()),
                 Interval::Closed(Version::parse($b).unwrap()),
@@ -896,5 +897,20 @@ mod tests {
         let c: Constraint = Constraint::new(rs);
 
         assert_eq!(c, c.complement().complement());
+    }
+
+    #[test]
+    fn test_constraint_subset() {
+        let a = Constraint::new(indexset!(
+            new_range!("1.0.0" ..~ "1.3.2"),
+            new_range!("5.5.7" ~.~ "5.6.2-alpha.2")
+        ));
+        let b = Constraint::new(indexset!(
+            new_range!("1.0.0" ~.~ "1.5.2"),
+            new_range!("5.3.2" ~.~ "5.7.7")
+        ));
+
+        assert_eq!(Relation::Subset, a.relation(&b));
+        assert_eq!(Relation::Superset, b.relation(&a));
     }
 }
