@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 failure = "0.1"
-indexmap = "1"
+indexmap = { version = "1", features = ["serde-1"] }
 itertools = "0.7"
 nom = "4.0"
 petgraph = "0.4"

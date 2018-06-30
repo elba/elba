@@ -2,25 +2,51 @@
 //!
 //! Lockfiles are created based on dependency constraints, and ensure that builds are repeatable
 
-use std::collections::HashSet;
+use indexmap::{IndexMap, IndexSet};
 use toml;
 
 use super::*;
 
-#[derive(Clone, Deserialize, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct Lockfile {
-    package: HashSet<LockedPkg>,
+    pub packages: IndexMap<Summary, Vec<Summary>>,
+}
+
+impl FromStr for Lockfile {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let toml = LockfileToml::from_str(s)?;
+
+        Ok(toml.into())
+    }
+}
+
+impl From<LockfileToml> for Lockfile {
+    fn from(l: LockfileToml) -> Self {
+        let mut packages = indexmap!();
+        for package in l.packages {
+            packages.insert(package.sum, package.dependencies);
+        }
+
+        Lockfile { packages }
+    }
+}
+
+#[derive(Clone, Deserialize, Debug, Serialize)]
+struct LockfileToml {
+    packages: IndexSet<LockedPkg>,
 }
 
 #[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Eq, Hash)]
-pub struct LockedPkg {
+struct LockedPkg {
     #[serde(flatten)]
     sum: Summary,
     #[serde(default = "Vec::new")]
     dependencies: Vec<Summary>,
 }
 
-impl FromStr for Lockfile {
+impl FromStr for LockfileToml {
     type Err = Error; // TODO
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
@@ -37,12 +63,12 @@ mod tests {
     #[test]
     fn valid_lockfile() {
         let lockfile = r#"
-[[package]]
-id = "terminator/one dir+file:///right/here"
+[[packages]]
+id = "terminator/one index+https://matic.io/pkg"
 version = "0.1.4"
 checksum = { fmt = "sha512", hash = "334d016f755cd6dc58c53a86e183882f8ec14f52fb05345887c8a5edd42c87b7" }
 
-[[package]]
+[[packages]]
 id = "good/package dir+file:///right/there"
 version = "1.0.5-alpha.5-zeta.15"
 dependencies = [

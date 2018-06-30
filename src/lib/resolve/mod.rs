@@ -10,15 +10,14 @@ mod retriever;
 pub mod types;
 
 use self::{
-    types::{
-        Assignment, AssignmentType, IncompatMatch, Incompatibility, IncompatibilityCause,
-    },
     retriever::Retriever,
+    types::{Assignment, AssignmentType, IncompatMatch, Incompatibility, IncompatibilityCause},
 };
 use err::Error;
+use index::Indices;
 use indexmap::IndexMap;
 use package::{
-    version::{Constraint, Relation}, PackageId, Summary,
+    lockfile::Lockfile, version::{Constraint, Relation}, PackageId, Summary,
 };
 use semver::Version;
 use std::cmp;
@@ -33,11 +32,15 @@ pub struct Resolver {
     incompats: Vec<Incompatibility>,
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
     retriever: Retriever,
-    root: Summary,
 }
 
 impl Resolver {
-    pub fn new(root: Summary) -> Self {
+    pub fn new(
+        root: Summary,
+        root_deps: Vec<(PackageId, Constraint)>,
+        indices: Indices,
+        lockfile: Lockfile,
+    ) -> Self {
         let step = 1;
         let level = 0;
         let assignments = vec![];
@@ -45,7 +48,7 @@ impl Resolver {
         let incompat_ixs = indexmap!();
         let decisions = indexmap!();
         let derivations = indexmap!();
-        let retriever = unimplemented!();
+        let retriever = Retriever::new(root, root_deps, indices, lockfile);
         Resolver {
             step,
             level,
@@ -55,15 +58,14 @@ impl Resolver {
             decisions,
             derivations,
             retriever,
-            root,
         }
     }
 
     pub fn solve(&mut self) -> Result<(), Error> {
-        let pkgs = indexmap!(self.root.id().clone() => self.root.version().clone().into());
+        let pkgs = indexmap!(self.retriever.root().id().clone() => self.retriever.root().version().clone().into());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
 
-        let mut next = Some(self.root.id().clone());
+        let mut next = Some(self.retriever.root().id().clone());
         while let Some(n) = next {
             self.propagate(n);
             next = self.choose_pkg_version();
@@ -320,7 +322,8 @@ impl Resolver {
 
     fn is_failure(&self, inc: &Incompatibility) -> bool {
         inc.deps().is_empty()
-            || (inc.deps().len() == 1 && inc.deps().get_index(0).unwrap().0 == self.root.id())
+            || (inc.deps().len() == 1
+                && inc.deps().get_index(0).unwrap().0 == self.retriever.root().id())
     }
 
     fn register(&mut self, a: &Assignment) {

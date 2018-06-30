@@ -3,6 +3,7 @@
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
 use indexmap::IndexMap;
+use package::Summary;
 use package::{version::Constraint, PackageId};
 use semver::Version;
 
@@ -30,6 +31,15 @@ pub enum IncompatMatch {
 impl Incompatibility {
     pub fn new(deps: IndexMap<PackageId, Constraint>, cause: IncompatibilityCause) -> Self {
         Incompatibility { deps, cause }
+    }
+
+    pub fn from_dep(a: Summary, b: (PackageId, Constraint)) -> Self {
+        let m = indexmap!(
+            a.id => a.version.into(),
+            b.0 => b.1,
+        );
+
+        Incompatibility::new(m, IncompatibilityCause::Dependency)
     }
 
     pub fn deps(&self) -> &IndexMap<PackageId, Constraint> {

@@ -115,6 +115,18 @@ pub enum Resolution {
     Index(IndexRes),
 }
 
+impl From<DirectRes> for Resolution {
+    fn from(i: DirectRes) -> Self {
+        Resolution::Direct(i)
+    }
+}
+
+impl From<IndexRes> for Resolution {
+    fn from(i: IndexRes) -> Self {
+        Resolution::Index(i)
+    }
+}
+
 impl FromStr for Resolution {
     type Err = Error;
 
@@ -133,7 +145,7 @@ impl fmt::Display for Resolution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Resolution::Direct(d) => write!(f, "{}", d),
-            Resolution::Index(i)  => write!(f, "{}", i),
+            Resolution::Index(i) => write!(f, "{}", i),
         }
     }
 }

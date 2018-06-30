@@ -35,14 +35,6 @@ use std::{
     cmp, fmt, hash::{Hash, Hasher}, str::FromStr,
 };
 
-// TODO: Implement lul
-/// A newtype wrapper for a `Version` which changes the ordering behavior such that the "greatest"
-/// version is the one that a user would most likely prefer (the latest not-prerelease version)
-pub struct OrderedVersion(Version);
-
-// TODO: Interval struct with side? That way, we don't have this cmp crap and we can implement
-// switching from upper to lower
-
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Relation {
     Superset,

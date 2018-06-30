@@ -12,7 +12,7 @@ use toml;
 type PathV = String;
 
 #[derive(Deserialize, Debug)]
-struct Manifest {
+pub struct Manifest {
     package: Package,
     #[serde(default = "BTreeMap::new")]
     dependencies: BTreeMap<Name, DepReq>,

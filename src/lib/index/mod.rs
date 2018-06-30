@@ -35,6 +35,8 @@
 //
 // TODO: Can we still have the local packages available be an index? It'd be the lowest priority
 //       one I guess (airplane mode moves it to highest?)
+//
+// TODO: Patching
 
 mod config;
 
@@ -42,7 +44,7 @@ use self::config::IndexConfig;
 use err::{Error, ErrorKind};
 use failure::ResultExt;
 use indexmap::IndexMap;
-use package::{version::Constraint, *};
+use package::{manifest::Manifest, version::Constraint, *};
 use semver::Version;
 use serde_json;
 use std::{
@@ -76,32 +78,59 @@ impl Indices {
         Indices { indices, cache }
     }
 
-    pub fn select(&mut self, pkg: Summary) -> Result<&IndexEntry, Error> {
-        // TODO: Actually do some loading if we can't find it instead of going straight to cache
-        unimplemented!();
-        let versions = self.cache.get(pkg.id()).ok_or_else(|| ErrorKind::PackageNotFound)?;
-        let entry = versions.get(pkg.version()).ok_or_else(|| ErrorKind::PackageNotFound)?;
+    pub fn select(&mut self, pkg: &Summary) -> Result<&IndexEntry, Error> {
+        let entry = self
+            .entries(pkg.id())?
+            .get(pkg.version())
+            .ok_or_else(|| ErrorKind::PackageNotFound)?;
 
         Ok(entry)
+    }
+
+    pub fn count_versions(&self, pkg: &PackageId) -> usize {
+        match self.cache.get(pkg) {
+            Some(m) => m.len(),
+            None => 0,
+        }
     }
 
     pub fn checksum(&mut self, pkg: Summary) -> Result<&Checksum, Error> {
         unimplemented!()
     }
 
-    pub fn entries(&mut self, name: &Name) -> Result<&Vec<IndexEntry>, Error> {
-        unimplemented!()
+    pub fn entries(&mut self, pkg: &PackageId) -> Result<&IndexMap<Version, IndexEntry>, Error> {
+        if self.cache.contains_key(pkg) {
+            return Ok(&self.cache[pkg]);
+        }
+
+        let res = pkg.resolution();
+        if let Resolution::Index(ir) = res {
+            let ix = self.indices.get(ir);
+
+            if let Some(ix) = ix {
+                let mut v = ix.entries(pkg.name())?;
+                v.sort_keys();
+                self.cache.insert(pkg.clone(), v);
+                Ok(&self.cache[pkg])
+            } else {
+                let e = Err(ErrorKind::PackageNotFound)?;
+                e
+            }
+        } else {
+            let e = Err(ErrorKind::PackageNotFound)?;
+            e
+        }
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct IndexEntry {
     #[serde(flatten)]
-    sum: Summary,
-    dependencies: Vec<Dep>,
-    yanked: bool,
-    checksum: Checksum,
-    location: DirectRes,
+    pub sum: Summary,
+    pub dependencies: Vec<Dep>,
+    pub yanked: bool,
+    pub checksum: Checksum,
+    pub location: DirectRes,
 }
 
 // TODO: The local packages available are an index.
@@ -128,8 +157,12 @@ impl Index {
         Index { id, path, config }
     }
 
-    pub fn entries(&mut self, name: &Name) -> Result<Vec<IndexEntry>, Error> {
-        let mut res = Vec::new();
+    pub fn add(&self, manifest: Manifest) {
+        unimplemented!()
+    }
+
+    pub fn entries(&self, name: &Name) -> Result<IndexMap<Version, IndexEntry>, Error> {
+        let mut res = indexmap!();
         let mut path = self.path.clone();
         path.push(name.group());
         path.push(name.name());
@@ -139,29 +172,11 @@ impl Index {
 
         for line in r.lines() {
             let line = line.context(ErrorKind::InvalidIndex)?;
-            let entry = self.parse_index_entry(&line)?;
+            let entry: IndexEntry = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
-            res.push(entry);
+            res.insert(entry.sum.version.clone(), entry);
         }
 
         Ok(res)
-    }
-
-    fn parse_index_entry(&mut self, line: &str) -> Result<IndexEntry, Error> {
-        let IndexEntry {
-            sum,
-            dependencies,
-            checksum,
-            yanked,
-            location,
-        } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
-
-        Ok(IndexEntry {
-            sum,
-            dependencies,
-            checksum,
-            yanked,
-            location,
-        })
     }
 }

@@ -27,10 +27,19 @@ enum Cmd {
         lib: bool,
         name: String,
     },
+    #[structopt(name = "index")]
+    Index(IndexCmd),
     #[structopt(name = "install")]
     Install { specifier: String },
     #[structopt(name = "uninstall")]
     Uninstall { name: String },
+}
+
+// TODO
+#[derive(StructOpt)]
+enum IndexCmd {
+    #[structopt(name = "new")]
+    New,
 }
 
 fn main() {
