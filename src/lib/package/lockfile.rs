@@ -7,12 +7,12 @@ use toml;
 
 use super::*;
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Clone, Deserialize, Debug, Serialize)]
 pub struct Lockfile {
     package: HashSet<LockedPkg>,
 }
 
-#[derive(Deserialize, Debug, Serialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Eq, Hash)]
 pub struct LockedPkg {
     #[serde(flatten)]
     sum: Summary,

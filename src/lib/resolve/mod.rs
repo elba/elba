@@ -6,17 +6,23 @@
 //! deal with backtracking nicer than Cargo (where the solution is just clone the solver state
 //! repeatedly).
 
+mod retriever;
 pub mod types;
 
-use self::types::{Assignment, AssignmentType, Incompatibility, IncompatMatch};
+use self::{
+    types::{
+        Assignment, AssignmentType, IncompatMatch, Incompatibility, IncompatibilityCause,
+    },
+    retriever::Retriever,
+};
 use err::Error;
 use indexmap::IndexMap;
-use package::{PackageId, Summary, version::{Constraint, Relation}};
+use package::{
+    version::{Constraint, Relation}, PackageId, Summary,
+};
 use semver::Version;
 use std::cmp;
 
-// TODO: incompats, derivations, decisions? assignments would just be a log of what happened with
-// indices to the other props
 pub struct Resolver {
     /// The current step.
     step: u16,
@@ -26,6 +32,7 @@ pub struct Resolver {
     derivations: IndexMap<PackageId, Constraint>,
     incompats: Vec<Incompatibility>,
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
+    retriever: Retriever,
     root: Summary,
 }
 
@@ -38,6 +45,7 @@ impl Resolver {
         let incompat_ixs = indexmap!();
         let decisions = indexmap!();
         let derivations = indexmap!();
+        let retriever = unimplemented!();
         Resolver {
             step,
             level,
@@ -46,13 +54,14 @@ impl Resolver {
             incompat_ixs,
             decisions,
             derivations,
+            retriever,
             root,
         }
     }
 
     pub fn solve(&mut self) -> Result<(), Error> {
         let pkgs = indexmap!(self.root.id().clone() => self.root.version().clone().into());
-        self.incompatibility(pkgs, None, None);
+        self.incompatibility(pkgs, IncompatibilityCause::Root);
 
         let mut next = Some(self.root.id().clone());
         while let Some(n) = next {
@@ -65,7 +74,18 @@ impl Resolver {
     }
 
     fn choose_pkg_version(&mut self) -> Option<PackageId> {
-        unimplemented!()
+        let unsatisfied = self
+            .derivations
+            .iter()
+            .map(|(d, _)| d)
+            .filter(|d| !self.decisions.contains_key(*d))
+            .collect::<Vec<_>>();
+
+        if unsatisfied.is_empty() {
+            None
+        } else {
+            unimplemented!()
+        }
     }
 
     fn propagate(&mut self, pkg: PackageId) {
@@ -77,7 +97,9 @@ impl Resolver {
                 'f: for icix in icixs {
                     let res = self.propagate_incompat(*icix);
                     match res {
-                        IncompatMatch::Almost(name) => { changed.insert(name); }
+                        IncompatMatch::Almost(name) => {
+                            changed.insert(name);
+                        }
                         IncompatMatch::Satisfied => {
                             // TODO: Error handling
                             let root = self.resolve_conflict(*icix).unwrap();
@@ -134,11 +156,10 @@ impl Resolver {
             // This is different from Constraints, in which not having anything means no solution
             Relation::Superset
         }
-
     }
 
     // This function is basically the only reason why we need NLL; we're doing immutable borrows
-    // with satisfier, but mutable ones wiht backtrack & incompatibility.
+    // with satisfier, but mutable ones with backtrack & incompatibility.
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
         let mut new_incompatibility = false;
         let incompats = self.incompats.to_vec();
@@ -158,12 +179,14 @@ impl Resolver {
                 match most_recent_satisfier {
                     Some(a) => {
                         if a.step() < satisfier.step() {
-                            previous_satisfier_level = cmp::max(previous_satisfier_level, a.level());
+                            previous_satisfier_level =
+                                cmp::max(previous_satisfier_level, a.level());
                             most_recent_term = Some((pkg, c));
                             most_recent_satisfier = Some(satisfier);
                             difference = None;
                         } else {
-                            previous_satisfier_level = cmp::max(previous_satisfier_level, satisfier.level());
+                            previous_satisfier_level =
+                                cmp::max(previous_satisfier_level, satisfier.level());
                         }
                     }
                     None => {
@@ -191,7 +214,8 @@ impl Resolver {
                     if let Some((pkg, diff)) = difference.clone() {
                         previous_satisfier_level = cmp::max(
                             previous_satisfier_level,
-                            self.satisfier(pkg, &diff.complement()).unwrap().level());
+                            self.satisfier(pkg, &diff.complement()).unwrap().level(),
+                        );
                     }
                 }
             }
@@ -203,7 +227,7 @@ impl Resolver {
             {
                 self.backtrack(previous_satisfier_level);
                 if new_incompatibility {
-                    return Ok(self.incompatibility(i.deps().clone(), i.left(), i.right()));
+                    return Ok(self.incompatibility(i.deps, i.cause));
                 } else {
                     return Ok(inc);
                 }
@@ -213,15 +237,29 @@ impl Resolver {
             let cause = incompats[most_recent_satisfier.cause().unwrap()].clone();
             let mut new_terms: IndexMap<PackageId, Constraint> = IndexMap::new()
                 .into_iter()
-                .chain(i.deps().clone().into_iter().filter(|t| (&t.0, &t.1) != most_recent_term))
-                .chain(cause.deps().clone().into_iter().filter(|t| &t.0 != most_recent_satisfier.pkg()))
+                .chain(
+                    i.deps()
+                        .clone()
+                        .into_iter()
+                        .filter(|t| (&t.0, &t.1) != most_recent_term),
+                )
+                .chain(
+                    cause
+                        .deps()
+                        .clone()
+                        .into_iter()
+                        .filter(|t| &t.0 != most_recent_satisfier.pkg()),
+                )
                 .collect();
 
             if let Some((pkg, diff)) = difference {
                 new_terms.insert(pkg.clone(), diff.complement());
             }
 
-            i = Incompatibility::new(new_terms, Some(inc), most_recent_satisfier.cause());
+            i = Incompatibility::new(
+                new_terms,
+                IncompatibilityCause::Derived(inc, most_recent_satisfier.cause().unwrap()),
+            );
             new_incompatibility = true;
 
             // TODO: Some logging here
@@ -281,16 +319,21 @@ impl Resolver {
     }
 
     fn is_failure(&self, inc: &Incompatibility) -> bool {
-        inc.deps().is_empty() || (inc.deps().len() == 1 && inc.deps().get_index(0).unwrap().0 == self.root.id())
+        inc.deps().is_empty()
+            || (inc.deps().len() == 1 && inc.deps().get_index(0).unwrap().0 == self.root.id())
     }
 
     fn register(&mut self, a: &Assignment) {
         match a.ty() {
             AssignmentType::Decision { version } => {
                 self.decisions.insert(a.pkg().clone(), version.clone());
-                self.derivations.insert(a.pkg().clone(), version.clone().into());
+                self.derivations
+                    .insert(a.pkg().clone(), version.clone().into());
             }
-            AssignmentType::Derivation { cause: _cause, constraint } => {
+            AssignmentType::Derivation {
+                cause: _cause,
+                constraint,
+            } => {
                 if !self.derivations.contains_key(a.pkg()) {
                     self.derivations.insert(a.pkg().clone(), constraint.clone());
                 } else {
@@ -303,25 +346,45 @@ impl Resolver {
 
     fn decision(&mut self, pkg: PackageId, version: Version) {
         self.level += 1;
-        let a = Assignment::new(self.step, self.level, pkg, AssignmentType::Decision { version: version } );
+        let a = Assignment::new(
+            self.step,
+            self.level,
+            pkg,
+            AssignmentType::Decision { version: version },
+        );
         self.step += 1;
         self.register(&a);
         self.assignments.push(a);
     }
 
     fn derivation(&mut self, pkg: PackageId, c: Constraint, level: u16, cause: usize) {
-        let a = Assignment::new(self.step, level, pkg, AssignmentType::Derivation { constraint: c, cause });
+        let a = Assignment::new(
+            self.step,
+            level,
+            pkg,
+            AssignmentType::Derivation {
+                constraint: c,
+                cause,
+            },
+        );
         self.register(&a);
         self.assignments.push(a);
         self.step += 1;
     }
 
-    fn incompatibility(&mut self, pkgs: IndexMap<PackageId, Constraint>, left: Option<usize>, right: Option<usize>) -> usize {
+    fn incompatibility(
+        &mut self,
+        pkgs: IndexMap<PackageId, Constraint>,
+        cause: IncompatibilityCause,
+    ) -> usize {
         let new_ix = self.incompats.len();
         for (n, _) in &pkgs {
-            self.incompat_ixs.entry(n.clone()).or_insert_with(Vec::new).push(new_ix);
+            self.incompat_ixs
+                .entry(n.clone())
+                .or_insert_with(Vec::new)
+                .push(new_ix);
         }
-        self.incompats.push(Incompatibility::new(pkgs, left, right));
+        self.incompats.push(Incompatibility::new(pkgs, cause));
         self.step += 1;
 
         new_ix

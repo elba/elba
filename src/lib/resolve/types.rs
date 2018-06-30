@@ -6,15 +6,19 @@ use indexmap::IndexMap;
 use package::{version::Constraint, PackageId};
 use semver::Version;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum IncompatibilityCause {
+    Dependency,
+    NoVersions,
+    Root,
+    Unavailable,
+    Derived(usize, usize),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Incompatibility {
-    deps: IndexMap<PackageId, Constraint>,
-    /// One possible parent incompatibility which lead to the creation of this one. The `left`
-    /// incompatibility is always the first to be created.
-    left: Option<usize>,
-    /// The other possible parent incompatibility of this one. If there's only one parent, this is
-    /// `None`.
-    right: Option<usize>,
+    pub deps: IndexMap<PackageId, Constraint>,
+    pub cause: IncompatibilityCause,
 }
 
 pub enum IncompatMatch {
@@ -24,16 +28,8 @@ pub enum IncompatMatch {
 }
 
 impl Incompatibility {
-    pub fn new(
-        deps: IndexMap<PackageId, Constraint>,
-        left: Option<usize>,
-        right: Option<usize>,
-    ) -> Self {
-        Incompatibility {
-            deps,
-            left,
-            right,
-        }
+    pub fn new(deps: IndexMap<PackageId, Constraint>, cause: IncompatibilityCause) -> Self {
+        Incompatibility { deps, cause }
     }
 
     pub fn deps(&self) -> &IndexMap<PackageId, Constraint> {
@@ -41,11 +37,23 @@ impl Incompatibility {
     }
 
     pub fn left(&self) -> Option<usize> {
-        self.left
+        if let IncompatibilityCause::Derived(l, _) = self.cause {
+            Some(l)
+        } else {
+            None
+        }
     }
 
     pub fn right(&self) -> Option<usize> {
-        self.right
+        if let IncompatibilityCause::Derived(_, r) = self.cause {
+            Some(r)
+        } else {
+            None
+        }
+    }
+
+    pub fn cause(&self) -> IncompatibilityCause {
+        self.cause
     }
 }
 
@@ -59,7 +67,12 @@ pub struct Assignment {
 
 impl Assignment {
     pub fn new(step: u16, level: u16, pkg: PackageId, ty: AssignmentType) -> Self {
-        Assignment { step, level, ty, pkg }
+        Assignment {
+            step,
+            level,
+            ty,
+            pkg,
+        }
     }
 
     pub fn ty(&self) -> &AssignmentType {
@@ -80,29 +93,32 @@ impl Assignment {
 
     pub fn cause(&self) -> Option<usize> {
         match &self.ty {
-            AssignmentType::Decision { version: _version } => {
-                None
-            }
-            AssignmentType::Derivation { cause, constraint: _constraint } => {
-                Some(*cause)
-            }
+            AssignmentType::Decision { version: _version } => None,
+            AssignmentType::Derivation {
+                cause,
+                constraint: _constraint,
+            } => Some(*cause),
         }
     }
 
     pub fn constraint(&self) -> Constraint {
         match &self.ty {
-            AssignmentType::Decision { version } => {
-                version.clone().into()
-            }
-            AssignmentType::Derivation { constraint, cause: _cause } => {
-                constraint.clone()
-            }
+            AssignmentType::Decision { version } => version.clone().into(),
+            AssignmentType::Derivation {
+                constraint,
+                cause: _cause,
+            } => constraint.clone(),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AssignmentType {
-    Decision { version: Version },
-    Derivation { constraint: Constraint, cause: usize },
+    Decision {
+        version: Version,
+    },
+    Derivation {
+        constraint: Constraint,
+        cause: usize,
+    },
 }

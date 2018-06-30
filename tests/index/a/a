@@ -1,1 +1,1 @@
-{ "id": "a/a dir+file://index/a/a", "version": "1.5.2", "checksum": {"fmt": "sha512", "hash": "pizza"}, "dependencies": [], "yanked": false, "location": "index+https://other.io/test/repo" }
+{ "id": "a/a index+file://index", "version": "1.5.2", "checksum": {"fmt": "sha512", "hash": "pizza"}, "dependencies": [], "yanked": false, "location": "dir+file://../../../files/a/a" }

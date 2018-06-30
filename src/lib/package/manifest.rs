@@ -44,6 +44,10 @@ struct Package {
 #[serde(untagged)]
 enum DepReq {
     Registry(Constraint),
+    RegLong {
+        con: Constraint,
+        registry: String,
+    },
     Local {
         path: String,
     },

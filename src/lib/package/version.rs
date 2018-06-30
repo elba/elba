@@ -404,7 +404,7 @@ impl Constraint {
     }
 
     /// Checks if a `Version` is satisfied by this `Constraint`.
-    pub fn satisfies(&mut self, v: &Version) -> bool {
+    pub fn satisfies(&self, v: &Version) -> bool {
         if self.set.is_empty() {
             return false;
         }
@@ -912,5 +912,17 @@ mod tests {
 
         assert_eq!(Relation::Subset, a.relation(&b));
         assert_eq!(Relation::Superset, b.relation(&a));
+    }
+
+    #[test]
+    fn test_version_single() {
+        let v = Version::new(1, 4, 2);
+        let v2 = Version::new(1, 4, 3);
+        let v3 = Version::new(1, 4, 1);
+        let c: Constraint = v.clone().into();
+
+        assert!(c.satisfies(&v));
+        assert!(!c.satisfies(&v2));
+        assert!(!c.satisfies(&v3));
     }
 }

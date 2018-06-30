@@ -1,28 +1,50 @@
-//! Module `index` defines the format of and the interface for a package index.
+//! An index from which information/metadata about available packages is obtained.
 //!
-//! First, some definitions:
-//! *index* = a listing of package metadata, including versions, dependencies, and source urls.
-//! *registry* = a place where package archives are hosted.
+//! ## Design
+//! Indices provide metadata about available packages from a particular source. Multiple indices
+//! can be specified at once, but packages will always default to using the index with the highest
+//! priority. If a user wants to use a package from a different registry, they have to explicitly specify
+//! this from their manifest. By default, the official index has the highest priority, and so the
+//! official index will be assumed to be the index where the package is located. All dependencies
+//! of a package listed in an index must have a source: either a direct source (i.e. a git repo or
+//! tarball or file directory), or a url to another index.
 //!
-//! Indices are the main way to get information about packages. Indices do not correspond one-to-
-//! one with registries; they can refer to packages in a registry, or to git repositories, or to
-//! local directories. To which they are referring to is disambiguated from the Url schema.
+//! The packages that the index offers must have a direct source: they cannot point to other
+//! registries. Because the package doesn't necessarily need to be a tarball stored somewhere,
+//! indices can serve to "curate" packages from disparate repositories and other sources (think
+//! Purescript package sets). It is assumed that the id of every package that an index offers
+//! is set to that index.
 //!
-//! Multiple indices can be used at the same time. Indices that are listed first have "higher
-//! priority," and their entries override subsequent indices' entries.
+//! A package can only be published to the official index if it only depends on packages in the
+//! official index.
 //!
-//! Only packages which rely solely on the official index and depend on packages in the official
-//! registry can be published to the official registry.
-//! This can be manually checked for by unofficial registries.
-//!
-//! Indices can also act like Purescript package sets, in that they can refer to git repositories.
+//! ## Prior art
+//! This design follows closely with that of Cargo's, specifically with their RFC for using
+//! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
+// TODO: If we allow git repositories, that negates the entire purpose of having an index. Now
+//       if you want to find the dependencies of that git repo, you have to clone the entire package
+//       and now you're back where you started. If you require that dependencies only point to
+//       indices, you have to check that the Manifest == the Index (counter: you derive index values
+//       from the manifest), and the index has to take on all of the dependencies of the git package...
+//       Plus if ppl wanna use git repos they can just do that in their manifests.
+//       Registries shouldn't deal with that.
+//
+//       Counter-argument: you can check before adding a direct package to an index that it doesn't
+//       depend on other direct packages so that an index will always have its metadata.
+//
+// TODO: Can we still have the local packages available be an index? It'd be the lowest priority
+//       one I guess (airplane mode moves it to highest?)
+
+mod config;
+
+use self::config::IndexConfig;
 use err::{Error, ErrorKind};
 use failure::ResultExt;
+use indexmap::IndexMap;
 use package::{version::Constraint, *};
 use semver::Version;
 use serde_json;
-use std::collections::BTreeMap;
 use std::{
     fs, io::{self, BufRead}, path::PathBuf,
 };
@@ -31,26 +53,47 @@ use url::Url;
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Dep {
-    pub name: PackageId,
+    pub name: Name,
+    pub index: IndexRes,
     pub req: Constraint,
 }
 
-// TODO: IndexMap<Resolution, Index> so we can select faster?
-pub struct Indices(Vec<Index>);
+#[derive(Clone, Debug)]
+pub struct Indices {
+    /// The indices being used.
+    ///
+    /// It is assumed that all dependent indices have been resolved, and that this mapping contains
+    /// every index mentioned or depended on.
+    indices: IndexMap<IndexRes, Index>,
+    cache: IndexMap<PackageId, IndexMap<Version, IndexEntry>>,
+}
 
 impl Indices {
-    pub fn select(&mut self, pkg: Summary) -> Result<IndexEntry, Error> {
-        for ix in &mut self.0 {
-            if let Ok(r) = ix.select(&pkg) {
-                return Ok(r);
-            }
-        }
+    pub fn new(indices: Vec<Index>) -> Self {
+        let indices = indices.into_iter().map(|i| (i.id.clone(), i)).collect();
+        let cache = indexmap!();
 
-        return Err(ErrorKind::NotInIndex)?;
+        Indices { indices, cache }
+    }
+
+    pub fn select(&mut self, pkg: Summary) -> Result<&IndexEntry, Error> {
+        // TODO: Actually do some loading if we can't find it instead of going straight to cache
+        unimplemented!();
+        let versions = self.cache.get(pkg.id()).ok_or_else(|| ErrorKind::PackageNotFound)?;
+        let entry = versions.get(pkg.version()).ok_or_else(|| ErrorKind::PackageNotFound)?;
+
+        Ok(entry)
+    }
+
+    pub fn checksum(&mut self, pkg: Summary) -> Result<&Checksum, Error> {
+        unimplemented!()
+    }
+
+    pub fn entries(&mut self, name: &Name) -> Result<&Vec<IndexEntry>, Error> {
+        unimplemented!()
     }
 }
 
-// TODO: We could separate source out into a special thing for IndexEntry. But needless duplication...
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct IndexEntry {
     #[serde(flatten)]
@@ -58,69 +101,40 @@ pub struct IndexEntry {
     dependencies: Vec<Dep>,
     yanked: bool,
     checksum: Checksum,
-    location: Resolution,
+    location: DirectRes,
 }
 
+// TODO: The local packages available are an index.
+// TODO: Are Lockfiles an index?
 // TODO: Dealing with where to download the Index, using the Config to get that info.
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.
+#[derive(Clone, Debug)]
 pub struct Index {
     /// Indicates identifying information about the index
-    id: Resolution,
+    pub id: IndexRes,
     /// Indicates where this index is stored on-disk.
-    path: PathBuf,
-    // TODO: Should this hold urls too?
-    /// Contains a mapping of versioned packages to checksums
-    checksums: BTreeMap<Name, BTreeMap<Version, Checksum>>,
-    cache: BTreeMap<Name, Vec<IndexEntry>>,
+    pub path: PathBuf,
+    /// The configuration of this index.
+    pub config: IndexConfig,
 }
 
 impl Index {
-    /// Method `Index::new` creates a new empty package index directly from a Url and a local path.
+    /// Creates a new empty package index directly from a Url and a local path.
     pub fn new(url: Url, path: PathBuf) -> Self {
-        let id = Resolution::Index { url };
-        let checksums = BTreeMap::new();
-        let cache = BTreeMap::new();
-        Index {
-            id,
-            path,
-            checksums,
-            cache,
-        }
+        let id = IndexRes { url };
+        let config = unimplemented!();
+        Index { id, path, config }
     }
 
-    pub fn checksum(&mut self, pkg: PackageId, vers: &Version) -> Result<Checksum, Error> {
-        let name = pkg.name();
-
-        if let Some(s) = self.checksums.get(name).and_then(|v| v.get(vers)) {
-            return Ok(s.clone());
-        }
-
-        self.entries(name)?;
-        Ok(self.checksums[name][vers].clone())
-    }
-
-    pub fn entries(&mut self, name: &Name) -> Result<&Vec<IndexEntry>, Error> {
-        if !self.cache.contains_key(&name) {
-            let summaries = self.load_entries(name)?;
-            self.cache.insert(name.clone(), summaries);
-        }
-
-        Ok(&self.cache[name])
-    }
-
-    /// Method `Index::find` searches for a package within the index, invoking a callback on its
-    /// contents.
-    pub fn load_entries(&mut self, name: &Name) -> Result<Vec<IndexEntry>, Error> {
+    pub fn entries(&mut self, name: &Name) -> Result<Vec<IndexEntry>, Error> {
         let mut res = Vec::new();
         let mut path = self.path.clone();
         path.push(name.group());
         path.push(name.name());
 
-        self.checksums.insert(name.clone(), BTreeMap::new());
-
-        let file = fs::File::open(path).context(ErrorKind::NotInIndex)?;
+        let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
         let r = io::BufReader::new(&file);
 
         for line in r.lines() {
@@ -133,7 +147,6 @@ impl Index {
         Ok(res)
     }
 
-    // TODO: What to do with unused fields
     fn parse_index_entry(&mut self, line: &str) -> Result<IndexEntry, Error> {
         let IndexEntry {
             sum,
@@ -143,11 +156,6 @@ impl Index {
             location,
         } = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
-        self.checksums
-            .get_mut(sum.name())
-            .unwrap()
-            .insert(sum.version().clone(), checksum.clone());
-
         Ok(IndexEntry {
             sum,
             dependencies,
@@ -155,17 +163,5 @@ impl Index {
             yanked,
             location,
         })
-    }
-
-    pub fn select(&mut self, pkg: &Summary) -> Result<IndexEntry, Error> {
-        let sums = self.entries(pkg.name())?;
-
-        for s in sums {
-            if &s.sum == pkg {
-                return Ok(s.clone());
-            }
-        }
-
-        return Err(ErrorKind::NotInIndex)?;
     }
 }
