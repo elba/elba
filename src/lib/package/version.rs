@@ -217,12 +217,8 @@ impl Range {
             Closed(u) => u.is_prerelease(),
             Unbounded => true,
         };
-        let lower_pre_ok = match &self.lower {
-            Open(l) => l.is_prerelease(),
-            Closed(l) => l.is_prerelease(),
-            Unbounded => false,
-        };
-        let pre_ok = upper_pre_ok || lower_pre_ok;
+        // Note: we don't care about lower_pre_ok because if our bound is >= 1.0.0, 1.0.0-beta,
+        // which is smaller, won't ever satisfy it anyways.
 
         let satisfies_upper = match &self.upper {
             Open(u) => version < u,
@@ -234,9 +230,8 @@ impl Range {
             Closed(l) => version >= l,
             Unbounded => true,
         };
-        let satisfies_pre = pre_ok || !version.is_prerelease();
 
-        satisfies_upper && satisfies_lower && satisfies_pre
+        satisfies_lower && (!version.is_prerelease() || upper_pre_ok) && satisfies_upper
     }
 
     /// Returns the intersection of two `Range`s, or `None` if the two `Range`s are disjoint.

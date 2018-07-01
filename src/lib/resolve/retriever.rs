@@ -1,8 +1,8 @@
-use semver::Version;
-use err::Error;
+use err::{Error, ErrorKind};
 use index::Indices;
 use package::{lockfile::Lockfile, version::Constraint, PackageId, Summary};
 use resolve::types::Incompatibility;
+use semver::Version;
 
 // TODO: Patching
 /// Retrieves the best packages using both the indices available and a lockfile.
@@ -30,9 +30,43 @@ impl Retriever {
         }
     }
 
-    /// Chooses the best version of a package.
-    pub fn best(&mut self, pkg: &PackageId, minimize: bool) -> Result<Version, Error> {
-        unimplemented!()
+    /// Chooses the best version of a package given a constraint.
+    pub fn best(
+        &mut self,
+        pkg: &PackageId,
+        con: &Constraint,
+        minimize: bool,
+    ) -> Result<Version, Error> {
+        if let Some((v, pkg)) = self.lockfile.packages.get(pkg) {
+            if con.satisfies(v) {
+                return Ok(v.clone());
+            }
+        }
+
+        let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
+            .indices
+            .entries(pkg)?
+            .clone()
+            .into_iter()
+            .map(|v| v.0)
+            .filter(|v| con.satisfies(v))
+            .partition(|v| v.is_prerelease());
+
+        if !not_pre.is_empty() {
+            if !minimize {
+                Ok(not_pre.pop().unwrap())
+            } else {
+                Ok(not_pre.remove(0))
+            }
+        } else if !pre.is_empty() {
+            if !minimize {
+                Ok(pre.pop().unwrap())
+            } else {
+                Ok(pre.remove(0))
+            }
+        } else {
+            Err(Error::from(ErrorKind::PackageNotFound))
+        }
     }
 
     // TODO: if subsequent versions of a package have the same dependencies, reflect that in the
@@ -48,17 +82,31 @@ impl Retriever {
             Ok(res)
         } else {
             // If the Lockfile has an entry for the package, we use that.
-            if let Some(deps) = self.lockfile.packages.get(pkg) {
-                Ok(deps
-                    .clone()
-                    .into_iter()
-                    .map(|d| {
-                        Incompatibility::from_dep(
-                            pkg.clone(),
-                            (d.id.clone(), d.version.clone().into()),
-                        )
-                    })
-                    .collect())
+            if let Some((v, deps)) = self.lockfile.packages.get(pkg.id()) {
+                if v == pkg.version() {
+                    Ok(deps
+                        .clone()
+                        .into_iter()
+                        .map(|d| {
+                            Incompatibility::from_dep(
+                                pkg.clone(),
+                                (d.id.clone(), d.version.clone().into()),
+                            )
+                        })
+                        .collect())
+                } else {
+                    Ok(self
+                        .indices
+                        .select(pkg)?
+                        .dependencies
+                        .iter()
+                        .cloned()
+                        .map(|d| {
+                            let dep = (PackageId::new(d.name, d.index.into()), d.req);
+                            Incompatibility::from_dep(pkg.clone(), dep)
+                        })
+                        .collect())
+                }
             } else {
                 Ok(self
                     .indices

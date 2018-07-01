@@ -9,7 +9,7 @@ use super::*;
 
 #[derive(Clone, Debug)]
 pub struct Lockfile {
-    pub packages: IndexMap<Summary, Vec<Summary>>,
+    pub packages: IndexMap<PackageId, (Version, Vec<Summary>)>,
 }
 
 impl FromStr for Lockfile {
@@ -26,7 +26,8 @@ impl From<LockfileToml> for Lockfile {
     fn from(l: LockfileToml) -> Self {
         let mut packages = indexmap!();
         for package in l.packages {
-            packages.insert(package.sum, package.dependencies);
+            let s = package.sum;
+            packages.insert(s.id, (s.version, package.dependencies));
         }
 
         Lockfile { packages }
