@@ -32,7 +32,8 @@ use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
-    cmp, fmt, hash::{Hash, Hasher}, str::FromStr,
+    cmp, fmt,
+    str::FromStr,
 };
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -98,12 +99,10 @@ impl Interval {
                         } else {
                             ap.cmp(&bp).reverse()
                         }
+                    } else if ap == bp {
+                        cmp::Ordering::Less
                     } else {
-                        if ap == bp {
-                            cmp::Ordering::Less
-                        } else {
-                            ap.cmp(&bp)
-                        }
+                        ap.cmp(&bp)
                     }
                 } else {
                     a.cmp(&b)
@@ -117,12 +116,10 @@ impl Interval {
                         } else {
                             ap.cmp(&bp).reverse()
                         }
+                    } else if ap == bp {
+                        cmp::Ordering::Greater
                     } else {
-                        if ap == bp {
-                            cmp::Ordering::Greater
-                        } else {
-                            ap.cmp(&bp)
-                        }
+                        ap.cmp(&bp)
                     }
                 } else {
                     a.cmp(&b)
@@ -173,12 +170,10 @@ impl Interval {
                     } else {
                         format!(">={} ", v)
                     }
+                } else if !v.is_prerelease() && *p {
+                    format!("<=!{}", v)
                 } else {
-                    if !v.is_prerelease() && *p {
-                        format!("<=!{}", v)
-                    } else {
-                        format!("<={}", v)
-                    }
+                    format!("<={}", v)
                 }
             }
             Interval::Open(v, p) => {
@@ -188,12 +183,10 @@ impl Interval {
                     } else {
                         format!(">{} ", v)
                     }
+                } else if !v.is_prerelease() && *p {
+                    format!("<!{}", v)
                 } else {
-                    if !v.is_prerelease() && *p {
-                        format!("<!{}", v)
-                    } else {
-                        format!("<{}", v)
-                    }
+                    format!("<{}", v)
                 }
             }
         }
@@ -206,9 +199,9 @@ impl Interval {
 /// both sides. Pre-release `Version`s can satisfy a `Range` iff the `Range`
 /// mentions a pre-release `Version` on either bound, or if the `Range` is unbounded on the upper
 /// side. Additionally, if a greater-than and/or less-than `Range` also has a `!` after the
-/// inequality symbol, the Range will include pre-release versions. `>! 1.0.0` and `>=! 1.0.0`
-/// both accept all pre-releases of 1.0.0, along with the greater versions. `<! 2.0.0` includes
-/// pre-releases of 2.0.0.
+/// inequality symbol, the Range will include pre-release versions. `>=! 1.0.0` accepts all
+/// pre-releases of 1.0.0, along with the greater versions. `<! 2.0.0` includes pre-releases of
+/// 2.0.0. >! and > mean the same thing, as do <=! and <=.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Range {
     lower: Interval,
@@ -257,17 +250,16 @@ impl Range {
         (self.lower, self.upper)
     }
 
-    /// Checks if a version is satisfied by this `Range`. When dealing with pre-release versions,
-    /// pre-releases can only satisfy ranges if the range explicitly mentions a pre-release in either
-    /// the upper or lower bound (or if it's unbounded in the upper direction)
+    /// Checks if a version is satisfied by this `Range`.
     pub fn satisfies(&self, version: &Version) -> bool {
+        // For an upper range, a pre-release will satisfy the upper range if the interval is Open
+        // and it either is a prerelease or always accepts prereleases, or if the Interval is
+        // Closed or Unbounded. (`<= 2.0.0` includes 2.0.0-alpha, etc. <= is the same as <=!, and
+        // as we'll see later, >! is the same as >)
         let upper_pre_ok = match &self.upper {
             Open(u, p) => u.is_prerelease() || *p,
-            Closed(u, p) => u.is_prerelease() || *p,
-            Unbounded => true,
+            _ => true,
         };
-        // Note: we don't care about lower_pre_ok because if our bound is >= 1.0.0, 1.0.0-beta,
-        // which is smaller, won't ever satisfy it anyways.
 
         let satisfies_upper = match &self.upper {
             Open(u, _) => version < u,
@@ -277,14 +269,13 @@ impl Range {
         let satisfies_lower = match &self.lower {
             Open(l, false) => version > l,
             Closed(l, false) => version >= l,
-            // When the lower interval acceps prereleases but it doesn't specify a prerelease
-            // itself, we just compare the versions
-            Open(l, true) => if !version.is_prerelease() {
-                version > l
-            } else {
+            // >! is the same as >, since > means "ignoring this release, anything above"; the
+            // prereleases would've been ignored either way.
+            Open(l, true) => version > l,
+            // >=! is not the same as >=. >= ignores pre-releases of the version. >=! doesn't.
+            Closed(l, true) => {
                 (version.major, version.minor, version.patch) >= (l.major, l.minor, l.patch)
-            },
-            Closed(l, true) => (version.major, version.minor, version.patch) >= (l.major, l.minor, l.patch),
+            }
             Unbounded => true,
         };
 
@@ -643,14 +634,6 @@ impl Default for Constraint {
     }
 }
 
-impl Hash for Constraint {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for r in &self.set {
-            r.hash(state);
-        }
-    }
-}
-
 impl From<Range> for Constraint {
     fn from(r: Range) -> Constraint {
         let mut set = IndexSet::new();
@@ -714,12 +697,10 @@ mod parse {
 
         if v.major > 0 || (!minor_specified && !patch_specified) {
             v.increment_major();
+        } else if v.minor > 0 {
+            v.increment_minor();
         } else {
-            if v.minor > 0 {
-                v.increment_minor();
-            } else {
-                v.increment_patch();
-            }
+            v.increment_patch();
         }
 
         v

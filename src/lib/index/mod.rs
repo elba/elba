@@ -48,12 +48,15 @@ use package::{manifest::Manifest, version::Constraint, *};
 use semver::Version;
 use serde_json;
 use std::{
-    fs, io::{self, BufRead}, path::PathBuf,
+    fs,
+    io::{self, prelude::*, BufReader},
+    path::PathBuf,
+    str::FromStr,
 };
 use url::Url;
 
 /// A dependency.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Dep {
     pub name: Name,
     pub index: IndexRes,
@@ -94,7 +97,7 @@ impl Indices {
         }
     }
 
-    pub fn checksum(&mut self, pkg: Summary) -> Result<&Checksum, Error> {
+    pub fn checksum(&mut self, pkg: &Summary) -> Result<&Checksum, Error> {
         unimplemented!()
     }
 
@@ -113,17 +116,15 @@ impl Indices {
                 self.cache.insert(pkg.clone(), v);
                 Ok(&self.cache[pkg])
             } else {
-                let e = Err(ErrorKind::PackageNotFound)?;
-                e
+                Err(Error::from(ErrorKind::PackageNotFound))
             }
         } else {
-            let e = Err(ErrorKind::PackageNotFound)?;
-            e
+            Err(Error::from(ErrorKind::PackageNotFound))
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct IndexEntry {
     #[serde(flatten)]
     pub sum: Summary,
@@ -151,13 +152,21 @@ pub struct Index {
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn new(url: Url, path: PathBuf) -> Self {
+    pub fn from_local(url: Url, path: PathBuf) -> Result<Self, Error> {
         let id = IndexRes { url };
-        let config = unimplemented!();
-        Index { id, path, config }
+        let mut pn = path.clone();
+        pn.push("index.toml");
+        let file = fs::File::open(pn).context(ErrorKind::InvalidIndex)?;
+        let mut file = BufReader::new(file);
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .context(ErrorKind::InvalidIndex)?;
+        let config = IndexConfig::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+
+        Ok(Index { id, path, config })
     }
 
-    pub fn add(&self, manifest: Manifest) {
+    pub fn add(&self, manifest: &Manifest) {
         unimplemented!()
     }
 

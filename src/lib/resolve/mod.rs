@@ -17,7 +17,9 @@ use err::Error;
 use index::Indices;
 use indexmap::IndexMap;
 use package::{
-    lockfile::Lockfile, version::{Constraint, Relation}, PackageId, Summary,
+    lockfile::Lockfile,
+    version::{Constraint, Relation},
+    PackageId, Summary,
 };
 use semver::Version;
 use std::cmp;
@@ -131,7 +133,7 @@ impl Resolver {
             if relation == Relation::Disjoint {
                 return IncompatMatch::Contradicted;
             } else if relation != Relation::Subset {
-                if let None = unsatis {
+                if unsatis.is_none() {
                     unsatis = Some((pkg, con));
                 } else {
                     // We can't deduce anything. This should prolly be "None" instead of
@@ -353,7 +355,7 @@ impl Resolver {
             self.step,
             self.level,
             pkg,
-            AssignmentType::Decision { version: version },
+            AssignmentType::Decision { version },
         );
         self.step += 1;
         self.register(&a);

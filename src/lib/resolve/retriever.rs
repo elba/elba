@@ -80,33 +80,19 @@ impl Retriever {
                 res.push(Incompatibility::from_dep(pkg.clone(), dep.clone()));
             }
             Ok(res)
-        } else {
+        } else if let Some((v, deps)) = self.lockfile.packages.get(pkg.id()) {
             // If the Lockfile has an entry for the package, we use that.
-            if let Some((v, deps)) = self.lockfile.packages.get(pkg.id()) {
-                if v == pkg.version() {
-                    Ok(deps
-                        .clone()
-                        .into_iter()
-                        .map(|d| {
-                            Incompatibility::from_dep(
-                                pkg.clone(),
-                                (d.id.clone(), d.version.clone().into()),
-                            )
-                        })
-                        .collect())
-                } else {
-                    Ok(self
-                        .indices
-                        .select(pkg)?
-                        .dependencies
-                        .iter()
-                        .cloned()
-                        .map(|d| {
-                            let dep = (PackageId::new(d.name, d.index.into()), d.req);
-                            Incompatibility::from_dep(pkg.clone(), dep)
-                        })
-                        .collect())
-                }
+            if v == pkg.version() {
+                Ok(deps
+                    .clone()
+                    .into_iter()
+                    .map(|d| {
+                        Incompatibility::from_dep(
+                            pkg.clone(),
+                            (d.id.clone(), d.version.clone().into()),
+                        )
+                    })
+                    .collect())
             } else {
                 Ok(self
                     .indices
@@ -120,6 +106,18 @@ impl Retriever {
                     })
                     .collect())
             }
+        } else {
+            Ok(self
+                .indices
+                .select(pkg)?
+                .dependencies
+                .iter()
+                .cloned()
+                .map(|d| {
+                    let dep = (PackageId::new(d.name, d.index.into()), d.req);
+                    Incompatibility::from_dep(pkg.clone(), dep)
+                })
+                .collect())
         }
     }
 

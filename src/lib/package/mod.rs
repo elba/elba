@@ -133,7 +133,7 @@ impl FromStr for Resolution {
     fn from_str(url: &str) -> Result<Self, Self::Err> {
         let s = DirectRes::from_str(url);
 
-        if let Err(_) = s {
+        if s.is_err() {
             IndexRes::from_str(url).map(Resolution::Index)
         } else {
             s.map(Resolution::Direct)
