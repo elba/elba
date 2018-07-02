@@ -45,8 +45,8 @@ pub enum Relation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Interval {
-    Closed(Version),
-    Open(Version),
+    Closed(Version, bool),
+    Open(Version, bool),
     Unbounded,
 }
 
@@ -66,25 +66,63 @@ impl Interval {
             } else {
                 cmp::Ordering::Less
             },
-            (Interval::Open(a), Interval::Open(b)) => a.cmp(&b),
-            (Interval::Closed(a), Interval::Closed(b)) => a.cmp(&b),
-            (Interval::Open(a), Interval::Closed(b)) => {
+            (Interval::Open(a, ap), Interval::Open(b, bp)) => {
+                let c = a.cmp(&b);
+                if c == cmp::Ordering::Equal {
+                    if lower {
+                        ap.cmp(&bp).reverse()
+                    } else {
+                        ap.cmp(&bp)
+                    }
+                } else {
+                    c
+                }
+            }
+            (Interval::Closed(a, ap), Interval::Closed(b, bp)) => {
+                let c = a.cmp(&b);
+                if c == cmp::Ordering::Equal {
+                    if lower {
+                        ap.cmp(&bp).reverse()
+                    } else {
+                        ap.cmp(&bp)
+                    }
+                } else {
+                    c
+                }
+            }
+            (Interval::Open(a, ap), Interval::Closed(b, bp)) => {
                 if a == b {
                     if lower {
-                        cmp::Ordering::Greater
+                        if ap == bp {
+                            cmp::Ordering::Greater
+                        } else {
+                            ap.cmp(&bp).reverse()
+                        }
                     } else {
-                        cmp::Ordering::Less
+                        if ap == bp {
+                            cmp::Ordering::Less
+                        } else {
+                            ap.cmp(&bp)
+                        }
                     }
                 } else {
                     a.cmp(&b)
                 }
             }
-            (Interval::Closed(a), Interval::Open(b)) => {
+            (Interval::Closed(a, ap), Interval::Open(b, bp)) => {
                 if a == b {
                     if lower {
-                        cmp::Ordering::Less
+                        if ap == bp {
+                            cmp::Ordering::Less
+                        } else {
+                            ap.cmp(&bp).reverse()
+                        }
                     } else {
-                        cmp::Ordering::Greater
+                        if ap == bp {
+                            cmp::Ordering::Greater
+                        } else {
+                            ap.cmp(&bp)
+                        }
                     }
                 } else {
                     a.cmp(&b)
@@ -111,9 +149,53 @@ impl Interval {
 
     pub fn flip(self) -> Interval {
         match self {
-            Interval::Closed(v) => Interval::Open(v),
-            Interval::Open(v) => Interval::Closed(v),
+            Interval::Closed(v, pre_ok) => Interval::Open(v, !pre_ok),
+            Interval::Open(v, pre_ok) => Interval::Closed(v, !pre_ok),
             Interval::Unbounded => Interval::Unbounded,
+        }
+    }
+
+    pub fn pre_ok(&self) -> bool {
+        match self {
+            Interval::Closed(_, pre_ok) => *pre_ok,
+            Interval::Open(_, pre_ok) => *pre_ok,
+            Interval::Unbounded => true,
+        }
+    }
+
+    pub fn show(&self, lower: bool) -> String {
+        match &self {
+            Interval::Unbounded => "".to_string(),
+            Interval::Closed(v, p) => {
+                if lower {
+                    if !v.is_prerelease() && *p {
+                        format!(">=!{} ", v)
+                    } else {
+                        format!(">={} ", v)
+                    }
+                } else {
+                    if !v.is_prerelease() && *p {
+                        format!("<=!{}", v)
+                    } else {
+                        format!("<={}", v)
+                    }
+                }
+            }
+            Interval::Open(v, p) => {
+                if lower {
+                    if !v.is_prerelease() && *p {
+                        format!(">!{} ", v)
+                    } else {
+                        format!(">{} ", v)
+                    }
+                } else {
+                    if !v.is_prerelease() && *p {
+                        format!("<!{}", v)
+                    } else {
+                        format!("<{}", v)
+                    }
+                }
+            }
         }
     }
 }
@@ -123,7 +205,10 @@ impl Interval {
 /// specifications (just like Cargo). Like Pub, the `any` Range is completely unbounded on
 /// both sides. Pre-release `Version`s can satisfy a `Range` iff the `Range`
 /// mentions a pre-release `Version` on either bound, or if the `Range` is unbounded on the upper
-/// side.
+/// side. Additionally, if a greater-than and/or less-than `Range` also has a `!` after the
+/// inequality symbol, the Range will include pre-release versions. `>! 1.0.0` and `>=! 1.0.0`
+/// both accept all pre-releases of 1.0.0, along with the greater versions. `<! 2.0.0` includes
+/// pre-releases of 2.0.0.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Range {
     lower: Interval,
@@ -137,56 +222,20 @@ impl Range {
     /// suggested, `None` is returned.
     pub fn new(lower: Interval, upper: Interval) -> Option<Range> {
         match (lower, upper) {
-            (Open(lower), Open(upper)) => {
-                if lower >= upper {
-                    None
-                } else {
-                    Some(Range {
-                        lower: Open(lower),
-                        upper: Open(upper),
-                    })
-                }
-            }
-            (Open(lower), Closed(upper)) => {
-                if lower >= upper {
-                    None
-                } else {
-                    Some(Range {
-                        lower: Open(lower),
-                        upper: Closed(upper),
-                    })
-                }
-            }
-            (Closed(lower), Open(upper)) => {
-                if lower >= upper {
-                    None
-                } else {
-                    Some(Range {
-                        lower: Closed(lower),
-                        upper: Open(upper),
-                    })
-                }
-            }
-            (Closed(lower), Closed(upper)) => {
-                if lower > upper {
-                    None
-                } else {
-                    Some(Range {
-                        lower: Closed(lower),
-                        upper: Closed(upper),
-                    })
-                }
-            }
-            (lower, upper) => Some(Range { lower, upper }),
+            (Interval::Unbounded, b) => Some(Range {
+                lower: Interval::Unbounded,
+                upper: b,
+            }),
+            (a, Interval::Unbounded) => Some(Range {
+                lower: a,
+                upper: Interval::Unbounded,
+            }),
+            (a, b) => if a.cmp(&b, true) != cmp::Ordering::Greater {
+                Some(Range { lower: a, upper: b })
+            } else {
+                None
+            },
         }
-    }
-
-    /// Creates the empty Range, which satisfies nothing.
-    pub fn empty() -> Range {
-        let lower = Interval::Open(Version::new(1, 0, 0));
-        let upper = Interval::Open(Version::new(1, 0, 0));
-
-        Range { lower, upper }
     }
 
     pub fn any() -> Range {
@@ -213,25 +262,33 @@ impl Range {
     /// the upper or lower bound (or if it's unbounded in the upper direction)
     pub fn satisfies(&self, version: &Version) -> bool {
         let upper_pre_ok = match &self.upper {
-            Open(u) => u.is_prerelease(),
-            Closed(u) => u.is_prerelease(),
+            Open(u, p) => u.is_prerelease() || *p,
+            Closed(u, p) => u.is_prerelease() || *p,
             Unbounded => true,
         };
         // Note: we don't care about lower_pre_ok because if our bound is >= 1.0.0, 1.0.0-beta,
         // which is smaller, won't ever satisfy it anyways.
 
         let satisfies_upper = match &self.upper {
-            Open(u) => version < u,
-            Closed(u) => version <= u,
+            Open(u, _) => version < u,
+            Closed(u, _) => version <= u,
             Unbounded => true,
         };
         let satisfies_lower = match &self.lower {
-            Open(l) => version > l,
-            Closed(l) => version >= l,
+            Open(l, false) => version > l,
+            Closed(l, false) => version >= l,
+            // When the lower interval acceps prereleases but it doesn't specify a prerelease
+            // itself, we just compare the versions
+            Open(l, true) => if !version.is_prerelease() {
+                version > l
+            } else {
+                (version.major, version.minor, version.patch) >= (l.major, l.minor, l.patch)
+            },
+            Closed(l, true) => (version.major, version.minor, version.patch) >= (l.major, l.minor, l.patch),
             Unbounded => true,
         };
 
-        satisfies_lower && (!version.is_prerelease() || upper_pre_ok) && satisfies_upper
+        satisfies_lower && satisfies_upper && (!version.is_prerelease() || upper_pre_ok)
     }
 
     /// Returns the intersection of two `Range`s, or `None` if the two `Range`s are disjoint.
@@ -248,8 +305,8 @@ impl Range {
 
 impl From<Version> for Range {
     fn from(v: Version) -> Range {
-        let lower = Interval::Closed(v.clone());
-        let upper = Interval::Closed(v);
+        let lower = Interval::Closed(v.clone(), false);
+        let upper = Interval::Closed(v, false);
         Range { lower, upper }
     }
 }
@@ -271,15 +328,8 @@ impl FromStr for Range {
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (&self.lower, &self.upper) {
-            (Open(l), Open(u)) => write!(f, "> {} < {}", l, u),
-            (Open(l), Closed(u)) => write!(f, "> {} <= {}", l, u),
-            (Open(l), Unbounded) => write!(f, "> {}", l),
-            (Closed(l), Open(u)) => write!(f, ">= {} < {}", l, u),
-            (Closed(l), Closed(u)) => write!(f, ">= {} <= {}", l, u),
-            (Closed(l), Unbounded) => write!(f, ">= {}", l),
-            (Unbounded, Open(u)) => write!(f, "< {}", u),
-            (Unbounded, Closed(u)) => write!(f, "< {}", u),
             (Unbounded, Unbounded) => write!(f, "any"),
+            (a, b) => write!(f, "{}{}", a.show(true), b.show(false)),
         }
     }
 }
@@ -363,19 +413,18 @@ impl Constraint {
                     let r = Range::new(lower, upper).unwrap();
                     Ok(r)
                 } else if a.upper().cmp(b.lower(), false) == cmp::Ordering::Equal {
-                    if let (Interval::Open(_), Interval::Open(_)) = (a.upper(), b.lower()) {
-                        Err((a, b))
-                    } else {
-                        let lower = a.take().0;
-                        let upper = b.take().1;
-                        let r = Range::new(lower, upper).unwrap();
-                        Ok(r)
+                    if let (Interval::Open(_, _), Interval::Open(_, _)) = (a.upper(), b.lower()) {
+                        return Err((a, b));
                     }
+                    let lower = a.take().0;
+                    let upper = b.take().1;
+                    let r = Range::new(lower, upper).unwrap();
+                    Ok(r)
                 } else {
                     let (a2, b2) = (a.clone(), b.clone());
                     let (al, au) = a.take();
                     let (bl, bu) = b.take();
-                    if let (Interval::Open(v), Interval::Closed(w)) = (au, bl) {
+                    if let (Interval::Open(v, _), Interval::Closed(w, _)) = (au, bl) {
                         if v == w {
                             let r = Range::new(al, bu).unwrap();
                             Ok(r)
@@ -465,7 +514,7 @@ impl Constraint {
                                     // Situation 2
                                     // If they're the same, the lower bound will always be open no matter
                                     // what
-                                    let lower = if let Interval::Open(_) = s.upper() {
+                                    let lower = if let Interval::Open(_, _) = s.upper() {
                                         s.upper().clone()
                                     } else {
                                         s.upper().clone().flip()
@@ -514,7 +563,7 @@ impl Constraint {
                                 }
                                 cmp::Ordering::Equal => {
                                     // Situation 2
-                                    let lower = if let Interval::Open(_) = r.upper() {
+                                    let lower = if let Interval::Open(_, _) = r.upper() {
                                         r.upper().clone()
                                     } else {
                                         r.upper().clone().flip()
@@ -688,19 +737,43 @@ mod parse {
         v
     }
 
-    fn build_range(lower: Interval, upper: Interval) -> Option<Range> {
-        if lower == Interval::Unbounded && upper == Interval::Unbounded {
-            None
+    fn version_char(chr: char) -> bool {
+        chr == '.' || chr.is_digit(10)
+    }
+
+    fn build_range(
+        lower: Option<(bool, Version, bool)>,
+        upper: Option<(bool, Version, bool)>,
+    ) -> Option<Range> {
+        let lower = if let Some(lower) = lower {
+            if lower.0 {
+                Interval::Closed(lower.1, lower.2)
+            } else {
+                Interval::Open(lower.1, lower.2)
+            }
         } else {
-            Range::new(lower, upper)
+            Interval::Unbounded
+        };
+
+        let upper = if let Some(upper) = upper {
+            if upper.0 {
+                Interval::Closed(upper.1, upper.2)
+            } else {
+                Interval::Open(upper.1, upper.2)
+            }
+        } else {
+            Interval::Unbounded
+        };
+
+        if lower == Interval::Unbounded && upper == Interval::Unbounded {
+            return None;
         }
+
+        Range::new(lower, upper)
     }
 
     named!(to_u64<CompleteStr, u64>,
-        map_res!(
-          ws!(digit),
-          |s: CompleteStr| { FromStr::from_str(s.0) }
-        )
+        map_res!(digit, |s: CompleteStr| FromStr::from_str(s.0))
     );
 
     named!(bare_version_major<CompleteStr, (Version, bool, bool)>, do_parse!(
@@ -715,55 +788,43 @@ mod parse {
         ((Version::new(major, minor, 0), true, false))
     ));
 
-    named!(bare_version_from_str<CompleteStr, (Version, bool, bool)>, do_parse!(
-        vers: parse_to!(Version) >>
-        (vers, true, true)
-    ));
+    named!(bare_version_from_str<CompleteStr, (Version, bool, bool)>,
+        map_res!(take_while1_s!(version_char), |s: CompleteStr| Version::parse(s.0).map(|v| (v, true, true)))
+    );
 
     named!(pub bare_version<CompleteStr, (Version, bool, bool)>,
         alt!(bare_version_from_str | bare_version_minor | bare_version_major)
     );
 
     // TODO: Unwrapping is Bad
+    // TODO: Allow "!" for caret and tilde?
     named!(range_caret<CompleteStr, Range>, ws!(do_parse!(
         opt!(tag_s!("^")) >>
         version: bare_version >>
-        (Range::new(Interval::Closed(version.0.clone()), Interval::Open(increment_caret(version.0, version.1, version.2))).unwrap())
+        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_caret(version.0, version.1, version.2), false)).unwrap())
     )));
 
     named!(range_tilde<CompleteStr, Range>, ws!(do_parse!(
         tag_s!("~") >>
         version: bare_version >>
-        (Range::new(Interval::Closed(version.0.clone()), Interval::Open(increment_tilde(version.0, version.1, version.2))).unwrap())
-    )));
-
-    named!(interval_lt<CompleteStr, Interval>, ws!(do_parse!(
-        tag_s!("<") >>
-        version: bare_version >>
-        (Interval::Open(version.0))
-    )));
-
-    named!(interval_le<CompleteStr, Interval>, ws!(do_parse!(
-        tag_s!("<=") >>
-        version: bare_version >>
-        (Interval::Closed(version.0))
-    )));
-
-    named!(interval_gt<CompleteStr, Interval>, ws!(do_parse!(
-        tag_s!(">") >>
-        version: bare_version >>
-        (Interval::Open(version.0))
-    )));
-
-    named!(interval_ge<CompleteStr, Interval>, ws!(do_parse!(
-        tag_s!(">=") >>
-        version: bare_version >>
-        (Interval::Closed(version.0))
+        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_tilde(version.0, version.1, version.2), false)).unwrap())
     )));
 
     named!(range_interval<CompleteStr, Range>, ws!(do_parse!(
-        lower: alt!(interval_gt | interval_ge | value!(Interval::Unbounded)) >>
-        upper: alt!(interval_lt | interval_le | value!(Interval::Unbounded)) >>
+        lower: opt!(ws!(do_parse!(
+            tag_s!(">") >>
+            a: opt!(tag_s!("=")) >>
+            inf: opt!(tag_s!("!")) >>
+            version: bare_version >>
+            (a.is_some(), version.0.clone(), inf.is_some() && !version.0.is_prerelease())
+        ))) >>
+        upper: opt!(ws!(do_parse!(
+            tag_s!("<") >>
+            a: opt!(tag_s!("=")) >>
+            inf: opt!(tag_s!("!")) >>
+            version: bare_version >>
+            (a.is_some(), version.0.clone(), inf.is_some() && !version.0.is_prerelease())
+        ))) >>
         (build_range(lower, upper).unwrap())
     )));
 
@@ -773,7 +834,7 @@ mod parse {
     ));
 
     named!(pub range<CompleteStr, Range>,
-        alt!(range_caret | range_tilde | range_interval | range_any)
+        alt_complete!(range_caret | range_tilde | range_interval | range_any)
     );
 
     named!(pub constraint<CompleteStr, Constraint>,
@@ -797,27 +858,27 @@ mod tests {
         };
         ($a:tt ~ .. $b:tt) => {
             Range::new(
-                Interval::Closed(Version::parse($a).unwrap()),
-                Interval::Open(Version::parse($b).unwrap()),
+                Interval::Closed(Version::parse($a).unwrap(), false),
+                Interval::Open(Version::parse($b).unwrap(), false),
             ).unwrap()
         };
         ($a:tt.. ~ $b:tt) => {
             Range::new(
-                Interval::Open(Version::parse($a).unwrap()),
-                Interval::Closed(Version::parse($b).unwrap()),
+                Interval::Open(Version::parse($a).unwrap(), false),
+                Interval::Closed(Version::parse($b).unwrap(), false),
             ).unwrap()
         };
         ($a:tt ~ . ~ $b:tt) => {
             Range::new(
-                Interval::Closed(Version::parse($a).unwrap()),
-                Interval::Closed(Version::parse($b).unwrap()),
+                Interval::Closed(Version::parse($a).unwrap(), false),
+                Interval::Closed(Version::parse($b).unwrap(), false),
             ).unwrap()
         };
     }
 
     #[test]
     fn test_parse_bare() {
-        let vs: Vec<CompleteStr> = vec![
+        let vs = vec![
             "1",
             "1.0",
             "1.0.0",
@@ -825,8 +886,8 @@ mod tests {
             "1.0.0+b1231231",
             "1.0.0-alpha.1+b1231231",
         ].into_iter()
-            .map(CompleteStr)
-            .collect();
+            .map(|v| CompleteStr(v))
+            .collect::<Vec<_>>();
 
         for v in vs {
             assert!(bare_version(v).is_ok());
@@ -837,8 +898,7 @@ mod tests {
     fn test_parse_range_caret() {
         let vs = vec!["1", "1.4", "1.4.3", "0", "0.2", "0.2.3", "0.0.2"]
             .into_iter()
-            .map(CompleteStr)
-            .map(|s| range(s).unwrap().1)
+            .map(|s| range(CompleteStr(s)).unwrap().1)
             .collect::<Vec<_>>();
 
         let ns = vec![
@@ -858,8 +918,7 @@ mod tests {
     fn test_parse_range_tilde() {
         let vs = vec!["~1", "~1.4", "~1.4.3", "~0", "~0.2", "~0.2.3", "~0.0.2"]
             .into_iter()
-            .map(CompleteStr)
-            .map(|s| range(s).unwrap().1)
+            .map(|s| range(CompleteStr(s)).unwrap().1)
             .collect::<Vec<_>>();
 
         let ns = vec![
@@ -873,6 +932,41 @@ mod tests {
         ];
 
         assert_eq!(ns, vs);
+    }
+
+    #[test]
+    fn test_parse_range_manual() {
+        let vs = vec![">= 1.0.0 < 2.0.0", ">= 1.0.0", "< 2.0.0"]
+            .into_iter()
+            .map(|s| {
+                println!("{:#?}", range(CompleteStr(s)));
+                range(CompleteStr(s)).unwrap().1
+            })
+            .collect::<Vec<_>>();
+
+        let ns = vec![
+            new_range!("1.0.0" ~.. "2.0.0"),
+            Range::new(
+                Interval::Closed(Version::parse("1.0.0").unwrap(), false),
+                Interval::Unbounded,
+            ).unwrap(),
+            Range::new(
+                Interval::Unbounded,
+                Interval::Open(Version::parse("2.0.0").unwrap(), false),
+            ).unwrap(),
+        ];
+
+        assert_eq!(ns, vs);
+    }
+
+    #[test]
+    fn test_range_pre_ok() {
+        let r = Range::from_str(">=! 1.0.0 <! 2.0.0").unwrap();
+        let vs = vec!["1.0.0-alpha.1", "1.0.0", "1.4.2", "1.6.3", "2.0.0-alpha.1"];
+        for v in vs {
+            let v = Version::parse(v).unwrap();
+            assert!(r.satisfies(&v));
+        }
     }
 
     #[test]

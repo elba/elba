@@ -78,8 +78,6 @@ dependencies = [
 checksum = { fmt = "sha512", hash = "4a7d6d3e8888a86b41c710f1d44c43d9ec7a4f97dce4f1ec3c0fb124ca0188de" }
         "#;
 
-        println!("{:#?}", Lockfile::from_str(lockfile));
-
         assert!(Lockfile::from_str(lockfile).is_ok());
     }
 }

@@ -144,8 +144,6 @@ exports = [
     'src/lib/That.idr',
 ]"#;
 
-        println!("{:#?}", Manifest::from_str(manifest));
-
         assert!(Manifest::from_str(manifest).is_ok());
     }
 }

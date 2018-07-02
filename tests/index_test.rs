@@ -13,7 +13,7 @@ fn index_success() {
     path.push(start);
     path.push("tests/index");
 
-    let mut i = Index::new(url, path);
+    let i = Index::new(url, path);
 
     let vs = i.entries(&Name::from_str("a/a").unwrap());
 
