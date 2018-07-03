@@ -48,12 +48,12 @@ pub enum ErrorKind {
     InvalidPackageId,
     #[fail(display = "Invalid constraint.")]
     InvalidConstraint,
-    #[fail(display = "Index is missing a valid `index.toml` file.")]
-    IndexInvalidConfig,
     #[fail(display = "Invalid index structure.")]
     InvalidIndex,
     #[fail(display = "Package doesn't exist in index.")]
     PackageNotFound,
+    #[fail(display = "Conflict resolution failure.")]
+    NoConflictRes,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,

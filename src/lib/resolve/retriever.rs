@@ -37,7 +37,7 @@ impl Retriever {
         con: &Constraint,
         minimize: bool,
     ) -> Result<Version, Error> {
-        if let Some((v, pkg)) = self.lockfile.packages.get(pkg) {
+        if let Some((v, _)) = self.lockfile.packages.get(pkg) {
             if con.satisfies(v) {
                 return Ok(v.clone());
             }
@@ -119,6 +119,10 @@ impl Retriever {
                 })
                 .collect())
         }
+    }
+
+    pub fn count_versions(&self, pkg: &PackageId) -> usize {
+        self.indices.count_versions(pkg)
     }
 
     pub fn root(&self) -> &Summary {

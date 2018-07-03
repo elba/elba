@@ -10,7 +10,6 @@ use semver::Version;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IncompatibilityCause {
     Dependency,
-    NoVersions,
     Root,
     Unavailable,
     Derived(usize, usize),

@@ -31,10 +31,7 @@ use itertools::Itertools;
 use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{
-    cmp, fmt,
-    str::FromStr,
-};
+use std::{cmp, fmt, str::FromStr};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Relation {
@@ -437,12 +434,12 @@ impl Constraint {
         }
 
         for s in &self.set {
-            if !s.satisfies(v) {
-                return false;
+            if s.satisfies(v) {
+                return true;
             }
         }
 
-        true
+        false
     }
 
     pub fn intersection(&self, other: &Constraint) -> Constraint {
@@ -951,12 +948,38 @@ mod tests {
     }
 
     #[test]
+    fn test_constraint_complement() {
+        let rs = indexset!(
+            new_range!("1.0.0" ~.. "2.0.0"),
+            new_range!("2.5.3-beta.1" ~.~ "2.7.8")
+        );
+        let c = Constraint::new(rs);
+        let a = c.complement();
+
+        let vs = vec![
+            "1.0.0-alpha.1",
+            "1.0.0",
+            "1.4.2",
+            "1.6.3",
+            "2.0.0-alpha.1",
+            "2.5.3-alpha.1",
+            "2.5.3-zeta.1",
+            "2.7.8-beta.3",
+        ];
+
+        for v in vs {
+            let v = Version::parse(v).unwrap();
+            assert_eq!(c.satisfies(&v), !a.satisfies(&v));
+        }
+    }
+
+    #[test]
     fn test_constraint_complement_symmetry() {
         let rs = indexset!(
             new_range!("1.0.0" ~.. "2.0.0"),
             new_range!("1.5.0" ~.~ "2.6.1")
         );
-        let c: Constraint = Constraint::new(rs);
+        let c = Constraint::new(rs);
 
         assert_eq!(c, c.complement().complement());
     }

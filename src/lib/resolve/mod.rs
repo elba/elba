@@ -13,7 +13,7 @@ use self::{
     retriever::Retriever,
     types::{Assignment, AssignmentType, IncompatMatch, Incompatibility, IncompatibilityCause},
 };
-use err::Error;
+use err::{Error, ErrorKind};
 use index::Indices;
 use indexmap::IndexMap;
 use package::{
@@ -69,30 +69,16 @@ impl Resolver {
 
         let mut next = Some(self.retriever.root().id().clone());
         while let Some(n) = next {
-            self.propagate(n);
+            self.propagate(n)?;
             next = self.choose_pkg_version();
         }
 
-        // Return the solution!
-        unimplemented!()
+        // TODO: Return the solution!
+        Ok(())
     }
 
-    fn choose_pkg_version(&mut self) -> Option<PackageId> {
-        let unsatisfied = self
-            .derivations
-            .iter()
-            .map(|(d, _)| d)
-            .filter(|d| !self.decisions.contains_key(*d))
-            .collect::<Vec<_>>();
-
-        if unsatisfied.is_empty() {
-            None
-        } else {
-            unimplemented!()
-        }
-    }
-
-    fn propagate(&mut self, pkg: PackageId) {
+    // 1: Unit propagation
+    fn propagate(&mut self, pkg: PackageId) -> Result<(), Error> {
         let mut changed = indexset!(pkg);
 
         while let Some(package) = changed.pop() {
@@ -106,7 +92,7 @@ impl Resolver {
                         }
                         IncompatMatch::Satisfied => {
                             // TODO: Error handling
-                            let root = self.resolve_conflict(*icix).unwrap();
+                            let root = self.resolve_conflict(*icix)?;
                             changed.clear();
                             if let IncompatMatch::Almost(name) = self.propagate_incompat(root) {
                                 changed.insert(name);
@@ -120,6 +106,8 @@ impl Resolver {
                 }
             }
         }
+
+        Ok(())
     }
 
     fn propagate_incompat(&mut self, icix: usize) -> IncompatMatch {
@@ -162,6 +150,7 @@ impl Resolver {
         }
     }
 
+    // 2: Conflict resolution
     // This function is basically the only reason why we need NLL; we're doing immutable borrows
     // with satisfier, but mutable ones with backtrack & incompatibility.
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
@@ -265,12 +254,10 @@ impl Resolver {
                 IncompatibilityCause::Derived(inc, most_recent_satisfier.cause().unwrap()),
             );
             new_incompatibility = true;
-
-            // TODO: Some logging here
         }
 
         // Some error type here
-        unimplemented!()
+        Err(Error::from(ErrorKind::NoConflictRes))
     }
 
     fn backtrack(&mut self, previous_satisfier_level: u16) {
@@ -302,6 +289,62 @@ impl Resolver {
         }
     }
 
+    // 3: Decision making
+    // TODO: Make sure we're not missing anything; we ignore "unknown source" errors - those are
+    //       treated like the package has no versions available, and we don't turn constraints
+    //       which exclude one version into "any" constraints.
+    fn choose_pkg_version(&mut self) -> Option<PackageId> {
+        let mut unsatisfied = self
+            .derivations
+            .iter()
+            .filter(|d| !self.decisions.contains_key(d.0))
+            .collect::<Vec<_>>();
+
+        if unsatisfied.is_empty() {
+            None
+        } else {
+            // We want to find the unsatisfied package with the fewest available versions.
+            unsatisfied.sort_by(|a, b| {
+                // Reversing the comparison will put the items with the least versions at the end,
+                // which is more efficient for popping
+                self.retriever
+                    .count_versions(a.0)
+                    .cmp(&self.retriever.count_versions(b.0))
+                    .reverse()
+            });
+            let package = unsatisfied.pop().unwrap();
+            // TODO: What if we want to minimize our packages?
+            let best = self.retriever.best(package.0, package.1, true);
+            let res = Some(package.0.clone());
+            if let Ok(best) = best {
+                let sum = Summary::new(package.0.clone(), best.clone());
+                // We know the package exists, so unwrapping here is fine
+                let incompats = self.retriever.incompats(&sum).unwrap();
+                let mut conflict = false;
+                for ic in incompats {
+                    conflict = conflict
+                        || ic
+                            .deps
+                            .iter()
+                            .map(|(k, v)| k == sum.id() || self.relation(k, v) == Relation::Subset)
+                            .fold(true, |a, b| a && b);
+                    self.incompatibility(ic.deps, ic.cause);
+                }
+                if !conflict {
+                    self.decision(sum.id, best);
+                }
+            } else {
+                // This case encapsulates everything from "no versions were found" to "the package
+                // literally doesn't exist in the index"
+                let pkgs = indexmap!(
+                    package.0.clone() => package.1.clone()
+                );
+                self.incompatibility(pkgs, IncompatibilityCause::Unavailable);
+            }
+            res
+        }
+    }
+
     fn satisfier(&self, pkg: &PackageId, con: &Constraint) -> Option<&Assignment> {
         let mut assigned_term = Constraint::any();
 
@@ -309,8 +352,6 @@ impl Resolver {
             if assignment.pkg() != pkg {
                 continue;
             }
-
-            // TODO: If we want to implement overlapping, it happens here.
 
             assigned_term = assigned_term.intersection(&assignment.constraint());
 
@@ -357,9 +398,9 @@ impl Resolver {
             pkg,
             AssignmentType::Decision { version },
         );
-        self.step += 1;
         self.register(&a);
         self.assignments.push(a);
+        self.step += 1;
     }
 
     fn derivation(&mut self, pkg: PackageId, c: Constraint, level: u16, cause: usize) {

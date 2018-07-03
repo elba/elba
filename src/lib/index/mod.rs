@@ -97,10 +97,6 @@ impl Indices {
         }
     }
 
-    pub fn checksum(&mut self, pkg: &Summary) -> Result<&Checksum, Error> {
-        unimplemented!()
-    }
-
     pub fn entries(&mut self, pkg: &PackageId) -> Result<&IndexMap<Version, IndexEntry>, Error> {
         if self.cache.contains_key(pkg) {
             return Ok(&self.cache[pkg]);
