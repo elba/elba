@@ -124,8 +124,6 @@ impl Resolver {
             {
                 return IncompatMatch::Contradicted;
             } else if relation != Relation::Subset && relation != Relation::Equal {
-                // We special-case the empty Incompatibility, corresponding to an "any" dep.
-
                 if unsatis.is_none() {
                     unsatis = Some((pkg, con));
                 } else {

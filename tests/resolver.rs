@@ -55,3 +55,10 @@ fn resolve_simple() {
 
     assert!(resolver.solve().is_ok())
 }
+
+#[test]
+fn resolve_simple_constrained() {
+    let mut resolver = resolver(sum!("root/simple_constrained", "0.0.1"));
+
+    assert!(resolver.solve().is_ok())
+}

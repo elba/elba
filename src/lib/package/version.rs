@@ -225,7 +225,7 @@ impl Range {
                 }
             }
             (Interval::Closed(a, ap), Interval::Open(b, bp)) => {
-                if a == b && !(ap && !bp) {
+                if a == b && !(ap && bp) {
                     None
                 } else {
                     let (a, b) = (Interval::Closed(a, ap), Interval::Open(b, bp));
@@ -972,6 +972,18 @@ mod tests {
             let v = Version::parse(v).unwrap();
             assert!(r.satisfies(&v));
         }
+    }
+
+    #[test]
+    fn test_constraint_relation() {
+        let rs = indexset!(
+            Range::from_str("1").unwrap(),
+        );
+        let c = Constraint::new(rs);
+
+        let c2 = c.complement();
+
+        assert_eq!(Relation::Disjoint, c.relation(&c2));
     }
 
     #[test]
