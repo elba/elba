@@ -3,7 +3,8 @@ extern crate semver;
 extern crate url;
 
 use matic::{
-    index::{Index, Indices}, package::{IndexRes, lockfile::Lockfile, Name, PackageId, Resolution, Summary},
+    index::{Index, Indices},
+    package::{lockfile::Lockfile, IndexRes, Name, PackageId, Resolution, Summary},
     resolve::Resolver,
 };
 use semver::Version;
@@ -11,13 +12,14 @@ use std::{path::PathBuf, str::FromStr};
 use url::Url;
 
 macro_rules! sum {
-    ( $a:tt, $b:tt ) => {
-        {
-            let root_name = Name::from_str($a).unwrap();
-            let root_pkg = PackageId::new(root_name, Resolution::Index(IndexRes::from_str("index+file://index/").unwrap()));
-            Summary::new(root_pkg, Version::parse($b).unwrap())
-        }
-    }
+    ($a:tt, $b:tt) => {{
+        let root_name = Name::from_str($a).unwrap();
+        let root_pkg = PackageId::new(
+            root_name,
+            Resolution::Index(IndexRes::from_str("index+file://index/").unwrap()),
+        );
+        Summary::new(root_pkg, Version::parse($b).unwrap())
+    }};
 }
 
 fn indices() -> Indices {

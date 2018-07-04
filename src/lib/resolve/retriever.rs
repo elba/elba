@@ -78,7 +78,10 @@ impl Retriever {
         if pkg == &self.root {
             let mut res = vec![];
             for dep in &self.root_deps {
-                res.push(Incompatibility::from_dep(pkg.clone(), (dep.0.clone(), dep.1.complement())));
+                res.push(Incompatibility::from_dep(
+                    pkg.clone(),
+                    (dep.0.clone(), dep.1.complement()),
+                ));
             }
             return Ok(res);
         } else if let Some((v, deps)) = self.lockfile.packages.get(pkg.id()) {
@@ -89,10 +92,7 @@ impl Retriever {
                     .into_iter()
                     .map(|d| {
                         let c: Constraint = d.version.clone().into();
-                        Incompatibility::from_dep(
-                            pkg.clone(),
-                            (d.id.clone(), c.complement()),
-                        )
+                        Incompatibility::from_dep(pkg.clone(), (d.id.clone(), c.complement()))
                     })
                     .collect());
             }

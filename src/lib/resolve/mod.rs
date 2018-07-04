@@ -73,8 +73,6 @@ impl Resolver {
             next = self.choose_pkg_version();
         }
 
-        unimplemented!();
-
         // TODO: Return the solution!
         Ok(())
     }
@@ -113,15 +111,21 @@ impl Resolver {
 
     fn propagate_incompat(&mut self, icix: usize) -> IncompatMatch {
         // Yes, we're cloning again. I'm sorry.
-        let inc = &self.incompats.to_vec()[icix];
+        let inc = &self.incompats[icix].clone();
         let mut unsatis = None;
 
         for (pkg, con) in inc.deps() {
             let relation = self.relation(pkg, con);
 
-            if relation == Relation::Disjoint {
+            // We have to special-case the "any" dependency because the any derivation is a superset of the null set, which would
+            // result in continuous "Almost"s if a package only depends on any version of one other package.
+            if relation == Relation::Disjoint
+                || (con.is_empty() && self.derivations.get(pkg).is_some())
+            {
                 return IncompatMatch::Contradicted;
-            } else if relation != Relation::Subset {
+            } else if relation != Relation::Subset && relation != Relation::Equal {
+                // We special-case the empty Incompatibility, corresponding to an "any" dep.
+
                 if unsatis.is_none() {
                     unsatis = Some((pkg, con));
                 } else {

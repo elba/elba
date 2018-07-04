@@ -39,6 +39,7 @@ pub enum Relation {
     Subset,
     Overlapping,
     Disjoint,
+    Equal,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -222,7 +223,7 @@ impl Range {
                         None
                     }
                 }
-            },
+            }
             (Interval::Closed(a, ap), Interval::Open(b, bp)) => {
                 if a == b && !(ap && !bp) {
                     None
@@ -234,7 +235,7 @@ impl Range {
                         None
                     }
                 }
-            },
+            }
             (a, b) => if a.cmp(&b, true) != cmp::Ordering::Greater {
                 Some(Range { lower: a, upper: b })
             } else {
@@ -442,6 +443,10 @@ impl Constraint {
             .collect();
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.set.is_empty()
+    }
+
     /// Checks if a `Version` is satisfied by this `Constraint`.
     pub fn satisfies(&self, v: &Version) -> bool {
         if self.set.is_empty() {
@@ -490,10 +495,6 @@ impl Constraint {
                 if g {
                     match r.lower().cmp(s.lower(), true) {
                         cmp::Ordering::Greater => {
-                            // Special case Unbounded case:
-                            if let (&Interval::Unbounded, &Interval::Unbounded) = (r.upper(), s.upper()) {
-
-                            }
                             //------------------//
                             //         [=r=]    //
                             // [==s==]          //
@@ -602,6 +603,11 @@ impl Constraint {
                             }
                         }
                         cmp::Ordering::Equal => {
+                            if s.upper() == r.upper() {
+                                g = false;
+                                continue;
+                            }
+
                             let lower = s.upper().clone().flip();
                             let upper = r.upper().clone();
 
@@ -632,7 +638,9 @@ impl Constraint {
 
     pub fn relation(&self, other: &Constraint) -> Relation {
         let i = &self.intersection(other);
-        if i == other {
+        if i == other && i == self {
+            Relation::Equal
+        } else if i == other {
             Relation::Superset
         } else if i == self {
             Relation::Subset
@@ -974,9 +982,7 @@ mod tests {
         );
         let c = Constraint::new(rs);
 
-        let r2 = indexset!(
-            Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),
-        );
+        let r2 = indexset!(Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),);
         let c2 = Constraint::new(r2);
 
         assert_eq!(c.relation(&c2), Relation::Disjoint);
@@ -1027,9 +1033,7 @@ mod tests {
         );
         let c = Constraint::new(rs);
 
-        let r2 = indexset!(
-            Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),
-        );
+        let r2 = indexset!(Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),);
         let c2 = Constraint::new(r2);
 
         assert_eq!(c.complement(), c2);
