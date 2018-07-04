@@ -119,8 +119,8 @@ impl Indices {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct IndexEntry {
-    #[serde(flatten)]
-    pub sum: Summary,
+    pub name: Name,
+    pub version: Version,
     pub dependencies: Vec<Dep>,
     pub yanked: bool,
     pub checksum: Checksum,
@@ -176,7 +176,7 @@ impl Index {
             let line = line.context(ErrorKind::InvalidIndex)?;
             let entry: IndexEntry = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
 
-            res.insert(entry.sum.version.clone(), entry);
+            res.insert(entry.version.clone(), entry);
         }
 
         Ok(res)
