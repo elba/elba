@@ -21,6 +21,7 @@ pub struct Incompatibility {
     pub cause: IncompatibilityCause,
 }
 
+#[derive(Clone, Debug)]
 pub enum IncompatMatch {
     Satisfied,
     Almost(PackageId),

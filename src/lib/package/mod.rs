@@ -113,6 +113,7 @@ pub enum GitTag {
 pub enum Resolution {
     Direct(DirectRes),
     Index(IndexRes),
+    Root,
 }
 
 impl From<DirectRes> for Resolution {
@@ -130,13 +131,14 @@ impl From<IndexRes> for Resolution {
 impl FromStr for Resolution {
     type Err = Error;
 
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
-        let s = DirectRes::from_str(url);
-
-        if s.is_err() {
-            IndexRes::from_str(url).map(Resolution::Index)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let direct = DirectRes::from_str(s);
+        if s == "root" {
+            Ok(Resolution::Root)
+        } else if direct.is_ok() {
+            direct.map(Resolution::Direct)
         } else {
-            s.map(Resolution::Direct)
+            IndexRes::from_str(s).map(Resolution::Index)
         }
     }
 }
@@ -146,6 +148,7 @@ impl fmt::Display for Resolution {
         match self {
             Resolution::Direct(d) => write!(f, "{}", d),
             Resolution::Index(i) => write!(f, "{}", i),
+            Resolution::Root => write!(f, "root"),
         }
     }
 }
@@ -373,11 +376,4 @@ impl Summary {
     pub fn version(&self) -> &Version {
         &self.version
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO
 }

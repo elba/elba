@@ -1,0 +1,1 @@
+{ "id": "root/simple index+file://index/", "version": "1.0.0", "checksum": {"fmt": "sha512", "hash": "pizza"}, "dependencies": [{ "name": "a/a", "index": "index+file://index/", "req": "any" }], "yanked": false, "location": "dir+file://../../../files/a/a" }

@@ -5,6 +5,7 @@ use resolve::types::Incompatibility;
 use semver::Version;
 
 // TODO: Patching
+// TODO: How to deal with git deps, local file deps from top-level...
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
 #[derive(Clone, Debug)]
@@ -77,48 +78,37 @@ impl Retriever {
         if pkg == &self.root {
             let mut res = vec![];
             for dep in &self.root_deps {
-                res.push(Incompatibility::from_dep(pkg.clone(), dep.clone()));
+                res.push(Incompatibility::from_dep(pkg.clone(), (dep.0.clone(), dep.1.complement())));
             }
-            Ok(res)
+            return Ok(res);
         } else if let Some((v, deps)) = self.lockfile.packages.get(pkg.id()) {
             // If the Lockfile has an entry for the package, we use that.
             if v == pkg.version() {
-                Ok(deps
+                return Ok(deps
                     .clone()
                     .into_iter()
                     .map(|d| {
+                        let c: Constraint = d.version.clone().into();
                         Incompatibility::from_dep(
                             pkg.clone(),
-                            (d.id.clone(), d.version.clone().into()),
+                            (d.id.clone(), c.complement()),
                         )
                     })
-                    .collect())
-            } else {
-                Ok(self
-                    .indices
-                    .select(pkg)?
-                    .dependencies
-                    .iter()
-                    .cloned()
-                    .map(|d| {
-                        let dep = (PackageId::new(d.name, d.index.into()), d.req);
-                        Incompatibility::from_dep(pkg.clone(), dep)
-                    })
-                    .collect())
+                    .collect());
             }
-        } else {
-            Ok(self
-                .indices
-                .select(pkg)?
-                .dependencies
-                .iter()
-                .cloned()
-                .map(|d| {
-                    let dep = (PackageId::new(d.name, d.index.into()), d.req);
-                    Incompatibility::from_dep(pkg.clone(), dep)
-                })
-                .collect())
         }
+
+        Ok(self
+            .indices
+            .select(pkg)?
+            .dependencies
+            .iter()
+            .cloned()
+            .map(|d| {
+                let dep = (PackageId::new(d.name, d.index.into()), d.req.complement());
+                Incompatibility::from_dep(pkg.clone(), dep)
+            })
+            .collect())
     }
 
     pub fn count_versions(&self, pkg: &PackageId) -> usize {

@@ -68,8 +68,10 @@ impl Interval {
                 let c = a.cmp(&b);
                 if c == cmp::Ordering::Equal {
                     if lower {
-                        ap.cmp(&bp).reverse()
+                        // >! == >
+                        cmp::Ordering::Equal
                     } else {
+                        // <! > <
                         ap.cmp(&bp)
                     }
                 } else {
@@ -88,35 +90,24 @@ impl Interval {
                     c
                 }
             }
-            (Interval::Open(a, ap), Interval::Closed(b, bp)) => {
+            (Interval::Open(a, _), Interval::Closed(b, _)) => {
                 if a == b {
                     if lower {
-                        if ap == bp {
-                            cmp::Ordering::Greater
-                        } else {
-                            ap.cmp(&bp).reverse()
-                        }
-                    } else if ap == bp {
-                        cmp::Ordering::Less
+                        cmp::Ordering::Greater
                     } else {
-                        ap.cmp(&bp)
+                        cmp::Ordering::Less
                     }
                 } else {
                     a.cmp(&b)
                 }
             }
-            (Interval::Closed(a, ap), Interval::Open(b, bp)) => {
+            (Interval::Closed(a, _), Interval::Open(b, _)) => {
                 if a == b {
                     if lower {
-                        if ap == bp {
-                            cmp::Ordering::Less
-                        } else {
-                            ap.cmp(&bp).reverse()
-                        }
-                    } else if ap == bp {
-                        cmp::Ordering::Greater
+                        // The pre_ok doesn't matter, cause >! == >
+                        cmp::Ordering::Less
                     } else {
-                        ap.cmp(&bp)
+                        cmp::Ordering::Greater
                     }
                 } else {
                     a.cmp(&b)
@@ -220,6 +211,30 @@ impl Range {
                 lower: a,
                 upper: Interval::Unbounded,
             }),
+            (Interval::Open(a, ap), Interval::Closed(b, bp)) => {
+                if a == b {
+                    None
+                } else {
+                    let (a, b) = (Interval::Open(a, ap), Interval::Closed(b, bp));
+                    if a.cmp(&b, true) != cmp::Ordering::Greater {
+                        Some(Range { lower: a, upper: b })
+                    } else {
+                        None
+                    }
+                }
+            },
+            (Interval::Closed(a, ap), Interval::Open(b, bp)) => {
+                if a == b && !(ap && !bp) {
+                    None
+                } else {
+                    let (a, b) = (Interval::Closed(a, ap), Interval::Open(b, bp));
+                    if a.cmp(&b, true) != cmp::Ordering::Greater {
+                        Some(Range { lower: a, upper: b })
+                    } else {
+                        None
+                    }
+                }
+            },
             (a, b) => if a.cmp(&b, true) != cmp::Ordering::Greater {
                 Some(Range { lower: a, upper: b })
             } else {
@@ -475,6 +490,10 @@ impl Constraint {
                 if g {
                     match r.lower().cmp(s.lower(), true) {
                         cmp::Ordering::Greater => {
+                            // Special case Unbounded case:
+                            if let (&Interval::Unbounded, &Interval::Unbounded) = (r.upper(), s.upper()) {
+
+                            }
                             //------------------//
                             //         [=r=]    //
                             // [==s==]          //
@@ -812,7 +831,7 @@ mod parse {
     ));
 
     named!(pub range<CompleteStr, Range>,
-        alt_complete!(range_caret | range_tilde | range_interval | range_any)
+        alt_complete!(range_caret | range_tilde | range_any | range_interval)
     );
 
     named!(pub constraint<CompleteStr, Constraint>,
@@ -948,6 +967,22 @@ mod tests {
     }
 
     #[test]
+    fn test_constraint_relation_single() {
+        let rs = indexset!(
+            Range::from_str("<! 1.0.0").unwrap(), // pre-releases of 1.0.0 ok
+            Range::from_str(">! 1.0.0").unwrap(), // same as > 1.0.0
+        );
+        let c = Constraint::new(rs);
+
+        let r2 = indexset!(
+            Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),
+        );
+        let c2 = Constraint::new(r2);
+
+        assert_eq!(c.relation(&c2), Relation::Disjoint);
+    }
+
+    #[test]
     fn test_constraint_complement() {
         let rs = indexset!(
             new_range!("1.0.0" ~.. "2.0.0"),
@@ -982,6 +1017,22 @@ mod tests {
         let c = Constraint::new(rs);
 
         assert_eq!(c, c.complement().complement());
+    }
+
+    #[test]
+    fn test_constraint_complement_single() {
+        let rs = indexset!(
+            Range::from_str("<! 1.0.0").unwrap(), // pre-releases of 1.0.0 ok
+            Range::from_str(">! 1.0.0").unwrap(), // same as > 1.0.0
+        );
+        let c = Constraint::new(rs);
+
+        let r2 = indexset!(
+            Range::from_str(">= 1.0.0 <= 1.0.0").unwrap(),
+        );
+        let c2 = Constraint::new(r2);
+
+        assert_eq!(c.complement(), c2);
     }
 
     #[test]

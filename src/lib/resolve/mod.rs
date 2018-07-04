@@ -17,13 +17,12 @@ use err::{Error, ErrorKind};
 use index::Indices;
 use indexmap::IndexMap;
 use package::{
-    lockfile::Lockfile,
-    version::{Constraint, Relation},
-    PackageId, Summary,
+    lockfile::Lockfile, version::{Constraint, Relation}, PackageId, Summary,
 };
 use semver::Version;
 use std::cmp;
 
+#[derive(Debug)]
 pub struct Resolver {
     /// The current step.
     step: u16,
@@ -64,7 +63,8 @@ impl Resolver {
     }
 
     pub fn solve(&mut self) -> Result<(), Error> {
-        let pkgs = indexmap!(self.retriever.root().id().clone() => self.retriever.root().version().clone().into());
+        let c: Constraint = self.retriever.root().version().clone().into();
+        let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
 
         let mut next = Some(self.retriever.root().id().clone());
@@ -72,6 +72,8 @@ impl Resolver {
             self.propagate(n)?;
             next = self.choose_pkg_version();
         }
+
+        unimplemented!();
 
         // TODO: Return the solution!
         Ok(())
@@ -91,7 +93,6 @@ impl Resolver {
                             changed.insert(name);
                         }
                         IncompatMatch::Satisfied => {
-                            // TODO: Error handling
                             let root = self.resolve_conflict(*icix)?;
                             changed.clear();
                             if let IncompatMatch::Almost(name) = self.propagate_incompat(root) {
@@ -133,7 +134,7 @@ impl Resolver {
 
         if let Some((pkg, con)) = unsatis {
             let level = self.level;
-            self.derivation(pkg.clone(), con.clone(), level, icix);
+            self.derivation(pkg.clone(), con.clone().complement(), level, icix);
             return IncompatMatch::Almost(pkg.clone());
         } else {
             return IncompatMatch::Satisfied;
@@ -431,7 +432,6 @@ impl Resolver {
                 .push(new_ix);
         }
         self.incompats.push(Incompatibility::new(pkgs, cause));
-        self.step += 1;
 
         new_ix
     }
