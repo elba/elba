@@ -48,7 +48,10 @@ use package::{manifest::Manifest, version::Constraint, *};
 use semver::Version;
 use serde_json;
 use std::{
-    fs, io::{self, prelude::*, BufReader}, path::PathBuf, str::FromStr,
+    fs,
+    io::{self, prelude::*, BufReader},
+    path::PathBuf,
+    str::FromStr,
 };
 use url::Url;
 

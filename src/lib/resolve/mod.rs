@@ -17,12 +17,14 @@ use err::{Error, ErrorKind};
 use index::Indices;
 use indexmap::IndexMap;
 use package::{
-    lockfile::Lockfile, version::{Constraint, Relation}, PackageId, Summary,
+    lockfile::Lockfile,
+    version::{Constraint, Relation},
+    PackageId, Summary,
 };
 use semver::Version;
 use std::cmp;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Resolver {
     /// The current step.
     step: u16,
@@ -259,7 +261,6 @@ impl Resolver {
             new_incompatibility = true;
         }
 
-        // Some error type here
         Err(Error::from(ErrorKind::NoConflictRes))
     }
 
@@ -335,7 +336,11 @@ impl Resolver {
                         || ic
                             .deps
                             .iter()
-                            .map(|(k, v)| k == sum.id() || self.relation(k, v) == Relation::Subset)
+                            .map(|(k, v)| {
+                                k == sum.id()
+                                    || self.relation(k, v) == Relation::Subset
+                                    || self.relation(k, v) == Relation::Equal
+                            })
                             .fold(true, |a, b| a && b);
                     self.incompatibility(ic.deps, ic.cause);
                 }
@@ -364,7 +369,9 @@ impl Resolver {
 
             assigned_term = assigned_term.intersection(&assignment.constraint());
 
-            if assigned_term.relation(con) == Relation::Subset {
+            if assigned_term.relation(con) == Relation::Subset
+                || assigned_term.relation(con) == Relation::Equal
+            {
                 return Some(assignment);
             }
         }

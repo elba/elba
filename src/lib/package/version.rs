@@ -976,9 +976,7 @@ mod tests {
 
     #[test]
     fn test_constraint_relation() {
-        let rs = indexset!(
-            Range::from_str("1").unwrap(),
-        );
+        let rs = indexset!(Range::from_str("1").unwrap(),);
         let c = Constraint::new(rs);
 
         let c2 = c.complement();

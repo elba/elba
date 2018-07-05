@@ -55,3 +55,24 @@ fn resolve_no_conflict() {
 
     assert!(resolver.solve().is_ok())
 }
+
+#[test]
+fn resolve_avoid_conflict() {
+    let mut resolver = resolver(sum!("avoid_conflict/root", "1.0.0"));
+
+    assert!(resolver.solve().is_ok())
+}
+
+#[test]
+fn resolve_conflict_res_simple() {
+    let mut resolver = resolver(sum!("conflict_res_simple/root", "1.0.0"));
+
+    assert!(resolver.solve().is_ok())
+}
+
+#[test]
+fn resolve_conflict_res_partial() {
+    let mut resolver = resolver(sum!("conflict_res_partial/root", "1.0.0"));
+
+    assert!(resolver.solve().is_ok())
+}

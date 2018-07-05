@@ -1,0 +1,1 @@
+{ "name": "conflict_res_partial/root", "version": "1.0.0", "checksum": {"fmt": "sha512", "hash": "test"}, "dependencies": [{ "name": "conflict_res_partial/foo", "index": "index+file://index/", "req": "1.0.0" }, { "name": "conflict_res_partial/target", "index": "index+file://index/", "req": "2.0.0" }], "yanked": false, "location": "dir+file://test" }
