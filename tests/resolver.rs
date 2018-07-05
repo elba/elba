@@ -50,15 +50,8 @@ fn resolver(root: Summary) -> Resolver {
 }
 
 #[test]
-fn resolve_simple() {
-    let mut resolver = resolver(sum!("root/simple", "1.0.0"));
-
-    assert!(resolver.solve().is_ok())
-}
-
-#[test]
-fn resolve_simple_constrained() {
-    let mut resolver = resolver(sum!("root/simple_constrained", "0.0.1"));
+fn resolve_no_conflict() {
+    let mut resolver = resolver(sum!("no_conflict/root", "1.0.0"));
 
     assert!(resolver.solve().is_ok())
 }

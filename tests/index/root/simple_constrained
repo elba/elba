@@ -1,1 +1,0 @@
-{ "name": "root/simple_constrained", "version": "0.0.1", "checksum": {"fmt": "sha512", "hash": "pizza"}, "dependencies": [{ "name": "a/a", "index": "index+file://index/", "req": "1" }], "yanked": false, "location": "dir+file://../../../files/root/simple_constrained" }

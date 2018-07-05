@@ -15,7 +15,7 @@ fn index_success() {
 
     let i = Index::from_local(url, path).unwrap();
 
-    let vs = i.entries(&Name::from_str("a/a").unwrap());
+    let vs = i.entries(&Name::from_str("no_conflict/root").unwrap());
 
     println!("{:#?}", vs);
 

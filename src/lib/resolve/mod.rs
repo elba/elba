@@ -292,6 +292,12 @@ impl Resolver {
         }
     }
 
+    fn is_failure(&self, inc: &Incompatibility) -> bool {
+        inc.deps().is_empty()
+            || (inc.deps().len() == 1
+                && inc.deps().get_index(0).unwrap().0 == self.retriever.root().id())
+    }
+
     // 3: Decision making
     // TODO: Make sure we're not missing anything; we ignore "unknown source" errors - those are
     //       treated like the package has no versions available, and we don't turn constraints
@@ -364,12 +370,6 @@ impl Resolver {
         }
 
         None
-    }
-
-    fn is_failure(&self, inc: &Incompatibility) -> bool {
-        inc.deps().is_empty()
-            || (inc.deps().len() == 1
-                && inc.deps().get_index(0).unwrap().0 == self.retriever.root().id())
     }
 
     fn register(&mut self, a: &Assignment) {
