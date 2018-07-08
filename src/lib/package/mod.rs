@@ -83,6 +83,12 @@ impl Serialize for Name {
     }
 }
 
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.inner.serialization)
+    }
+}
+
 impl<'de> Deserialize<'de> for Name {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -277,7 +283,7 @@ impl<'de> Deserialize<'de> for IndexRes {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PackageId {
     pub name: Name,
     pub resolution: Resolution,
@@ -312,6 +318,18 @@ impl FromStr for PackageId {
     }
 }
 
+impl fmt::Debug for PackageId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PackageId(\"{} {}\")", self.name, self.resolution)
+    }
+}
+
+impl fmt::Display for PackageId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.name, self.resolution)
+    }
+}
+
 impl<'de> Deserialize<'de> for PackageId {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
@@ -324,16 +342,7 @@ impl Serialize for PackageId {
     where
         S: Serializer,
     {
-        let name = self.name.as_str();
-        let src = &self.resolution.to_string();
-
-        let mut s = String::with_capacity(name.len() + src.len() + 5);
-
-        s.push_str(name);
-        s.push(' ');
-        s.push_str(src);
-
-        serializer.serialize_str(&s)
+        serializer.serialize_str(&self.to_string())
     }
 }
 

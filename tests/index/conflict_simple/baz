@@ -1,0 +1,2 @@
+{ "name": "conflict_simple/baz", "version": "1.0.0", "checksum": {"fmt": "sha512", "hash": "test"}, "dependencies": [], "yanked": false, "location": "dir+file://test" }
+{ "name": "conflict_simple/baz", "version": "3.0.0", "checksum": {"fmt": "sha512", "hash": "test"}, "dependencies": [], "yanked": false, "location": "dir+file://test" }

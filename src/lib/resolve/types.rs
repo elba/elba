@@ -3,9 +3,11 @@
 // TODO: Roll our own semver? Or fork semver and add intersections?
 
 use indexmap::IndexMap;
+use itertools::Itertools;
 use package::Summary;
 use package::{version::Constraint, PackageId};
 use semver::Version;
+use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum IncompatibilityCause {
@@ -15,13 +17,13 @@ pub enum IncompatibilityCause {
     Derived(usize, usize),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Incompatibility {
     pub deps: IndexMap<PackageId, Constraint>,
     pub cause: IncompatibilityCause,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum IncompatMatch {
     Satisfied,
     Almost(PackageId),
@@ -46,24 +48,98 @@ impl Incompatibility {
         &self.deps
     }
 
-    pub fn left(&self) -> Option<usize> {
-        if let IncompatibilityCause::Derived(l, _) = self.cause {
-            Some(l)
+    pub fn derived(&self) -> Option<(usize, usize)> {
+        if let IncompatibilityCause::Derived(l, r) = self.cause {
+            Some((l, r))
         } else {
             None
         }
     }
 
-    pub fn right(&self) -> Option<usize> {
-        if let IncompatibilityCause::Derived(_, r) = self.cause {
-            Some(r)
-        } else {
-            None
-        }
+    pub fn is_derived(&self) -> bool {
+        self.derived().is_some()
     }
 
     pub fn cause(&self) -> IncompatibilityCause {
         self.cause
+    }
+
+    pub fn show(&self) -> String {
+        match self.cause {
+            IncompatibilityCause::Dependency => {
+                assert!(self.deps.len() == 2);
+                let depender = self.deps.get_index(0).unwrap();
+                let dependee = self.deps.get_index(1).unwrap();
+                format!(
+                    "{} {} depends on {} {}",
+                    depender.0,
+                    depender.1,
+                    dependee.0,
+                    dependee.1.complement()
+                )
+            }
+            IncompatibilityCause::Unavailable => {
+                assert!(self.deps.len() == 1);
+                let package = self.deps.get_index(0).unwrap();
+                format!("no versions of {} match {}", package.0, package.1)
+            }
+            IncompatibilityCause::Root => format!("version solving failed"),
+            IncompatibilityCause::Derived(_, _) => {
+                if self.deps.len() == 1 {
+                    let package = self.deps.get_index(0).unwrap();
+                    format!("{} {} is required", package.0, package.1.complement())
+                } else if self.deps.len() == 2 {
+                    let p1 = self.deps.get_index(0).unwrap();
+                    let p2 = self.deps.get_index(1).unwrap();
+                    format!("{} {} requires {} {}", p1.0, p1.1, p2.0, p2.1.complement())
+                } else {
+                    format!(
+                        "one of {} must be false",
+                        self.deps
+                            .iter()
+                            .map(|(k, v)| format!("{} {}", k, v))
+                            .join("; ")
+                    )
+                }
+            }
+        }
+    }
+
+    // TODO: Actually special-case stuff to look nicer.
+    pub fn show_combine(
+        &self,
+        other: &Incompatibility,
+        self_linum: Option<u16>,
+        other_linum: Option<u16>,
+    ) -> String {
+        let mut buf = self.show();
+        if let Some(l) = self_linum {
+            buf.push_str(" (");
+            buf.push_str(&l.to_string());
+            buf.push(')');
+        }
+        buf.push_str(" and ");
+        buf.push_str(&other.show());
+        if let Some(l) = other_linum {
+            buf.push_str(" (");
+            buf.push_str(&l.to_string());
+            buf.push(')');
+        }
+
+        buf
+    }
+}
+
+impl fmt::Debug for Incompatibility {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Incompatibility {{ {} }}",
+            self.deps
+                .iter()
+                .map(|(k, v)| format!("{} {}", k, v))
+                .join("; ")
+        )
     }
 }
 

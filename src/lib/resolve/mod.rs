@@ -64,7 +64,17 @@ impl Resolver {
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), Error> {
+    pub fn solve(&mut self) -> Result<(), String> {
+        let r = self.solve_loop();
+
+        if r.is_err() {
+            Err(self.pp_error(self.incompat_ixs.len() - 1))
+        } else {
+            Ok(r.unwrap())
+        }
+    }
+
+    fn solve_loop(&mut self) -> Result<(), Error> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -377,6 +387,193 @@ impl Resolver {
         }
 
         None
+    }
+
+    // 4: Error reporting
+    // cause things go bad
+    // TODO: Error reporting struct? (or pass state as parameters: linums, ic_occur, out)
+    fn pp_error(&self, root_icix: usize) -> String {
+        let mut s = String::new();
+        let mut ic_occur = indexmap!();
+        let mut linum: IndexMap<usize, u16> = indexmap!();
+        let mut cur_linum = 1;
+        for (ix, i) in self.incompats.iter().enumerate() {
+            if !ic_occur.contains_key(&ix) {
+                ic_occur.insert(ix, 0);
+            }
+
+            if let Some((l, r)) = i.derived() {
+                {
+                    let l = ic_occur.entry(l).or_insert_with(|| 0);
+                    *l += 1;
+                }
+                {
+                    let r = ic_occur.entry(r).or_insert_with(|| 0);
+                    *r += 1;
+                }
+            }
+        }
+
+        self.pp_err_recur(root_icix, &ic_occur, &mut linum, &mut cur_linum, &mut s);
+
+        s
+    }
+
+    fn pp_err_recur(
+        &self,
+        icix: usize,
+        ic_occur: &IndexMap<usize, u16>,
+        linum: &mut IndexMap<usize, u16>,
+        cur_linum: &mut u16,
+        out: &mut String,
+    ) {
+        let root = &self.incompats[icix];
+        let (left_ix, right_ix) = root.derived().unwrap();
+        let (left, right) = (&self.incompats[left_ix], &self.incompats[right_ix]);
+
+        match (left.derived(), right.derived()) {
+            (Some((l1, l2)), Some((r1, r2))) => {
+                // Case 1 in the Pubgrub doc
+                let left_line = linum.get(&left_ix).map(|x| *x);
+                let right_line = linum.get(&right_ix).map(|x| *x);
+
+                match (left_line, right_line) {
+                    (Some(l), Some(r)) => {
+                        out.push_str("Because ");
+                        out.push_str(&left.show_combine(right, Some(l), Some(r)));
+                    }
+                    (Some(l), None) => {
+                        self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                        out.push_str("And because ");
+                        out.push_str(&left.show());
+                        out.push_str(" (");
+                        out.push_str(&l.to_string());
+                    }
+                    (None, Some(r)) => {
+                        self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                        out.push_str("And because ");
+                        out.push_str(&right.show());
+                        out.push_str(" (");
+                        out.push_str(&r.to_string());
+                    }
+                    (None, None) => {
+                        // TODO
+                        let l1_i = &self.incompats[l1];
+                        let l2_i = &self.incompats[l2];
+                        let r1_i = &self.incompats[r1];
+                        let r2_i = &self.incompats[r2];
+
+                        match (l1_i.derived(), l2_i.derived(), r1_i.derived(), r2_i.derived()) {
+                            (Some(_), Some(_), Some(_), Some(_)) | (Some(_), Some(_), None, None)=> {
+                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
+                                out.push_str("Thus");
+                            }
+                            (None, None, Some(_), Some(_)) => {
+                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                                out.push_str("Thus");
+                            }
+                            _ => {
+                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
+                                if !linum.contains_key(&left_ix) {
+                                    // Remove the \n from before
+                                    out.pop();
+                                    out.push_str(" (");
+                                    out.push_str(&cur_linum.to_string());
+                                    out.push(')');
+                                    linum.insert(icix, *cur_linum);
+                                    *cur_linum += 1;
+                                    out.push('\n');
+                                }
+                                out.push('\n');
+                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+
+                                // TODO: This just feels wrong
+                                // "Associate this line number with the first cause"
+                                // Remove the \n from before
+                                out.pop();
+                                out.push_str(" (");
+                                out.push_str(&cur_linum.to_string());
+                                out.push(')');
+                                linum.insert(icix, *cur_linum);
+                                *cur_linum += 1;
+                                out.push('\n');
+
+                                out.push_str("And because ");
+                                out.push_str(&left.show());
+                            }
+                        }
+                    }
+                }
+            }
+            (None, None) => {
+                // Case 3 in the Pubgrub doc
+                out.push_str("Because ");
+                out.push_str(&left.show_combine(right, None, None));
+            }
+            (ld, rd) => {
+                let derived_ix = match (ld, rd) {
+                    (Some(_), None) => left_ix,
+                    (None, Some(_)) => right_ix,
+                    _ => unreachable!(),
+                };
+
+                let (derived, external) = match (ld, rd) {
+                    (Some(_), None) => (left, right),
+                    (None, Some(_)) => (right, left),
+                    _ => unreachable!(),
+                };
+
+                if linum.contains_key(&derived_ix) {
+                    let l = linum[&derived_ix];
+                    out.push_str("Because ");
+                    out.push_str(&external.show_combine(derived, None, Some(l)));
+                } else {
+                    let d2 = &self.incompats[derived_ix].derived();
+                    if d2.is_some()
+                        && ((self.incompats[d2.unwrap().0].is_derived()
+                            && linum.get(&d2.unwrap().0).is_none())
+                            ^ (self.incompats[d2.unwrap().1].is_derived()
+                                && linum.get(&d2.unwrap().1).is_none()))
+                    {
+                        // TODO
+                        let a = &self.incompats[d2.unwrap().0];
+                        let b = &self.incompats[d2.unwrap().1];
+                        let prior_derived_ix = match (a.derived(), b.derived()) {
+                            (Some(_), None) => d2.unwrap().0,
+                            (None, Some(_)) => d2.unwrap().1,
+                            _ => unreachable!(),
+                        };
+                        let prior_external = match (a.derived(), b.derived()) {
+                            (Some(_), None) => a,
+                            (None, Some(_)) => b,
+                            _ => unreachable!(),
+                        };
+
+                        self.pp_err_recur(prior_derived_ix, ic_occur, linum, cur_linum, out);
+                        out.push_str("And because ");
+                        out.push_str(&prior_external.show_combine(external, None, None));
+                    } else {
+                        self.pp_err_recur(derived_ix, ic_occur, linum, cur_linum, out);
+                        out.push_str("And because ");
+                        out.push_str(&external.show());
+                    }
+                }
+            }
+        }
+
+        out.push_str(", ");
+        out.push_str(&root.show());
+        out.push('.');
+        if ic_occur[&icix] >= 2 {
+            out.push_str(" (");
+            out.push_str(&cur_linum.to_string());
+            out.push(')');
+            linum.insert(icix, *cur_linum);
+            *cur_linum += 1;
+        }
+        out.push('\n');
     }
 
     fn register(&mut self, a: &Assignment) {

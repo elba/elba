@@ -73,6 +73,13 @@ fn resolve_conflict_res_simple() {
 #[test]
 fn resolve_conflict_res_partial() {
     let mut resolver = resolver(sum!("conflict_res_partial/root", "1.0.0"));
-
     assert!(resolver.solve().is_ok())
+}
+
+#[test]
+fn resolve_conflict_simple_report() {
+    let mut resolver = resolver(sum!("conflict_simple/root", "1.0.0"));
+    let msg = resolver.solve();
+    println!("{:#?}", resolver);
+    assert!(resolver.solve().is_err())
 }
