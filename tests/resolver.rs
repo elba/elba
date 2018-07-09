@@ -80,7 +80,7 @@ fn resolve_conflict_res_partial() {
 fn resolve_conflict_simple_report() {
     let mut resolver = resolver(sum!("conflict_simple/root", "1.0.0"));
     let msg = resolver.solve();
-    println!("{:#?}", resolver);
-    println!("{:?}", msg);
+    println!();
+    println!("{}", msg.clone().unwrap_err());
     assert!(msg.is_err())
 }

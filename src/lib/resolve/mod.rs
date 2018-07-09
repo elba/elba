@@ -168,10 +168,11 @@ impl Resolver {
     // This function is basically the only reason why we need NLL; we're doing immutable borrows
     // with satisfier, but mutable ones with backtrack & incompatibility.
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
+        let mut inc = inc;
         let mut new_incompatibility = false;
-        let mut i = self.incompats[inc].clone();
 
-        while !self.is_failure(&i) {
+        while !self.is_failure(&self.incompats[inc]) {
+            let i = self.incompats[inc].clone();
             let mut most_recent_term: Option<(&PackageId, &Constraint)> = None;
             let mut most_recent_satisfier: Option<&Assignment> = None;
             let mut difference: Option<(&PackageId, Constraint)> = None;
@@ -262,14 +263,18 @@ impl Resolver {
                 new_terms.insert(pkg.clone(), diff.complement());
             }
 
-            i = Incompatibility::new(
+            let new_i = Incompatibility::new(
                 new_terms,
                 IncompatibilityCause::Derived(inc, most_recent_satisfier.cause().unwrap()),
             );
+            // What Pub does is just add the current incompatibility directly as a cause of the new
+            // incompatibility. Unfortunately, we don't want to be copying *that* much, so instead
+            // we just add the incompatibility to the global cache. I'm not entirely sure if this
+            // is totally correct, but oh well.
+            inc = self.incompatibility(new_i.deps, new_i.cause);
             new_incompatibility = true;
         }
 
-        self.incompatibility(i.deps, i.cause);
         Err(Error::from(ErrorKind::NoConflictRes))
     }
 
@@ -456,7 +461,6 @@ impl Resolver {
                         out.push_str(&r.to_string());
                     }
                     (None, None) => {
-                        // TODO
                         let l1_i = &self.incompats[l1];
                         let l2_i = &self.incompats[l2];
                         let r1_i = &self.incompats[r1];
@@ -536,7 +540,6 @@ impl Resolver {
                             ^ (self.incompats[d2.unwrap().1].is_derived()
                                 && linum.get(&d2.unwrap().1).is_none()))
                     {
-                        // TODO
                         let a = &self.incompats[d2.unwrap().0];
                         let b = &self.incompats[d2.unwrap().1];
                         let prior_derived_ix = match (a.derived(), b.derived()) {

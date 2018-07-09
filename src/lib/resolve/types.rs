@@ -87,7 +87,7 @@ impl Incompatibility {
             IncompatibilityCause::Derived(_, _) => {
                 if self.deps.len() == 1 {
                     let package = self.deps.get_index(0).unwrap();
-                    format!("{} {} is impossible.", package.0, package.1)
+                    format!("{} {} is impossible", package.0, package.1)
                 } else if self.deps.len() == 2 {
                     let p1 = self.deps.get_index(0).unwrap();
                     let p2 = self.deps.get_index(1).unwrap();
