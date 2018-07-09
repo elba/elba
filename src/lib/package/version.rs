@@ -627,6 +627,12 @@ impl Constraint {
                             break;
                         }
 
+                        // Again, special-casing the Unbounded case.
+                        if s.upper() == &Interval::Unbounded {
+                            g = false;
+                            break;
+                        }
+
                         let lower = s.upper().clone().flip();
                         let upper = r.upper().clone();
 
@@ -1130,6 +1136,15 @@ mod tests {
     #[test]
     fn test_constraint_difference_any() {
         let c1 = Constraint::from_str(">= 2.0.0 < 3.0.0").unwrap();
+        let c2 = Constraint::from_str("any").unwrap();
+        let ce = Constraint::empty();
+
+        assert_eq!(ce, c1.difference(&c2));
+    }
+
+    #[test]
+    fn test_constraint_difference_any_union() {
+        let c1 = Constraint::from_str("<! 1.1.0, >= 2.0.0").unwrap();
         let c2 = Constraint::from_str("any").unwrap();
         let ce = Constraint::empty();
 

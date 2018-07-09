@@ -84,3 +84,12 @@ fn resolve_conflict_simple_report() {
     println!("{}", msg.clone().unwrap_err());
     assert!(msg.is_err())
 }
+
+#[test]
+fn resolve_conflict_complex_report() {
+    let mut resolver = resolver(sum!("conflict_complex/root", "1.0.0"));
+    let msg = resolver.solve();
+    println!();
+    println!("{}", msg.clone().unwrap_err());
+    assert!(msg.is_err())
+}

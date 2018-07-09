@@ -109,31 +109,43 @@ impl Retriever {
                 lix -= 1;
                 let new = entries.get_index(lix).unwrap();
                 let new_deps = &new.1.dependencies;
+                let mut seen = false;
                 for new_dep in new_deps {
                     if dep.name == new_dep.name && dep.index == new_dep.index {
                         let rel = dep.req.relation(&new_dep.req);
                         if rel == Relation::Equal || rel == Relation::Superset {
+                            seen = true;
                             lower = &new.0;
                         } else {
-                            break;
+                            seen = false;
                         }
                     }
+                }
+                if !seen {
+                    lix += 1;
+                    break;
                 }
             }
 
             while rix < l - 1 {
                 rix += 1;
-                let new = entries.get_index(lix).unwrap();
+                let new = entries.get_index(rix).unwrap();
                 let new_deps = &new.1.dependencies;
+                let mut seen = false;
                 for new_dep in new_deps {
                     if dep.name == new_dep.name && dep.index == new_dep.index {
                         let rel = dep.req.relation(&new_dep.req);
                         if rel == Relation::Equal || rel == Relation::Superset {
+                            seen = true;
                             upper = &new.0;
                         } else {
-                            break;
+                            seen = false;
                         }
                     }
+                }
+                if !seen {
+                    rix -= 1;
+                    break;
                 }
             }
 

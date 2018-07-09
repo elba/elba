@@ -91,7 +91,7 @@ impl Incompatibility {
                 } else if self.deps.len() == 2 {
                     let p1 = self.deps.get_index(0).unwrap();
                     let p2 = self.deps.get_index(1).unwrap();
-                    format!("{} {} requires {} {}", p1.0, p1.1, p2.0, p2.1.complement())
+                    format!("{} {} is incompatible with {} {}", p1.0, p1.1, p2.0, p2.1)
                 } else {
                     format!(
                         "one of {} must be false",

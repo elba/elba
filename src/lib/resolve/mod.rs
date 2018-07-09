@@ -96,7 +96,18 @@ impl Resolver {
         while let Some(package) = changed.pop() {
             // Yeah, I hate cloning too, but unfortunately it's necessary here
             if let Some(icixs) = self.incompat_ixs.clone().get(&package) {
-                'f: for icix in icixs {
+                'f: for icix in icixs.iter().rev() {
+                    // When the first term of a dependency incompat is inconclusive but the second
+                    // one is satisfied, it means that we know that the two sets of packages as
+                    // constrained cannot coexist. But, this does not REQUIRE that the first package
+                    // exist under that version; the first package might not even be chosen.
+                    // In lieu of having positive and negative derivations, this is a workaround
+                    // which fixes the problem. Incompatible versions will eventually bubble
+                    // up and force conflict resolution...
+                    if &self.incompats[*icix].cause == &IncompatibilityCause::Dependency && self.incompats[*icix].deps().get_index(0).unwrap().0 != &package {
+                        continue;
+                    }
+
                     let res = self.propagate_incompat(*icix);
                     match res {
                         IncompatMatch::Almost(name) => {
@@ -147,7 +158,7 @@ impl Resolver {
 
         if let Some((pkg, con)) = unsatis {
             let level = self.level;
-            self.derivation(pkg.clone(), con.clone().complement(), level, icix);
+            self.derivation(pkg.clone(), con.complement(), level, icix);
             return IncompatMatch::Almost(pkg.clone());
         } else {
             return IncompatMatch::Satisfied;
@@ -234,10 +245,9 @@ impl Resolver {
             {
                 self.backtrack(previous_satisfier_level);
                 if new_incompatibility {
-                    return Ok(self.incompatibility(i.deps, i.cause));
-                } else {
-                    return Ok(inc);
+                    self.incompat_ixs(inc);
                 }
+                return Ok(inc);
             }
 
             // newterms etc
@@ -271,7 +281,8 @@ impl Resolver {
             // incompatibility. Unfortunately, we don't want to be copying *that* much, so instead
             // we just add the incompatibility to the global cache. I'm not entirely sure if this
             // is totally correct, but oh well.
-            inc = self.incompatibility(new_i.deps, new_i.cause);
+            inc = self.incompats.len();
+            self.incompats.push(new_i);
             new_incompatibility = true;
         }
 
@@ -305,6 +316,7 @@ impl Resolver {
                 self.register(&assignment);
             }
         }
+
     }
 
     fn is_failure(&self, inc: &Incompatibility) -> bool {
@@ -338,7 +350,7 @@ impl Resolver {
             });
             let package = unsatisfied.pop().unwrap();
             // TODO: What if we want to minimize our packages?
-            let best = self.retriever.best(package.0, package.1, true);
+            let best = self.retriever.best(package.0, package.1, false);
             let res = Some(package.0.clone());
             if let Ok(best) = best {
                 let sum = Summary::new(package.0.clone(), best.clone());
@@ -632,14 +644,19 @@ impl Resolver {
         cause: IncompatibilityCause,
     ) -> usize {
         let new_ix = self.incompats.len();
-        for (n, _) in &pkgs {
+        self.incompats.push(Incompatibility::new(pkgs, cause));
+        self.incompat_ixs(new_ix);
+
+        new_ix
+    }
+
+    fn incompat_ixs(&mut self, icix: usize) {
+        let ic = &self.incompats[icix];
+        for (n, _) in ic.deps() {
             self.incompat_ixs
                 .entry(n.clone())
                 .or_insert_with(Vec::new)
-                .push(new_ix);
+                .push(icix);
         }
-        self.incompats.push(Incompatibility::new(pkgs, cause));
-
-        new_ix
     }
 }
