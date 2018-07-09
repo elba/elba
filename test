@@ -1,0 +1,616 @@
+   Compiling matic v0.1.0 (file:///home/david/dev/matic)
+warning: unused variable: `manifest`
+   --> src/lib/index/mod.rs:165:23
+    |
+165 |     pub fn add(&self, manifest: &Manifest) {
+    |                       ^^^^^^^^ help: consider using `_manifest` instead
+    |
+    = note: #[warn(unused_variables)] on by default
+
+warning: struct is never used: `InvokeBuilder`
+ --> src/lib/compiler.rs:3:1
+  |
+3 | struct InvokeBuilder {
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: #[warn(dead_code)] on by default
+
+warning: unused variable: `manifest`
+   --> src/lib/index/mod.rs:165:23
+    |
+165 |     pub fn add(&self, manifest: &Manifest) {
+    |                       ^^^^^^^^ help: consider using `_manifest` instead
+    |
+    = note: #[warn(unused_variables)] on by default
+
+warning: struct is never used: `InvokeBuilder`
+ --> src/lib/compiler.rs:3:1
+  |
+3 | struct InvokeBuilder {
+  | ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: #[warn(dead_code)] on by default
+
+    Finished dev [unoptimized + debuginfo] target(s) in 6.14s
+     Running target/debug/deps/matic-7b106d6041d64a88
+
+running 18 tests
+Ok(
+    Lockfile {
+        packages: {
+            PackageId("terminator/one index+https://matic.io/pkg"): (
+                Version {
+                    major: 0,
+                    minor: 1,
+                    patch: 4,
+                    pre: [],
+                    build: []
+                },
+                []
+            ),
+            PackageId("good/package dir+file:///right/there"): (
+                Version {
+                    major: 1,
+                    minor: 0,
+                    patch: 5,
+                    pre: [
+                        AlphaNumeric(
+                            "alpha"
+                        ),
+                        AlphaNumeric(
+                            "5-zeta"
+                        ),
+                        Numeric(
+                            15
+                        )
+                    ],
+                    build: []
+                },
+                [
+                    Summary {
+                        id: PackageId("terminator/one index+https://matic.io/pkg"),
+                        version: Version {
+                            major: 0,
+                            minor: 1,
+                            patch: 4,
+                            pre: [],
+                            build: []
+                        }
+                    }
+                ]
+            )
+        }
+    }
+)
+test package::version::tests::test_constraint_complement ... ok
+test package::manifest::tests::valid_manifest ... ok
+test package::lockfile::tests::valid_lockfile ... ok
+test package::version::tests::test_constraint_complement_single ... ok
+test package::version::tests::test_constraint_complement_correct ... ok
+test package::version::tests::test_constraint_difference ... ok
+test package::version::tests::test_constraint_complement_symmetry ... ok
+test package::version::tests::test_constraint_difference_any ... ok
+test package::version::tests::test_constraint_relation_opposite ... ok
+test package::version::tests::test_constraint_relation ... ok
+test package::version::tests::test_parse_bare ... ok
+test package::version::tests::test_parse_range_caret ... ok
+test package::version::tests::test_constraint_subset ... ok
+Ok(
+    (
+        CompleteStr(
+            ""
+        ),
+        Range {
+            lower: Closed(
+                Version {
+                    major: 1,
+                    minor: 0,
+                    patch: 0,
+                    pre: [],
+                    build: []
+                },
+                false
+            ),
+            upper: Open(
+                Version {
+                    major: 2,
+                    minor: 0,
+                    patch: 0,
+                    pre: [],
+                    build: []
+                },
+                false
+            )
+        }
+    )
+)
+test package::version::tests::test_constraint_relation_single ... ok
+test package::version::tests::test_parse_range_tilde ... ok
+Ok(
+    (
+        CompleteStr(
+            ""
+        ),
+        Range {
+            lower: Closed(
+                Version {
+                    major: 1,
+                    minor: 0,
+                    patch: 0,
+                    pre: [],
+                    build: []
+                },
+                false
+            ),
+            upper: Unbounded
+        }
+    )
+)
+test package::version::tests::test_range_pre_ok ... ok
+test package::version::tests::test_version_single ... ok
+Ok(
+    (
+        CompleteStr(
+            ""
+        ),
+        Range {
+            lower: Unbounded,
+            upper: Open(
+                Version {
+                    major: 2,
+                    minor: 0,
+                    patch: 0,
+                    pre: [],
+                    build: []
+                },
+                false
+            )
+        }
+    )
+)
+test package::version::tests::test_parse_range_manual ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/matic-4af8d633de3f22ff
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/index-c78fdb42afae765d
+
+running 1 test
+Ok(
+    {
+        Version {
+            major: 1,
+            minor: 0,
+            patch: 0,
+            pre: [],
+            build: []
+        }: IndexEntry {
+            name: Name {
+                inner: NameInner {
+                    serialization: "no_conflict/root",
+                    group: "no_conflict",
+                    name: "root"
+                }
+            },
+            version: Version {
+                major: 1,
+                minor: 0,
+                patch: 0,
+                pre: [],
+                build: []
+            },
+            dependencies: [
+                Dep {
+                    name: Name {
+                        inner: NameInner {
+                            serialization: "no_conflict/foo",
+                            group: "no_conflict",
+                            name: "foo"
+                        }
+                    },
+                    index: IndexRes {
+                        url: "file://index/"
+                    },
+                    req: Constraint(>=1.0.0 <2.0.0)
+                }
+            ],
+            yanked: false,
+            checksum: Checksum {
+                fmt: Sha512,
+                hash: "test"
+            },
+            location: Dir {
+                url: "file://test/"
+            }
+        }
+    }
+)
+test index_success ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/resolver-addd3ae5b6ae3e7c
+
+running 5 tests
+test resolve_conflict_res_simple ... ok
+test resolve_avoid_conflict ... ok
+test resolve_conflict_res_partial ... ok
+test resolve_no_conflict ... ok
+Resolver {
+    step: 6,
+    level: 1,
+    assignments: [
+        Assignment {
+            step: 1,
+            level: 0,
+            ty: Derivation {
+                constraint: Constraint(>=1.0.0 <=1.0.0),
+                cause: 0
+            },
+            pkg: PackageId("conflict_simple/root index+file://index/")
+        },
+        Assignment {
+            step: 2,
+            level: 1,
+            ty: Decision {
+                version: Version {
+                    major: 1,
+                    minor: 0,
+                    patch: 0,
+                    pre: [],
+                    build: []
+                }
+            },
+            pkg: PackageId("conflict_simple/root index+file://index/")
+        },
+        Assignment {
+            step: 3,
+            level: 1,
+            ty: Derivation {
+                constraint: Constraint(>=1.0.0 <2.0.0),
+                cause: 1
+            },
+            pkg: PackageId("conflict_simple/foo index+file://index/")
+        },
+        Assignment {
+            step: 4,
+            level: 1,
+            ty: Derivation {
+                constraint: Constraint(>=1.0.0 <2.0.0),
+                cause: 2
+            },
+            pkg: PackageId("conflict_simple/baz index+file://index/")
+        },
+        Assignment {
+            step: 5,
+            level: 1,
+            ty: Derivation {
+                constraint: Constraint(),
+                cause: 4
+            },
+            pkg: PackageId("conflict_simple/bar index+file://index/")
+        }
+    ],
+    decisions: {
+        PackageId("conflict_simple/root index+file://index/"): Version {
+            major: 1,
+            minor: 0,
+            patch: 0,
+            pre: [],
+            build: []
+        }
+    },
+    derivations: {
+        PackageId("conflict_simple/root index+file://index/"): Constraint(>=1.0.0 <=1.0.0),
+        PackageId("conflict_simple/foo index+file://index/"): Constraint(>=1.0.0 <2.0.0),
+        PackageId("conflict_simple/baz index+file://index/"): Constraint(>=1.0.0 <2.0.0),
+        PackageId("conflict_simple/bar index+file://index/"): Constraint()
+    },
+    incompats: [
+        Incompatibility::Root(conflict_simple/root index+file://index/ <!1.0.0, >!1.0.0),
+        Incompatibility::Dependency(conflict_simple/root index+file://index/ >=1.0.0 <=1.0.0; conflict_simple/foo index+file://index/ <!1.0.0, >=!2.0.0),
+        Incompatibility::Dependency(conflict_simple/root index+file://index/ >=1.0.0 <=1.0.0; conflict_simple/baz index+file://index/ <!1.0.0, >=!2.0.0),
+        Incompatibility::Dependency(conflict_simple/foo index+file://index/ any; conflict_simple/bar index+file://index/ <!2.0.0, >=!3.0.0),
+        Incompatibility::Dependency(conflict_simple/bar index+file://index/ any; conflict_simple/baz index+file://index/ <!3.0.0, >=!4.0.0),
+        Incompatibility::Derived(3, 1)(conflict_simple/root index+file://index/ >=1.0.0 <=1.0.0)
+    ],
+    incompat_ixs: {
+        PackageId("conflict_simple/root index+file://index/"): [
+            0,
+            1,
+            2,
+            5
+        ],
+        PackageId("conflict_simple/foo index+file://index/"): [
+            1,
+            3
+        ],
+        PackageId("conflict_simple/baz index+file://index/"): [
+            2,
+            4
+        ],
+        PackageId("conflict_simple/bar index+file://index/"): [
+            3,
+            4
+        ]
+    },
+    retriever: Retriever {
+        root: Summary {
+            id: PackageId("conflict_simple/root index+file://index/"),
+            version: Version {
+                major: 1,
+                minor: 0,
+                patch: 0,
+                pre: [],
+                build: []
+            }
+        },
+        root_deps: [
+            (
+                PackageId("conflict_simple/foo index+file://index/"),
+                Constraint(>=1.0.0 <2.0.0)
+            ),
+            (
+                PackageId("conflict_simple/baz index+file://index/"),
+                Constraint(>=1.0.0 <2.0.0)
+            )
+        ],
+        indices: Indices {
+            indices: {
+                IndexRes {
+                    url: "file://index/"
+                }: Index {
+                    id: IndexRes {
+                        url: "file://index/"
+                    },
+                    path: "/home/david/dev/matic/tests/index",
+                    config: IndexConfig {
+                        index: IndexConfInner {
+                            secure: false,
+                            dependencies: []
+                        }
+                    }
+                }
+            },
+            cache: {
+                PackageId("conflict_simple/root index+file://index/"): {
+                    Version {
+                        major: 1,
+                        minor: 0,
+                        patch: 0,
+                        pre: [],
+                        build: []
+                    }: IndexEntry {
+                        name: Name {
+                            inner: NameInner {
+                                serialization: "conflict_simple/root",
+                                group: "conflict_simple",
+                                name: "root"
+                            }
+                        },
+                        version: Version {
+                            major: 1,
+                            minor: 0,
+                            patch: 0,
+                            pre: [],
+                            build: []
+                        },
+                        dependencies: [
+                            Dep {
+                                name: Name {
+                                    inner: NameInner {
+                                        serialization: "conflict_simple/foo",
+                                        group: "conflict_simple",
+                                        name: "foo"
+                                    }
+                                },
+                                index: IndexRes {
+                                    url: "file://index/"
+                                },
+                                req: Constraint(>=1.0.0 <2.0.0)
+                            },
+                            Dep {
+                                name: Name {
+                                    inner: NameInner {
+                                        serialization: "conflict_simple/baz",
+                                        group: "conflict_simple",
+                                        name: "baz"
+                                    }
+                                },
+                                index: IndexRes {
+                                    url: "file://index/"
+                                },
+                                req: Constraint(>=1.0.0 <2.0.0)
+                            }
+                        ],
+                        yanked: false,
+                        checksum: Checksum {
+                            fmt: Sha512,
+                            hash: "test"
+                        },
+                        location: Dir {
+                            url: "file://test/"
+                        }
+                    }
+                },
+                PackageId("conflict_simple/baz index+file://index/"): {
+                    Version {
+                        major: 1,
+                        minor: 0,
+                        patch: 0,
+                        pre: [],
+                        build: []
+                    }: IndexEntry {
+                        name: Name {
+                            inner: NameInner {
+                                serialization: "conflict_simple/baz",
+                                group: "conflict_simple",
+                                name: "baz"
+                            }
+                        },
+                        version: Version {
+                            major: 1,
+                            minor: 0,
+                            patch: 0,
+                            pre: [],
+                            build: []
+                        },
+                        dependencies: [],
+                        yanked: false,
+                        checksum: Checksum {
+                            fmt: Sha512,
+                            hash: "test"
+                        },
+                        location: Dir {
+                            url: "file://test/"
+                        }
+                    },
+                    Version {
+                        major: 3,
+                        minor: 0,
+                        patch: 0,
+                        pre: [],
+                        build: []
+                    }: IndexEntry {
+                        name: Name {
+                            inner: NameInner {
+                                serialization: "conflict_simple/baz",
+                                group: "conflict_simple",
+                                name: "baz"
+                            }
+                        },
+                        version: Version {
+                            major: 3,
+                            minor: 0,
+                            patch: 0,
+                            pre: [],
+                            build: []
+                        },
+                        dependencies: [],
+                        yanked: false,
+                        checksum: Checksum {
+                            fmt: Sha512,
+                            hash: "test"
+                        },
+                        location: Dir {
+                            url: "file://test/"
+                        }
+                    }
+                },
+                PackageId("conflict_simple/foo index+file://index/"): {
+                    Version {
+                        major: 1,
+                        minor: 0,
+                        patch: 0,
+                        pre: [],
+                        build: []
+                    }: IndexEntry {
+                        name: Name {
+                            inner: NameInner {
+                                serialization: "conflict_simple/foo",
+                                group: "conflict_simple",
+                                name: "foo"
+                            }
+                        },
+                        version: Version {
+                            major: 1,
+                            minor: 0,
+                            patch: 0,
+                            pre: [],
+                            build: []
+                        },
+                        dependencies: [
+                            Dep {
+                                name: Name {
+                                    inner: NameInner {
+                                        serialization: "conflict_simple/bar",
+                                        group: "conflict_simple",
+                                        name: "bar"
+                                    }
+                                },
+                                index: IndexRes {
+                                    url: "file://index/"
+                                },
+                                req: Constraint(>=2.0.0 <3.0.0)
+                            }
+                        ],
+                        yanked: false,
+                        checksum: Checksum {
+                            fmt: Sha512,
+                            hash: "test"
+                        },
+                        location: Dir {
+                            url: "file://test/"
+                        }
+                    }
+                },
+                PackageId("conflict_simple/bar index+file://index/"): {
+                    Version {
+                        major: 2,
+                        minor: 0,
+                        patch: 0,
+                        pre: [],
+                        build: []
+                    }: IndexEntry {
+                        name: Name {
+                            inner: NameInner {
+                                serialization: "conflict_simple/bar",
+                                group: "conflict_simple",
+                                name: "bar"
+                            }
+                        },
+                        version: Version {
+                            major: 2,
+                            minor: 0,
+                            patch: 0,
+                            pre: [],
+                            build: []
+                        },
+                        dependencies: [
+                            Dep {
+                                name: Name {
+                                    inner: NameInner {
+                                        serialization: "conflict_simple/baz",
+                                        group: "conflict_simple",
+                                        name: "baz"
+                                    }
+                                },
+                                index: IndexRes {
+                                    url: "file://index/"
+                                },
+                                req: Constraint(>=3.0.0 <4.0.0)
+                            }
+                        ],
+                        yanked: false,
+                        checksum: Checksum {
+                            fmt: Sha512,
+                            hash: "test"
+                        },
+                        location: Dir {
+                            url: "file://test/"
+                        }
+                    }
+                }
+            }
+        },
+        lockfile: Lockfile {
+            packages: {}
+        }
+    }
+}
+Err("Because conflict_simple/foo index+file://index/ any depends on conflict_simple/bar index+file://index/ >=2.0.0 <3.0.0 and conflict_simple/root index+file://index/ >=1.0.0 <=1.0.0 depends on conflict_simple/foo index+file://index/ >=1.0.0 <2.0.0, conflict_simple/root index+file://index/ >=1.0.0 <=1.0.0 is impossible..\n")
+test resolve_conflict_simple_report ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+   Doc-tests matic
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+

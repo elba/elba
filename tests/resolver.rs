@@ -81,5 +81,6 @@ fn resolve_conflict_simple_report() {
     let mut resolver = resolver(sum!("conflict_simple/root", "1.0.0"));
     let msg = resolver.solve();
     println!("{:#?}", resolver);
-    assert!(resolver.solve().is_err())
+    println!("{:?}", msg);
+    assert!(msg.is_err())
 }

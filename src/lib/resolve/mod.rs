@@ -68,7 +68,7 @@ impl Resolver {
         let r = self.solve_loop();
 
         if r.is_err() {
-            Err(self.pp_error(self.incompat_ixs.len() - 1))
+            Err(self.pp_error(self.incompats.len() - 1))
         } else {
             Ok(r.unwrap())
         }
@@ -128,7 +128,6 @@ impl Resolver {
 
         for (pkg, con) in inc.deps() {
             let relation = self.relation(pkg, con);
-
             // We have to special-case the "any" dependency because the any derivation is a superset of the null set, which would
             // result in continuous "Almost"s if a package only depends on any version of one other package.
             if relation == Relation::Disjoint
@@ -170,8 +169,7 @@ impl Resolver {
     // with satisfier, but mutable ones with backtrack & incompatibility.
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
         let mut new_incompatibility = false;
-        let incompats = self.incompats.to_vec();
-        let mut i = incompats[inc].clone();
+        let mut i = self.incompats[inc].clone();
 
         while !self.is_failure(&i) {
             let mut most_recent_term: Option<(&PackageId, &Constraint)> = None;
@@ -242,7 +240,7 @@ impl Resolver {
             }
 
             // newterms etc
-            let cause = incompats[most_recent_satisfier.cause().unwrap()].clone();
+            let cause = self.incompats[most_recent_satisfier.cause().unwrap()].clone();
             let mut new_terms: IndexMap<PackageId, Constraint> = IndexMap::new()
                 .into_iter()
                 .chain(
@@ -271,6 +269,7 @@ impl Resolver {
             new_incompatibility = true;
         }
 
+        self.incompatibility(i.deps, i.cause);
         Err(Error::from(ErrorKind::NoConflictRes))
     }
 
@@ -484,9 +483,9 @@ impl Resolver {
                                     out.push(')');
                                     linum.insert(icix, *cur_linum);
                                     *cur_linum += 1;
-                                    out.push('\n');
+                                    out.push_str("\n");
                                 }
-                                out.push('\n');
+                                out.push_str("\n");
                                 self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
 
                                 // TODO: This just feels wrong
@@ -498,7 +497,7 @@ impl Resolver {
                                 out.push(')');
                                 linum.insert(icix, *cur_linum);
                                 *cur_linum += 1;
-                                out.push('\n');
+                                out.push_str("\n");
 
                                 out.push_str("And because ");
                                 out.push_str(&left.show());
@@ -573,7 +572,7 @@ impl Resolver {
             linum.insert(icix, *cur_linum);
             *cur_linum += 1;
         }
-        out.push('\n');
+        out.push_str("\n");
     }
 
     fn register(&mut self, a: &Assignment) {

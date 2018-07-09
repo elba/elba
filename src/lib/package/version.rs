@@ -155,9 +155,9 @@ impl Interval {
             Interval::Closed(v, p) => {
                 if lower {
                     if !v.is_prerelease() && *p {
-                        format!(">=!{} ", v)
+                        format!(">=!{}", v)
                     } else {
-                        format!(">={} ", v)
+                        format!(">={}", v)
                     }
                 } else if !v.is_prerelease() && *p {
                     format!("<=!{}", v)
@@ -168,9 +168,9 @@ impl Interval {
             Interval::Open(v, p) => {
                 if lower {
                     if !v.is_prerelease() && *p {
-                        format!(">!{} ", v)
+                        format!(">!{}", v)
                     } else {
-                        format!(">{} ", v)
+                        format!(">{}", v)
                     }
                 } else if !v.is_prerelease() && *p {
                     format!("<!{}", v)
@@ -229,6 +229,18 @@ impl Range {
                     None
                 } else {
                     let (a, b) = (Interval::Closed(a, ap), Interval::Open(b, bp));
+                    if a.cmp(&b, true) != cmp::Ordering::Greater {
+                        Some(Range { lower: a, upper: b })
+                    } else {
+                        None
+                    }
+                }
+            }
+            (Interval::Open(a, ap), Interval::Open(b, bp)) => {
+                if a == b {
+                    None
+                } else {
+                    let (a, b) = (Interval::Open(a, ap), Interval::Open(b, bp));
                     if a.cmp(&b, true) != cmp::Ordering::Greater {
                         Some(Range { lower: a, upper: b })
                     } else {
@@ -333,7 +345,9 @@ impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (&self.lower, &self.upper) {
             (Unbounded, Unbounded) => write!(f, "any"),
-            (a, b) => write!(f, "{}{}", a.show(true), b.show(false)),
+            (Unbounded, b) => write!(f, "{}", b.show(false)),
+            (a, Unbounded) => write!(f, "{}", a.show(true)),
+            (a, b) => write!(f, "{} {}", a.show(true), b.show(false)),
         }
     }
 }
@@ -362,7 +376,7 @@ impl<'de> Deserialize<'de> for Range {
 /// doesn't allow mutating self).
 ///
 /// Syntax-wise, a `Constraint` is just a list of comma-separated ranges.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Constraint {
     set: IndexSet<Range>,
 }
@@ -492,130 +506,135 @@ impl Constraint {
             let mut r = r.clone();
             let mut g = true;
             for s in &other.set {
-                if g {
-                    match r.lower().cmp(s.lower(), true) {
-                        cmp::Ordering::Greater => {
-                            //------------------//
-                            //         [=r=]    //
-                            // [==s==]          //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            //         [=r=]    //
-                            // [===s===]        //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            //         [=r=]    //
-                            // [====s====]      //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            //         [=r=]    //
-                            // [======s======]  //
-                            //------------------//
-                            match r.lower().cmp(s.upper(), false) {
-                                cmp::Ordering::Greater => {
-                                    // Situation 1
+                match r.lower().cmp(s.lower(), true) {
+                    cmp::Ordering::Greater => {
+                        //------------------//
+                        //         [=r=]    //
+                        // [==s==]          //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        //         [=r=]    //
+                        // [===s===]        //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        //         [=r=]    //
+                        // [====s====]      //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        //         [=r=]    //
+                        // [======s======]  //
+                        //------------------//
+                        match r.lower().cmp(s.upper(), false) {
+                            cmp::Ordering::Greater => {
+                                // Situation 1
+                            }
+                            cmp::Ordering::Equal => {
+                                // Situation 2
+                                // If they're the same, the lower bound will always be open no matter
+                                // what
+                                let lower = if let Interval::Open(_, _) = s.upper() {
+                                    s.upper().clone()
+                                } else {
+                                    s.upper().clone().flip()
+                                };
+                                let upper = r.upper().clone();
+                                r = Range::new(lower, upper).unwrap();
+                            }
+                            cmp::Ordering::Less => {
+                                // Situation 3 & 4
+                                // Special-case for Unbounded because that screws with things
+                                if s.upper() == &Interval::Unbounded {
+                                    g = false;
+                                    break;
                                 }
-                                cmp::Ordering::Equal => {
-                                    // Situation 2
-                                    // If they're the same, the lower bound will always be open no matter
-                                    // what
-                                    let lower = if let Interval::Open(_, _) = s.upper() {
-                                        s.upper().clone()
-                                    } else {
-                                        s.upper().clone().flip()
-                                    };
-                                    let upper = r.upper().clone();
-                                    r = Range::new(lower, upper).unwrap();
-                                }
-                                cmp::Ordering::Less => {
-                                    // Situation 3 & 4
-                                    let lower = s.upper().clone().flip();
-                                    let upper = r.upper().clone();
-                                    // We have to do the if let because in Situation 4 there is no valid
-                                    // Range
-                                    if let Some(range) = Range::new(lower, upper) {
-                                        r = range;
-                                    } else {
-                                        g = false;
-                                    }
+                                let lower = s.upper().clone().flip();
+                                let upper = r.upper().clone();
+                                // We have to do the if let because in Situation 4 there is no valid
+                                // Range
+                                if let Some(range) = Range::new(lower, upper) {
+                                    r = range;
+                                } else {
+                                    g = false;
+                                    break;
                                 }
                             }
                         }
-                        cmp::Ordering::Less => {
-                            //------------------//
-                            // [=r=]            //
-                            //       [==s==]    //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            // [==r==]          //
-                            //       [==s==]    //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            // [====r====]      //
-                            //       [==s==]    //
-                            //------------------//
-                            //        OR        //
-                            //------------------//
-                            // [======r======]  //
-                            //       [==s==]    //
-                            //------------------//
-                            // Situations 1-3
-                            match r.upper().cmp(s.lower(), false) {
-                                cmp::Ordering::Less => {
-                                    // Situation 1
-                                }
-                                cmp::Ordering::Equal => {
-                                    // Situation 2
-                                    let lower = if let Interval::Open(_, _) = r.upper() {
-                                        r.upper().clone()
-                                    } else {
-                                        r.upper().clone().flip()
-                                    };
+                    }
+                    cmp::Ordering::Less => {
+                        //------------------//
+                        // [=r=]            //
+                        //       [==s==]    //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        // [==r==]          //
+                        //       [==s==]    //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        // [====r====]      //
+                        //       [==s==]    //
+                        //------------------//
+                        //        OR        //
+                        //------------------//
+                        // [======r======]  //
+                        //       [==s==]    //
+                        //------------------//
+                        // Situations 1-3
+                        match r.upper().cmp(s.lower(), false) {
+                            cmp::Ordering::Less => {
+                                // Situation 1
+                            }
+                            cmp::Ordering::Equal => {
+                                // Situation 2
+                                let lower = r.lower().clone();
+                                let upper = match (r.upper(), s.lower()) {
+                                    (Interval::Closed(a, ap), _) => Interval::Open(a.clone(), *ap),
+                                    (Interval::Open(_, _), _) => r.upper().clone(),
+                                    (_, _) => unreachable!(),
+                                };
+                                r = Range::new(lower, upper).unwrap();
+                            }
+                            cmp::Ordering::Greater => {
+                                // Situations 3 & 4
+                                if r.upper().cmp(s.upper(), false) != cmp::Ordering::Greater {
+                                    // Situation 3
+                                    let lower = r.lower().clone();
                                     let upper = s.lower().clone().flip();
                                     r = Range::new(lower, upper).unwrap();
-                                }
-                                cmp::Ordering::Greater => {
-                                    // Situations 3 & 4
-                                    if r.upper().cmp(s.upper(), false) != cmp::Ordering::Greater {
-                                        // Situation 3
-                                        let lower = r.lower().clone();
-                                        let upper = s.lower().clone().flip();
-                                        r = Range::new(lower, upper).unwrap();
-                                    } else {
-                                        // Situation 4
-                                        let l1 = r.lower().clone();
-                                        let u1 = s.lower().clone().flip();
+                                } else {
+                                    // Situation 4
+                                    let l1 = r.lower().clone();
+                                    let u1 = s.lower().clone().flip();
 
-                                        let l2 = s.upper().clone().flip();
-                                        let u2 = r.upper().clone();
+                                    let l2 = s.upper().clone().flip();
+                                    let u2 = r.upper().clone();
 
-                                        // We can do this because we have a guarantee that all ranges
-                                        // in a set are disjoint.
-                                        set.insert(Range::new(l1, u1).unwrap());
-                                        r = Range::new(l2, u2).unwrap();
-                                    }
+                                    // We can do this because we have a guarantee that all ranges
+                                    // in a set are disjoint.
+                                    set.insert(Range::new(l1, u1).unwrap());
+                                    r = Range::new(l2, u2).unwrap();
                                 }
                             }
                         }
-                        cmp::Ordering::Equal => {
-                            if s.upper() == r.upper() {
-                                g = false;
-                                continue;
-                            }
+                    }
+                    cmp::Ordering::Equal => {
+                        if s.upper() == r.upper() {
+                            g = false;
+                            break;
+                        }
 
-                            let lower = s.upper().clone().flip();
-                            let upper = r.upper().clone();
+                        let lower = s.upper().clone().flip();
+                        let upper = r.upper().clone();
 
-                            if let Some(range) = Range::new(lower, upper) {
-                                r = range;
-                            } else {
-                                g = false;
-                            }
+                        if let Some(range) = Range::new(lower, upper) {
+                            r = range;
+                        } else {
+                            g = false;
+                            break;
                         }
                     }
                 }
@@ -685,6 +704,12 @@ impl FromStr for Constraint {
             .map_err(|_| ErrorKind::InvalidConstraint)?;
 
         Ok(p)
+    }
+}
+
+impl fmt::Debug for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Constraint({})", self.set.iter().map(|r| r.to_string()).join(", "))
     }
 }
 
@@ -999,6 +1024,14 @@ mod tests {
     }
 
     #[test]
+    fn test_constraint_relation_opposite() {
+        let c1 = Constraint::from_str(">! 2.0.0 < 3.0.0").unwrap();
+        let c2 = Constraint::from_str("<! 2.0.0, >=! 3.0.0").unwrap();
+
+        assert_eq!(Relation::Disjoint, c1.relation(&c2));
+    }
+
+    #[test]
     fn test_constraint_complement() {
         let rs = indexset!(
             new_range!("1.0.0" ~.. "2.0.0"),
@@ -1033,6 +1066,14 @@ mod tests {
         let c = Constraint::new(rs);
 
         assert_eq!(c, c.complement().complement());
+    }
+
+    #[test]
+    fn test_constraint_complement_correct() {
+        let c1 = Constraint::from_str("<! 2.0.0, >=! 3.0.0").unwrap();
+        let c2 = Constraint::from_str(">= 2.0.0 < 3.0.0").unwrap();
+
+        assert_eq!(c2, c1.complement());
     }
 
     #[test]
@@ -1074,5 +1115,24 @@ mod tests {
         assert!(c.satisfies(&v));
         assert!(!c.satisfies(&v2));
         assert!(!c.satisfies(&v3));
+    }
+
+    #[test]
+    fn test_constraint_difference() {
+        let c1 = Constraint::from_str("<! 2.0.0").unwrap();
+        let c2 = Constraint::from_str(">! 2.0.0 < 3.0.0").unwrap();
+
+        let _ = c1.difference(&c2);
+
+        // just check that this doesn't unwrap on None.
+    }
+
+    #[test]
+    fn test_constraint_difference_any() {
+        let c1 = Constraint::from_str(">= 2.0.0 < 3.0.0").unwrap();
+        let c2 = Constraint::from_str("any").unwrap();
+        let ce = Constraint::empty();
+
+        assert_eq!(ce, c1.difference(&c2));
     }
 }
