@@ -56,7 +56,7 @@ struct LockedPkg {
 }
 
 impl FromStr for LockfileToml {
-    type Err = Error; // TODO
+    type Err = Error;
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         toml::from_str(raw)

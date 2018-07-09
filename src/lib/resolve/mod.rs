@@ -395,7 +395,6 @@ impl Resolver {
 
     // 4: Error reporting
     // cause things go bad
-    // TODO: Error reporting struct? (or pass state as parameters: linums, ic_occur, out)
     fn pp_error(&self, root_icix: usize) -> String {
         let mut s = String::new();
         let mut ic_occur = indexmap!();

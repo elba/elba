@@ -12,7 +12,7 @@ pub struct IndexConfig {
 }
 
 impl FromStr for IndexConfig {
-    type Err = Error; // TODO
+    type Err = Error;
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         toml::from_str(raw)

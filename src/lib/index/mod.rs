@@ -22,17 +22,6 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC for using
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
-// TODO: If we allow git repositories, that negates the entire purpose of having an index. Now
-//       if you want to find the dependencies of that git repo, you have to clone the entire package
-//       and now you're back where you started. If you require that dependencies only point to
-//       indices, you have to check that the Manifest == the Index (counter: you derive index values
-//       from the manifest), and the index has to take on all of the dependencies of the git package...
-//       Plus if ppl wanna use git repos they can just do that in their manifests.
-//       Registries shouldn't deal with that.
-//
-//       Counter-argument: you can check before adding a direct package to an index that it doesn't
-//       depend on other direct packages so that an index will always have its metadata.
-//
 // TODO: Can we still have the local packages available be an index? It'd be the lowest priority
 //       one I guess (airplane mode moves it to highest?)
 //
