@@ -1,2 +1,2 @@
-# matic* - an Idris package manager
-Name pending.
+# elba - a package manager for Idris
+TODO: everything.

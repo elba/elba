@@ -1,8 +1,8 @@
-extern crate matic;
+extern crate elba;
 extern crate semver;
 extern crate url;
 
-use matic::{
+use elba::{
     index::{Index, Indices},
     package::{lockfile::Lockfile, IndexRes, Name, PackageId, Resolution, Summary},
     resolve::Resolver,

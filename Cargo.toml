@@ -1,5 +1,5 @@
 [package]
-name = "matic"
+name = "elba"
 version = "0.1.0"
 authors = ["David Cao <dcao@protonmail.com>"]
 license = "MIT"
@@ -20,9 +20,9 @@ url = "1.7"
 url_serde = "0.2"
 
 [lib]
-name = "matic"
+name = "elba"
 path = "src/lib/lib.rs"
 
 [[bin]]
-name = "matic"
+name = "elba"
 path = "src/bin/main.rs"

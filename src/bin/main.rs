@@ -2,7 +2,7 @@
 #![allow(unused_variables, dead_code)]
 
 extern crate failure;
-extern crate matic;
+extern crate elba;
 #[macro_use]
 extern crate structopt;
 extern crate toml;

@@ -1,4 +1,4 @@
-extern crate matic;
+extern crate elba;
 extern crate url;
 
 use matic::{index::Index, package::Name};
