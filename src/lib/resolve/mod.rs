@@ -427,6 +427,10 @@ impl Resolver {
 
         self.pp_err_recur(root_icix, &ic_occur, &mut linum, &mut cur_linum, &mut s);
 
+        s.push_str("\n");
+        s.push_str("Thus, version solving has failed.");
+        s.push_str("\n");
+
         s
     }
 

@@ -159,19 +159,16 @@ impl Interval {
                     } else {
                         format!(">={}", v)
                     }
-                } else if !v.is_prerelease() && *p {
-                    format!("<=!{}", v)
                 } else {
+                    // <=! and <= are equivalent, so there's no point confusing people
+                    // with separate sigils
                     format!("<={}", v)
                 }
             }
             Interval::Open(v, p) => {
                 if lower {
-                    if !v.is_prerelease() && *p {
-                        format!(">!{}", v)
-                    } else {
-                        format!(">{}", v)
-                    }
+                    // Same thing with >! and >.
+                    format!(">{}", v)
                 } else if !v.is_prerelease() && *p {
                     format!("<!{}", v)
                 } else {
@@ -530,6 +527,7 @@ impl Constraint {
                         match r.lower().cmp(s.upper(), false) {
                             cmp::Ordering::Greater => {
                                 // Situation 1
+                                // Do nothing
                             }
                             cmp::Ordering::Equal => {
                                 // Situation 2
@@ -837,7 +835,6 @@ mod parse {
     );
 
     // TODO: Unwrapping is Bad
-    // TODO: Allow "!" for caret and tilde?
     named!(range_caret<CompleteStr, Range>, ws!(do_parse!(
         opt!(tag_s!("^")) >>
         version: bare_version >>
@@ -850,6 +847,7 @@ mod parse {
         (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_tilde(version.0, version.1, version.2), false)).unwrap())
     )));
 
+    // Note! We allow bangs where they don't change anything (>=! and <!)
     named!(range_interval<CompleteStr, Range>, ws!(do_parse!(
         lower: opt!(ws!(do_parse!(
             tag_s!(">") >>
