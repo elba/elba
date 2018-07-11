@@ -1,8 +1,8 @@
 // TODO: remove this once we start actually developing the CLI tool
 #![allow(unused_variables, dead_code)]
 
-extern crate failure;
 extern crate elba;
+extern crate failure;
 #[macro_use]
 extern crate structopt;
 extern crate toml;

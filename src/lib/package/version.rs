@@ -11,7 +11,7 @@
 //!
 //! Instead, this module adds features in some places and removes others for flexibility where it
 //! matters for elba.
-//! 
+//!
 //! ## Functionality
 //! Versions in elba take lots of good ideas from Cargo and Pub (Dart) versioning. We follow
 //! Cargo's compatibility rules for 0.* and 0.0.* versions to allow for less-stable packages.
@@ -715,7 +715,11 @@ impl FromStr for Constraint {
 
 impl fmt::Debug for Constraint {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Constraint({})", self.set.iter().map(|r| r.to_string()).join(", "))
+        write!(
+            f,
+            "Constraint({})",
+            self.set.iter().map(|r| r.to_string()).join(", ")
+        )
     }
 }
 

@@ -129,7 +129,8 @@ impl Resolver {
 
         for (ix, (pkg, con)) in inc.deps().iter().enumerate() {
             let relation = self.relation(pkg, con);
-            let positive = (ix == 1 && cause == IncompatibilityCause::Dependency) || cause == IncompatibilityCause::Root;
+            let positive = (ix == 1 && cause == IncompatibilityCause::Dependency)
+                || cause == IncompatibilityCause::Root;
             // We have to special-case the "any" dependency because the any derivation is a superset of the null set, which would
             // result in continuous "Almost"s if a package only depends on any version of one other package.
             if relation == Relation::Disjoint
@@ -310,7 +311,6 @@ impl Resolver {
                 self.register(&assignment);
             }
         }
-
     }
 
     fn is_failure(&self, inc: &Incompatibility) -> bool {
@@ -475,8 +475,14 @@ impl Resolver {
                         let r1_i = &self.incompats[r1];
                         let r2_i = &self.incompats[r2];
 
-                        match (l1_i.derived(), l2_i.derived(), r1_i.derived(), r2_i.derived()) {
-                            (Some(_), Some(_), Some(_), Some(_)) | (Some(_), Some(_), None, None)=> {
+                        match (
+                            l1_i.derived(),
+                            l2_i.derived(),
+                            r1_i.derived(),
+                            r2_i.derived(),
+                        ) {
+                            (Some(_), Some(_), Some(_), Some(_))
+                            | (Some(_), Some(_), None, None) => {
                                 self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
                                 self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
                                 out.push_str("Thus");
@@ -600,7 +606,8 @@ impl Resolver {
                 positive,
             } => {
                 if !self.derivations.contains_key(a.pkg()) {
-                    self.derivations.insert(a.pkg().clone(), (*positive, constraint.clone()));
+                    self.derivations
+                        .insert(a.pkg().clone(), (*positive, constraint.clone()));
                 } else {
                     let old = self.derivations.get_mut(a.pkg()).unwrap();
                     *old = (old.0 || *positive, old.1.intersection(&constraint));

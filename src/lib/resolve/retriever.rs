@@ -1,6 +1,10 @@
 use err::{Error, ErrorKind};
 use index::Indices;
-use package::{lockfile::Lockfile, version::{Constraint, Interval, Range, Relation}, PackageId, Summary};
+use package::{
+    lockfile::Lockfile,
+    version::{Constraint, Interval, Range, Relation},
+    PackageId, Summary,
+};
 use resolve::types::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 
@@ -85,11 +89,9 @@ impl Retriever {
                 ));
             }
             return Ok(res);
-        } 
+        }
 
-        let entries = self
-            .indices
-            .entries(pkg.id())?;
+        let entries = self.indices.entries(pkg.id())?;
 
         let l = entries.len();
 

@@ -133,7 +133,11 @@ impl Incompatibility {
         buf
     }
 
-    fn show_combine_same(&self, other: &Incompatibility, self_linum: Option<u16>) -> Option<String> {
+    fn show_combine_same(
+        &self,
+        other: &Incompatibility,
+        self_linum: Option<u16>,
+    ) -> Option<String> {
         if self == other {
             let mut buf = self.show();
             if let Some(l) = self_linum {

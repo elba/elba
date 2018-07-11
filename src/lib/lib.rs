@@ -25,3 +25,4 @@ pub mod err;
 pub mod index;
 pub mod package;
 pub mod resolve;
+pub mod retrieve;
