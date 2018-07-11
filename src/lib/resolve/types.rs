@@ -83,7 +83,7 @@ impl Incompatibility {
                 let package = self.deps.get_index(0).unwrap();
                 format!("no versions of {} match {}", package.0, package.1)
             }
-            IncompatibilityCause::Root => format!("version solving failed"),
+            IncompatibilityCause::Root => "the root package was chosen".to_string(),
             IncompatibilityCause::Derived(_, _) => {
                 if self.deps.len() == 1 {
                     let package = self.deps.get_index(0).unwrap();

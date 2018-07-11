@@ -70,7 +70,7 @@ impl Resolver {
         if r.is_err() {
             Err(self.pp_error(self.incompats.len() - 1))
         } else {
-            Ok(r.unwrap())
+            Ok(())
         }
     }
 
@@ -363,7 +363,7 @@ impl Resolver {
                                     || self.relation(k, v) == Relation::Subset
                                     || self.relation(k, v) == Relation::Equal
                             })
-                            .fold(true, |a, b| a && b);
+                            .all(|b| b);
                     self.incompatibility(ic.deps, ic.cause);
                 }
                 if !conflict {
@@ -449,8 +449,8 @@ impl Resolver {
         match (left.derived(), right.derived()) {
             (Some((l1, l2)), Some((r1, r2))) => {
                 // Case 1 in the Pubgrub doc
-                let left_line = linum.get(&left_ix).map(|x| *x);
-                let right_line = linum.get(&right_ix).map(|x| *x);
+                let left_line = linum.get(&left_ix).cloned();
+                let right_line = linum.get(&right_ix).cloned();
 
                 match (left_line, right_line) {
                     (Some(l), Some(r)) => {
