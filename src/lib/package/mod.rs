@@ -1,4 +1,4 @@
-//! Module `package` deals with all of the configuration files at the package level.
+//! Data structures related to packages.
 
 pub mod lockfile;
 pub mod manifest;
@@ -15,7 +15,7 @@ use url::Url;
 //       name of a package?
 // TODO: Legal characters?
 // TODO: Treat hyphens and underscores the same?
-/// Struct `Name` represents the name of a package. All packages in matic are namespaced, so all
+/// Struct `Name` represents the name of a package. All packages in elba are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name {

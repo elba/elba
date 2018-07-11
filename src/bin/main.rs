@@ -10,8 +10,8 @@ extern crate toml;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(name = "matic", about = "An Idris package manager")]
-struct Matic {
+#[structopt(name = "elba", about = "An Idris package manager")]
+struct Elba {
     #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
     verbose: u8,
     #[structopt(subcommand)]
@@ -46,5 +46,5 @@ enum IndexCmd {
 }
 
 fn main() {
-    let opt = Matic::from_args();
+    let opt = Elba::from_args();
 }

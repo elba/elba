@@ -1,19 +1,19 @@
-//! Module `package/version` defines (syntax for) version and version range specifiers.
+//! Defines (syntax for) version and version range specifiers.
 //!
 //! ## NIH?
 //! The semver crate's `Version` is fine. What's not fine is their `VersionReq.`
 //!
 //! The reason we're rolling our own instead of using something like the semver crate is that
-//! the requirements for matic conflict with what semver provides. The vector-of-predicate
+//! the requirements for elba conflict with what semver provides. The vector-of-predicate
 //! approach which semver provides is too flexible, making it harder to validate versions and
 //! perform operations on them (check if one range is a subset of another, etc.). The semver crate
 //! also provides some unnecessary operations.
 //!
-//! Instead, this module purposely restricts features and syntax to make code clearer, less bug-
-//! prone, and more efficient.
-//!
+//! Instead, this module adds features in some places and removes others for flexibility where it
+//! matters for elba.
+//! 
 //! ## Functionality
-//! Versions in matic take lots of good ideas from Cargo and Pub (Dart) versioning. We follow
+//! Versions in elba take lots of good ideas from Cargo and Pub (Dart) versioning. We follow
 //! Cargo's compatibility rules for 0.* and 0.0.* versions to allow for less-stable packages.
 //! Additionally, we also follow Cargo's rules when sigils are omitted.
 //! However, we purposely elide star notation since it's unnecessary; `0.* == 0`, `0.0.* == 0.0`.

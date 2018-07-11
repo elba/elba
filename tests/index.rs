@@ -1,7 +1,7 @@
 extern crate elba;
 extern crate url;
 
-use matic::{index::Index, package::Name};
+use elba::{index::Index, package::Name};
 use std::{path::PathBuf, str::FromStr};
 use url::Url;
 

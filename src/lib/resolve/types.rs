@@ -112,6 +112,10 @@ impl Incompatibility {
         self_linum: Option<u16>,
         other_linum: Option<u16>,
     ) -> String {
+        if let Some(b) = self.show_combine_same(other, self_linum) {
+            return b;
+        }
+
         let mut buf = self.show();
         if let Some(l) = self_linum {
             buf.push_str(" (");
@@ -127,6 +131,20 @@ impl Incompatibility {
         }
 
         buf
+    }
+
+    fn show_combine_same(&self, other: &Incompatibility, self_linum: Option<u16>) -> Option<String> {
+        if self == other {
+            let mut buf = self.show();
+            if let Some(l) = self_linum {
+                buf.push_str(" (");
+                buf.push_str(&l.to_string());
+                buf.push(')');
+            }
+            Some(buf)
+        } else {
+            None
+        }
     }
 }
 
@@ -184,6 +202,7 @@ impl Assignment {
             AssignmentType::Derivation {
                 cause,
                 constraint: _constraint,
+                positive: _positive,
             } => Some(*cause),
         }
     }
@@ -194,7 +213,19 @@ impl Assignment {
             AssignmentType::Derivation {
                 constraint,
                 cause: _cause,
+                positive: _positive,
             } => constraint.clone(),
+        }
+    }
+
+    pub fn is_positive(&self) -> bool {
+        match &self.ty {
+            AssignmentType::Decision { version: _version } => false,
+            AssignmentType::Derivation {
+                positive,
+                constraint: _constraint,
+                cause: _cause,
+            } => *positive,
         }
     }
 }
@@ -207,5 +238,6 @@ pub enum AssignmentType {
     Derivation {
         constraint: Constraint,
         cause: usize,
+        positive: bool,
     },
 }

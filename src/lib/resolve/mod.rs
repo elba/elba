@@ -1,6 +1,6 @@
 //! Module `resolve` provides logic for resolving dependency graphs.
 //!
-//! The dependency resolver in `matic` uses the Pubgrub algorithm for resolving package dependencies,
+//! The dependency resolver in `elba` uses the Pubgrub algorithm for resolving package dependencies,
 //! as used by Dart's Pub (https://github.com/dart-lang/pub/blob/master/doc/solver.md). This choice
 //! was mainly because the acronyms and stuff in that algorithm sounded cool. Also, it seems to
 //! deal with backtracking nicer than Cargo (where the solution is just clone the solver state
@@ -31,7 +31,7 @@ pub struct Resolver {
     level: u16,
     assignments: Vec<Assignment>,
     decisions: IndexMap<PackageId, Version>,
-    derivations: IndexMap<PackageId, Constraint>,
+    derivations: IndexMap<PackageId, (bool, Constraint)>,
     incompats: Vec<Incompatibility>,
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
     retriever: Retriever,
@@ -97,17 +97,6 @@ impl Resolver {
             // Yeah, I hate cloning too, but unfortunately it's necessary here
             if let Some(icixs) = self.incompat_ixs.clone().get(&package) {
                 'f: for icix in icixs.iter().rev() {
-                    // When the first term of a dependency incompat is inconclusive but the second
-                    // one is satisfied, it means that we know that the two sets of packages as
-                    // constrained cannot coexist. But, this does not REQUIRE that the first package
-                    // exist under that version; the first package might not even be chosen.
-                    // In lieu of having positive and negative derivations, this is a workaround
-                    // which fixes the problem. Incompatible versions will eventually bubble
-                    // up and force conflict resolution...
-                    if &self.incompats[*icix].cause == &IncompatibilityCause::Dependency && self.incompats[*icix].deps().get_index(0).unwrap().0 != &package {
-                        continue;
-                    }
-
                     let res = self.propagate_incompat(*icix);
                     match res {
                         IncompatMatch::Almost(name) => {
@@ -136,9 +125,11 @@ impl Resolver {
         // Yes, we're cloning again. I'm sorry.
         let inc = &self.incompats[icix].clone();
         let mut unsatis = None;
+        let cause = inc.cause();
 
-        for (pkg, con) in inc.deps() {
+        for (ix, (pkg, con)) in inc.deps().iter().enumerate() {
             let relation = self.relation(pkg, con);
+            let positive = (ix == 1 && cause == IncompatibilityCause::Dependency) || cause == IncompatibilityCause::Root;
             // We have to special-case the "any" dependency because the any derivation is a superset of the null set, which would
             // result in continuous "Almost"s if a package only depends on any version of one other package.
             if relation == Relation::Disjoint
@@ -147,7 +138,11 @@ impl Resolver {
                 return IncompatMatch::Contradicted;
             } else if relation != Relation::Subset && relation != Relation::Equal {
                 if unsatis.is_none() {
-                    unsatis = Some((pkg, con));
+                    // Any derivation other than one we got from a Dependency incompatibility is a
+                    // negative incompatibility; it doesn't necessarily require that a package
+                    // exists, only that certain versions of it don't exist.
+                    // Once a package has a positive derivation, it stays positive *forever*
+                    unsatis = Some((pkg, con, positive));
                 } else {
                     // We can't deduce anything. This should prolly be "None" instead of
                     // `Contradicted`, but oh well.
@@ -156,9 +151,8 @@ impl Resolver {
             }
         }
 
-        if let Some((pkg, con)) = unsatis {
-            let level = self.level;
-            self.derivation(pkg.clone(), con.complement(), level, icix);
+        if let Some((pkg, con, positive)) = unsatis {
+            self.derivation(pkg.clone(), con.complement(), icix, positive);
             return IncompatMatch::Almost(pkg.clone());
         } else {
             return IncompatMatch::Satisfied;
@@ -167,7 +161,7 @@ impl Resolver {
 
     fn relation(&self, pkg: &PackageId, con: &Constraint) -> Relation {
         if let Some(c) = self.derivations.get(pkg) {
-            c.relation(con)
+            c.1.relation(con)
         } else {
             // If we can't find anything, that means it allows all versions!
             // This is different from Constraints, in which not having anything means no solution
@@ -333,6 +327,8 @@ impl Resolver {
         let mut unsatisfied = self
             .derivations
             .iter()
+            .filter(|(_, v)| v.0)
+            .map(|(k, v)| (k, &v.1))
             .filter(|d| !self.decisions.contains_key(d.0))
             .collect::<Vec<_>>();
 
@@ -463,6 +459,7 @@ impl Resolver {
                         out.push_str(&left.show());
                         out.push_str(" (");
                         out.push_str(&l.to_string());
+                        out.push_str(")");
                     }
                     (None, Some(r)) => {
                         self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
@@ -470,6 +467,7 @@ impl Resolver {
                         out.push_str(&right.show());
                         out.push_str(" (");
                         out.push_str(&r.to_string());
+                        out.push_str(")");
                     }
                     (None, None) => {
                         let l1_i = &self.incompats[l1];
@@ -522,7 +520,7 @@ impl Resolver {
                 }
             }
             (None, None) => {
-                // Case 3 in the Pubgrub doc
+                // Case 3 in the Pubgrub doc: both are external.
                 out.push_str("Because ");
                 out.push_str(&left.show_combine(right, None, None));
             }
@@ -547,9 +545,9 @@ impl Resolver {
                     let d2 = &self.incompats[derived_ix].derived();
                     if d2.is_some()
                         && ((self.incompats[d2.unwrap().0].is_derived()
-                            && linum.get(&d2.unwrap().0).is_none())
+                            && !linum.contains_key(&d2.unwrap().0))
                             ^ (self.incompats[d2.unwrap().1].is_derived()
-                                && linum.get(&d2.unwrap().1).is_none()))
+                                && !linum.contains_key(&d2.unwrap().1)))
                     {
                         let a = &self.incompats[d2.unwrap().0];
                         let b = &self.incompats[d2.unwrap().1];
@@ -594,17 +592,18 @@ impl Resolver {
             AssignmentType::Decision { version } => {
                 self.decisions.insert(a.pkg().clone(), version.clone());
                 self.derivations
-                    .insert(a.pkg().clone(), version.clone().into());
+                    .insert(a.pkg().clone(), (true, version.clone().into()));
             }
             AssignmentType::Derivation {
                 cause: _cause,
                 constraint,
+                positive,
             } => {
                 if !self.derivations.contains_key(a.pkg()) {
-                    self.derivations.insert(a.pkg().clone(), constraint.clone());
+                    self.derivations.insert(a.pkg().clone(), (*positive, constraint.clone()));
                 } else {
                     let old = self.derivations.get_mut(a.pkg()).unwrap();
-                    *old = old.intersection(&constraint);
+                    *old = (old.0 || *positive, old.1.intersection(&constraint));
                 }
             }
         }
@@ -623,14 +622,15 @@ impl Resolver {
         self.step += 1;
     }
 
-    fn derivation(&mut self, pkg: PackageId, c: Constraint, level: u16, cause: usize) {
+    fn derivation(&mut self, pkg: PackageId, c: Constraint, cause: usize, positive: bool) {
         let a = Assignment::new(
             self.step,
-            level,
+            self.level,
             pkg,
             AssignmentType::Derivation {
                 constraint: c,
                 cause,
+                positive,
             },
         );
         self.register(&a);
