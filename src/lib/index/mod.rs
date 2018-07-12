@@ -21,9 +21,6 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC for using
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
-// TODO: Can we still have the local packages available be an index? It'd be the lowest priority
-//       one I guess (airplane mode moves it to highest?)
-
 mod config;
 
 use self::config::IndexConfig;

@@ -4,7 +4,7 @@
 //! This module is responsible for smoothing over that process, as well as coordinating the actual
 //! retrieval of packages from various different sources (hopefully in parallel).
 
-pub mod source;
+pub mod cache;
 
 use err::{Error, ErrorKind};
 use index::Indices;
