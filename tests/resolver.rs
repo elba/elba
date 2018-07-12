@@ -4,7 +4,7 @@ extern crate url;
 
 use elba::{
     index::{Index, Indices},
-    package::{lockfile::Lockfile, IndexRes, Name, PackageId, Resolution, Summary},
+    package::{lockfile::Lockfile, Name, PackageId, resolution::{IndexRes, Resolution}, Summary},
     resolve::Resolver,
 };
 use semver::Version;

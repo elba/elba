@@ -2,6 +2,7 @@
 //!
 //! Lockfiles are created based on dependency constraints, and ensure that builds are repeatable
 
+use failure::ResultExt;
 use indexmap::{IndexMap, IndexSet};
 use toml;
 

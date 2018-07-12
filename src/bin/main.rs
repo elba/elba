@@ -38,7 +38,6 @@ enum Cmd {
     Uninstall { name: String },
 }
 
-// TODO
 #[derive(StructOpt)]
 enum IndexCmd {
     #[structopt(name = "new")]

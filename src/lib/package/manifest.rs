@@ -1,4 +1,4 @@
-//! Module `package/manifest` deals with package manifest files.
+//! Package manifest files.
 
 use self::version::Constraint;
 use super::*;

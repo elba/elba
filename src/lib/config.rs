@@ -4,8 +4,6 @@
 //! to a package. Whereas package files are about specifying a package, config files specify the
 //! behavior of the tool itself.
 
-// TODO: A Config file. Should deal with registries, etc.
+// TODO: A Config file. Should deal with registries, etc. Should be unified.
 #[derive(Deserialize, Serialize)]
 struct Config {}
-
-// TODO: Config file unification

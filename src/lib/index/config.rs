@@ -2,7 +2,7 @@
 
 use err::{Error, ErrorKind};
 use failure::ResultExt;
-use package::IndexRes;
+use package::resolution::IndexRes;
 use std::str::FromStr;
 use toml;
 

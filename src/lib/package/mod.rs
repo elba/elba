@@ -2,14 +2,14 @@
 
 pub mod lockfile;
 pub mod manifest;
+pub mod resolution;
 pub mod version;
 
+use self::resolution::Resolution;
 use err::*;
-use failure::ResultExt;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
-use url::Url;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
@@ -103,186 +103,6 @@ impl AsRef<str> for Name {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum GitTag {
-    Commit(String),
-    Tag(String),
-}
-
-// TODO: Treat git tags like versions?
-/// Enum `Resolution` represents the possible places from which a package can be resolved. A package
-/// can be manually set to be located in a git repo or a local file directory, or it can be
-/// resolved with a package index.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Eq, Hash)]
-#[serde(untagged)]
-pub enum Resolution {
-    Direct(DirectRes),
-    Index(IndexRes),
-    Root,
-}
-
-impl From<DirectRes> for Resolution {
-    fn from(i: DirectRes) -> Self {
-        Resolution::Direct(i)
-    }
-}
-
-impl From<IndexRes> for Resolution {
-    fn from(i: IndexRes) -> Self {
-        Resolution::Index(i)
-    }
-}
-
-impl FromStr for Resolution {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let direct = DirectRes::from_str(s);
-        if s == "root" {
-            Ok(Resolution::Root)
-        } else if direct.is_ok() {
-            direct.map(Resolution::Direct)
-        } else {
-            IndexRes::from_str(s).map(Resolution::Index)
-        }
-    }
-}
-
-impl fmt::Display for Resolution {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Resolution::Direct(d) => write!(f, "{}", d),
-            Resolution::Index(i) => write!(f, "{}", i),
-            Resolution::Root => write!(f, "root"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DirectRes {
-    /// Git: the package originated from a git repository.
-    Git { repo: Url, tag: GitTag },
-    /// Dir: the package is on disk in a folder directory.
-    Dir { url: Url },
-    /// Tar: the package originated from an archive stored somewhere.
-    Tar { url: Url },
-}
-
-impl FromStr for DirectRes {
-    type Err = Error;
-
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
-        let mut parts = url.splitn(2, '+');
-        let utype = parts.next().unwrap();
-        let url = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
-
-        match utype {
-            "git" => unimplemented!(),
-            "dir" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(DirectRes::Dir { url })
-            }
-            "tar" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(DirectRes::Tar { url })
-            }
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
-        }
-    }
-}
-
-impl fmt::Display for DirectRes {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DirectRes::Git {
-                repo: _repo,
-                tag: _tag,
-            } => unimplemented!(),
-            DirectRes::Dir { url } => {
-                let url = url.as_str();
-                let mut s = String::with_capacity(url.len() + 5);
-                s.push_str("dir+");
-                s.push_str(url);
-                write!(f, "{}", s)
-            }
-            DirectRes::Tar { url } => {
-                let url = url.as_str();
-                let mut s = String::with_capacity(url.len() + 10);
-                s.push_str("tar+");
-                s.push_str(url);
-                write!(f, "{}", s)
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct IndexRes {
-    pub url: Url,
-    // TODO More?
-}
-
-impl FromStr for IndexRes {
-    type Err = Error;
-
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
-        let mut parts = url.splitn(2, '+');
-        let utype = parts.next().unwrap();
-        let url = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
-
-        match utype {
-            "index" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(IndexRes { url })
-            }
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
-        }
-    }
-}
-
-impl fmt::Display for IndexRes {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let url = self.url.as_str();
-        let mut s = String::with_capacity(url.len() + 10);
-        s.push_str("index+");
-        s.push_str(url);
-        write!(f, "{}", s)
-    }
-}
-
-impl Serialize for DirectRes {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for DirectRes {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        FromStr::from_str(&s).map_err(de::Error::custom)
-    }
-}
-
-impl Serialize for IndexRes {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for IndexRes {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        FromStr::from_str(&s).map_err(de::Error::custom)
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PackageId {
     pub name: Name,
@@ -358,7 +178,6 @@ pub struct Checksum {
     hash: String,
 }
 
-// TODO: Should Summaries have checksums?
 /// Struct `Summary` defines the summarized version of a package.
 ///
 /// The type parameter `T` allows us to use this struct for both resolved and unresolved

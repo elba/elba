@@ -6,12 +6,12 @@
 //! deal with backtracking nicer than Cargo (where the solution is just clone the solver state
 //! repeatedly).
 
-mod retriever;
-pub mod types;
+pub mod assignment;
+pub mod incompat;
 
 use self::{
-    retriever::Retriever,
-    types::{Assignment, AssignmentType, IncompatMatch, Incompatibility, IncompatibilityCause},
+    assignment::{Assignment, AssignmentType},
+    incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
 use err::{Error, ErrorKind};
 use index::Indices;
@@ -21,6 +21,7 @@ use package::{
     version::{Constraint, Relation},
     PackageId, Summary,
 };
+use retrieve::Retriever;
 use semver::Version;
 use std::cmp;
 

@@ -12,9 +12,8 @@
 //! The packages that the index offers must have a direct source: they cannot point to other
 //! registries. Because the package doesn't necessarily need to be a tarball stored somewhere,
 //! indices can serve to "curate" packages from disparate repositories and other sources (think
-//! Purescript package sets). It is assumed that the id of every package that an index offers
-//! is set to that index.
-//!
+//! Purescript package sets).
+//! 
 //! A package can only be published to the official index if it only depends on packages in the
 //! official index.
 //!
@@ -24,8 +23,6 @@
 
 // TODO: Can we still have the local packages available be an index? It'd be the lowest priority
 //       one I guess (airplane mode moves it to highest?)
-//
-// TODO: Patching
 
 mod config;
 
@@ -33,7 +30,12 @@ use self::config::IndexConfig;
 use err::{Error, ErrorKind};
 use failure::ResultExt;
 use indexmap::IndexMap;
-use package::{manifest::Manifest, version::Constraint, *};
+use package::{
+    manifest::Manifest,
+    resolution::{DirectRes, IndexRes, Resolution},
+    version::Constraint,
+    *,
+};
 use semver::Version;
 use serde_json;
 use std::{
@@ -48,6 +50,8 @@ use url::Url;
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Dep {
     pub name: Name,
+    // TODO: Ideally, instead of having the index be an IndexRes, we just let it be a String
+    // corresponding to a key in the Index's config which points to an actual IndexRes.
     pub index: IndexRes,
     pub req: Constraint,
 }
@@ -112,6 +116,8 @@ impl Indices {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct IndexEntry {
     pub name: Name,
+    // TODO: Maybe we have a "refer" field so that an index can hold direct deps and so we'd have
+    // our local cache just be an index of other packages
     pub version: Version,
     pub dependencies: Vec<Dep>,
     pub yanked: bool,
@@ -120,8 +126,8 @@ pub struct IndexEntry {
 }
 
 // TODO: The local packages available are an index.
-// TODO: Are Lockfiles an index?
 // TODO: Dealing with where to download the Index, using the Config to get that info.
+// TODO: user-friendly index names? (this decouples the index from its url)
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.
