@@ -13,7 +13,7 @@
 //! registries. Because the package doesn't necessarily need to be a tarball stored somewhere,
 //! indices can serve to "curate" packages from disparate repositories and other sources (think
 //! Purescript package sets).
-//! 
+//!
 //! A package can only be published to the official index if it only depends on packages in the
 //! official index.
 //!
@@ -113,8 +113,6 @@ impl Indices {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct IndexEntry {
     pub name: Name,
-    // TODO: Maybe we have a "refer" field so that an index can hold direct deps and so we'd have
-    // our local cache just be an index of other packages
     pub version: Version,
     pub dependencies: Vec<Dep>,
     pub yanked: bool,
@@ -122,7 +120,6 @@ pub struct IndexEntry {
     pub location: DirectRes,
 }
 
-// TODO: The local packages available are an index.
 // TODO: Dealing with where to download the Index, using the Config to get that info.
 // TODO: user-friendly index names? (this decouples the index from its url)
 /// Struct `Index` defines a single index.
@@ -140,7 +137,7 @@ pub struct Index {
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn from_local(url: Url, path: PathBuf) -> Result<Self, Error> {
+    pub fn from_disk(url: Url, path: PathBuf) -> Result<Self, Error> {
         let id = IndexRes { url };
         let mut pn = path.clone();
         pn.push("index.toml");

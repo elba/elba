@@ -6,6 +6,7 @@
 
 pub mod cache;
 
+pub use self::cache::Cache;
 use err::{Error, ErrorKind};
 use index::Indices;
 use package::{
@@ -22,6 +23,11 @@ use semver::Version;
 /// By default, prioritizes using a lockfile.
 #[derive(Clone, Debug)]
 pub struct Retriever {
+    /// The local cache of packages.
+    ///
+    /// The cache should never be used for looking up metadata of packages, unless the package has
+    /// no index (i.e. it's a direct dependency from the root).
+    cache: Cache,
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
     indices: Indices,
@@ -30,12 +36,14 @@ pub struct Retriever {
 
 impl Retriever {
     pub fn new(
+        cache: Cache,
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
         indices: Indices,
         lockfile: Lockfile,
     ) -> Self {
         Retriever {
+            cache,
             root,
             root_deps,
             indices,

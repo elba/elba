@@ -9,11 +9,13 @@ extern crate indexmap;
 extern crate itertools;
 #[macro_use]
 extern crate nom;
+extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate semver;
 extern crate serde_json;
+extern crate symlink;
 extern crate toml;
 extern crate url;
 extern crate url_serde;

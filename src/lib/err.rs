@@ -54,6 +54,10 @@ pub enum ErrorKind {
     PackageNotFound,
     #[fail(display = "Conflict resolution failure.")]
     NoConflictRes,
+    #[fail(display = "Package is missing manifest.")]
+    MissingManifest,
+    #[fail(display = "Could not download package.")]
+    CannotDownload,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,

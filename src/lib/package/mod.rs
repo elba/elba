@@ -127,7 +127,7 @@ impl FromStr for PackageId {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.splitn(2, ' ');
+        let mut s = s.splitn(2, '@');
         let name = s.next().unwrap();
         let url = s.next().ok_or_else(|| ErrorKind::InvalidPackageId)?;
 
@@ -140,13 +140,13 @@ impl FromStr for PackageId {
 
 impl fmt::Debug for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PackageId(\"{} {}\")", self.name, self.resolution)
+        write!(f, "PackageId(\"{}@{}\")", self.name, self.resolution)
     }
 }
 
 impl fmt::Display for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {}", self.name, self.resolution)
+        write!(f, "{}@{}", self.name, self.resolution)
     }
 }
 
@@ -182,7 +182,7 @@ pub struct Checksum {
 ///
 /// The type parameter `T` allows us to use this struct for both resolved and unresolved
 /// dependencies.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Summary {
     pub id: PackageId,
     pub version: Version,
@@ -203,5 +203,17 @@ impl Summary {
 
     pub fn version(&self) -> &Version {
         &self.version
+    }
+}
+
+impl fmt::Display for Summary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}#{}", self.id, self.version)
+    }
+}
+
+impl fmt::Debug for Summary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }

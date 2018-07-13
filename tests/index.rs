@@ -7,13 +7,13 @@ use url::Url;
 
 #[test]
 fn index_success() {
-    let url = Url::from_str("file://index").unwrap();
+    let url = Url::from_str("file://data/index").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::new();
     path.push(start);
-    path.push("tests/index");
+    path.push("tests/data/index");
 
-    let i = Index::from_local(url, path).unwrap();
+    let i = Index::from_disk(url, path).unwrap();
 
     let vs = i.entries(&Name::from_str("no_conflict/root").unwrap());
 

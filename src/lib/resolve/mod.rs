@@ -39,12 +39,7 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    pub fn new(
-        root: Summary,
-        root_deps: Vec<(PackageId, Constraint)>,
-        indices: Indices,
-        lockfile: Lockfile,
-    ) -> Self {
+    pub fn new(retriever: Retriever) -> Self {
         let step = 1;
         let level = 0;
         let assignments = vec![];
@@ -52,7 +47,6 @@ impl Resolver {
         let incompat_ixs = indexmap!();
         let decisions = indexmap!();
         let derivations = indexmap!();
-        let retriever = Retriever::new(root, root_deps, indices, lockfile);
         Resolver {
             step,
             level,

@@ -1,1 +1,0 @@
-{ "name": "no_conflict/root", "version": "1.0.0", "checksum": {"fmt": "sha512", "hash": "test"}, "dependencies": [{ "name": "no_conflict/foo", "index": "index+file://index/", "req": "1.0.0" }], "yanked": false, "location": "dir+file://test" }

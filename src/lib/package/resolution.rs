@@ -63,7 +63,11 @@ impl fmt::Display for Resolution {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DirectRes {
     /// Git: the package originated from a git repository.
-    Git { repo: Url, tag: GitTag },
+    Git {
+        repo: Url,
+        sub_path: String,
+        tag: GitTag,
+    },
     /// Dir: the package is on disk in a folder directory.
     Dir { url: Url },
     /// Tar: the package is an archive stored somewhere.
@@ -82,6 +86,9 @@ impl FromStr for DirectRes {
             "git" => unimplemented!(),
             "dir" => {
                 let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                if url.scheme() != "file" {
+                    return Err(ErrorKind::InvalidSourceUrl)?;
+                }
                 Ok(DirectRes::Dir { url })
             }
             "tar" => {
@@ -98,6 +105,7 @@ impl fmt::Display for DirectRes {
         match self {
             DirectRes::Git {
                 repo: _repo,
+                sub_path: _sub_path,
                 tag: _tag,
             } => unimplemented!(),
             DirectRes::Dir { url } => {

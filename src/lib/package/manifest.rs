@@ -1,23 +1,26 @@
 //! Package manifest files.
 
 use self::version::Constraint;
-use super::*;
+use super::{resolution::IndexRes, *};
 use err::*;
 use failure::ResultExt;
+use indexmap::IndexMap;
 use semver::Version;
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 use toml;
+use url::Url;
+use url_serde;
 
 /// A relative file path (not module path)
 type PathV = String;
 
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
-    package: Package,
-    #[serde(default = "BTreeMap::new")]
-    dependencies: BTreeMap<Name, DepReq>,
-    #[serde(default = "BTreeMap::new")]
-    dev_dependencies: BTreeMap<Name, DepReq>,
+    package: PackageInfo,
+    #[serde(default = "IndexMap::new")]
+    pub dependencies: IndexMap<Name, DepReq>,
+    #[serde(default = "IndexMap::new")]
+    dev_dependencies: IndexMap<Name, DepReq>,
     targets: Targets,
 }
 
@@ -32,7 +35,7 @@ impl FromStr for Manifest {
 }
 
 #[derive(Deserialize, Debug)]
-struct Package {
+struct PackageInfo {
     name: Name,
     version: Version,
     authors: Vec<String>,
@@ -41,26 +44,30 @@ struct Package {
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-enum DepReq {
+pub enum DepReq {
     Registry(Constraint),
     RegLong {
         con: Constraint,
-        registry: String,
+        registry: IndexRes,
     },
     Local {
-        path: String,
+        #[serde(with = "url_serde")]
+        path: Url,
     },
     Git {
-        git: String,
+        #[serde(with = "url_serde")]
+        git: Url,
         #[serde(default)]
         #[serde(flatten)]
         spec: PkgGitSpecifier,
+        #[serde(default = "String::new")]
+        sub_path: String,
     },
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
-enum PkgGitSpecifier {
+pub enum PkgGitSpecifier {
     Branch(String),
     Commit(String),
     Tag(String),
@@ -99,14 +106,14 @@ struct LibTarget {
 struct Features {
     default: Vec<String>,
     #[serde(flatten)]
-    other: BTreeMap<String, Vec<String>>,
+    other: IndexMap<String, Vec<String>>,
 }
 
 impl Default for Features {
     fn default() -> Self {
         Features {
             default: vec![],
-            other: BTreeMap::new(),
+            other: IndexMap::new(),
         }
     }
 }
@@ -127,7 +134,7 @@ license = 'MIT'
 [dependencies]
 'awesome/a' = '>= 1.0.0 < 2.0.0'
 'cool/b' = { git = 'https://github.com/super/cool', tag = "v1.0.0" }
-'great/c' = { path = 'here/right/now' }
+'great/c' = { path = 'file://here/right/now' }
 
 [dev_dependencies]
 'ayy/x' = '2.0'

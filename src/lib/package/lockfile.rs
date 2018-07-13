@@ -74,15 +74,15 @@ mod tests {
     fn valid_lockfile() {
         let lockfile = r#"
 [[packages]]
-id = "terminator/one index+https://elba.io/pkg"
+id = "terminator/one@index+https://elba.io/pkg"
 version = "0.1.4"
 checksum = { fmt = "sha512", hash = "334d016f755cd6dc58c53a86e183882f8ec14f52fb05345887c8a5edd42c87b7" }
 
 [[packages]]
-id = "good/package dir+file:///right/there"
+id = "good/package@dir+file:///right/there"
 version = "1.0.5-alpha.5-zeta.15"
 dependencies = [
-    { id = "terminator/one index+https://elba.io/pkg", version = "0.1.4" }
+    { id = "terminator/one@index+https://elba.io/pkg", version = "0.1.4" }
 ]
 checksum = { fmt = "sha512", hash = "4a7d6d3e8888a86b41c710f1d44c43d9ec7a4f97dce4f1ec3c0fb124ca0188de" }
         "#;
