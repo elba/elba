@@ -14,10 +14,8 @@ use self::{
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
 use err::{Error, ErrorKind};
-use index::Indices;
 use indexmap::IndexMap;
 use package::{
-    lockfile::Lockfile,
     version::{Constraint, Relation},
     PackageId, Summary,
 };

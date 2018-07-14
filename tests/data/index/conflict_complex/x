@@ -1,1 +1,1 @@
-{ "name": "conflict_complex/x", "version": "1.0.0", "checksum": {"fmt": "sha512", "hash": "test"}, "dependencies": [{ "name": "conflict_complex/y", "index": "index+file://data/index/", "req": "2.0.0" }], "yanked": false, "location": "dir+file://test" }
+{ "name": "conflict_complex/x", "version": "1.0.0", "dependencies": [{ "name": "conflict_complex/y", "index": "index+file://data/index/", "req": "2.0.0" }], "yanked": false, "location": "dir+file://test" }

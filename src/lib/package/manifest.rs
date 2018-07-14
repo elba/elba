@@ -14,6 +14,7 @@ use url_serde;
 /// A relative file path (not module path)
 type PathV = String;
 
+// TODO: Workspaces. Maybe just have a Workspace.toml file.
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
     package: PackageInfo,
@@ -22,6 +23,12 @@ pub struct Manifest {
     #[serde(default = "IndexMap::new")]
     dev_dependencies: IndexMap<Name, DepReq>,
     targets: Targets,
+}
+
+impl Manifest {
+    pub fn version(&self) -> &Version {
+        &self.package.version
+    }
 }
 
 impl FromStr for Manifest {
@@ -60,8 +67,6 @@ pub enum DepReq {
         #[serde(default)]
         #[serde(flatten)]
         spec: PkgGitSpecifier,
-        #[serde(default = "String::new")]
-        sub_path: String,
     },
 }
 

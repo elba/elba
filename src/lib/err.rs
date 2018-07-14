@@ -58,6 +58,8 @@ pub enum ErrorKind {
     MissingManifest,
     #[fail(display = "Could not download package.")]
     CannotDownload,
+    #[fail(display = "Checksum error.")]
+    Checksum,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,

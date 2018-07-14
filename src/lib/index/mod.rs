@@ -14,6 +14,9 @@
 //! indices can serve to "curate" packages from disparate repositories and other sources (think
 //! Purescript package sets).
 //!
+//! Tarballs are the only source which can contain a checksum, by nature of the way they're
+//! constructed.
+//!
 //! A package can only be published to the official index if it only depends on packages in the
 //! official index.
 //!
@@ -116,7 +119,6 @@ pub struct IndexEntry {
     pub version: Version,
     pub dependencies: Vec<Dep>,
     pub yanked: bool,
-    pub checksum: Checksum,
     pub location: DirectRes,
 }
 

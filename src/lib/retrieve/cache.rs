@@ -50,22 +50,35 @@
 
 use err::{Error, ErrorKind};
 use failure::ResultExt;
+use flate2::read::GzDecoder;
 use indexmap::IndexMap;
 use package::{
     manifest::{DepReq, Manifest},
-    resolution::{DirectRes, IndexRes},
+    resolution::{DirectRes, IndexRes, Resolution},
     version::Constraint,
-    Checksum, Name, PackageId, Summary,
+    Name, PackageId
 };
 use reqwest::Client;
+use semver::Version;
+use sha2::{Digest, Sha512};
 use std::{
     fs,
     io::{prelude::*, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
     str::FromStr,
-    string::ToString,
 };
 use symlink::symlink_dir;
+use tar::Archive;
+
+/// Utility function to turn an Sha2 Hash into a nice hex format
+fn hexify_hash(hash: &[u8]) -> String {
+    let mut s = String::new();
+    for byte in hash {
+        let p = format!("{:02x}", byte);
+        s.push_str(&p);
+    }
+    s
+}
 
 /// Metadata for a package in the Cache.
 ///
@@ -73,34 +86,24 @@ use symlink::symlink_dir;
 /// Constraint (the constraint is contained in the Resolution - use *this* directory or *this*
 /// git commit), so for those packages the Constraint is just "any."
 pub struct CacheMeta {
-    deps: IndexMap<PackageId, Constraint>,
+    pub version: Version,
+    pub deps: IndexMap<PackageId, Constraint>,
 }
 
 /// A Cache of downloaded packages and packages with no other Index.
 ///
-/// A Cache is located in a directory, and it has three directories of its own:
-/// - `dl/`: the cache of downloaded packages (tarballs only).
+/// A Cache is located in a directory, and it has two directories of its own:
 /// - `src/`: the cache of downloaded packages, in full source form.
 /// - `build/`: the cache of built packages.
 ///
 /// The src and build folders contain one folder for every group on disk. Each of those has
 /// all the packages.
 ///
-// TODO: {cabal new-build/nix}-style identifiers for downloaded packages. Instead of packages
-// being identified by their Summary, they're identified by a hash which includes Summary and
-// other stuff (maybe dependencies of the package, maybe features, maybe the code itself).
-//
-// e.g. a cached package directory used to be `group/test@test#1.0.0/`.
-// now it'll be `test-a12f312f12edw21w/`
-//
-// For cabal new-build, this is specifically relevant for globally caching builds, because the
-// deps can change output.
-//
-// TODO: If a package is downloaded but has the wrong checksum, wat do?
 #[derive(Debug, Clone)]
 pub struct Cache {
     location: PathBuf,
     def_index: IndexRes,
+    client: Client,
 }
 
 impl Cache {
@@ -117,32 +120,29 @@ impl Cache {
         loc.push("build");
         let _ = fs::create_dir_all(&loc);
 
+        let client = Client::new();
+
         Cache {
             location,
             def_index,
+            client,
         }
     }
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary. This is used
     /// for non-index dependencies.
-    pub fn metadata(
-        &self,
-        s: Summary,
-        cksum: Option<Checksum>,
-        loc: DirectRes,
-        c: &Client,
-    ) -> Result<CacheMeta, Error> {
-        let mut p = self.load(s, cksum, loc, c)?;
+    pub fn metadata(&self, pkg: &PackageId, v: Option<&Version>, loc: &DirectRes) -> Result<CacheMeta, Error> {
+        let p = self.load(pkg, v, loc)?;
+        let mf_path = p.join("Cargo.toml");
 
-        p.push("Cargo.toml");
-
-        let file = fs::File::open(p).context(ErrorKind::MissingManifest)?;
+        let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
         let mut file = BufReader::new(file);
         let mut contents = String::new();
         file.read_to_string(&mut contents)
             .context(ErrorKind::InvalidIndex)?;
 
         let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+        let version = manifest.version().clone();
         let mut deps = indexmap!();
 
         // We ignore dev-dependencies because those are only relevant if that package is the root
@@ -151,13 +151,13 @@ impl Cache {
             deps.insert(pid, c);
         }
 
-        let meta = CacheMeta { deps };
+        let meta = CacheMeta { deps, version };
 
         Ok(meta)
     }
 
     // TODO: In the future (heh), return Box<Future<Item = PathBuf, Error = Error>> and use async
-    // reqwest. For now, it seems like too much trouble for not that much gain (it)
+    // reqwest. For now, it seems like too much trouble for not that much gain.
     // Info on async:
     // https://stackoverflow.com/questions/49087958/getting-multiple-urls-concurrently-with-hyper
     // Info on downloading things in general:
@@ -170,41 +170,87 @@ impl Cache {
     ///
     /// If the package has a direct resolution of a local file directory, this just symlinks the
     /// package into the directory of the cache.
-    pub fn load(
-        &self,
-        s: Summary,
-        cksum: Option<Checksum>,
-        loc: DirectRes,
-        client: &Client,
-    ) -> Result<PathBuf, Error> {
-        if let Some(path) = self.check(&s, cksum) {
+    pub fn load(&self, pkg: &PackageId, v: Option<&Version>, loc: &DirectRes) -> Result<PathBuf, Error> {
+        if let Some(path) = self.check(pkg, v) {
             Ok(path)
         } else {
             match loc {
-                DirectRes::Tar { url } => match url.scheme() {
-                    "http" | "https" => client
-                        .get(url)
+                DirectRes::Tar { url, cksum } => match url.scheme() {
+                    "http" | "https" => self.client
+                        .get(url.clone())
                         .send()
                         .map_err(|_| Error::from(ErrorKind::CannotDownload))
-                        .map(|r| unimplemented!()),
-                    "file" => unimplemented!(),
+                        .and_then(|mut r| {
+                            let mut buf: Vec<u8> = vec![];
+                            r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+
+                            let hash = hexify_hash(Sha512::digest(&buf[..]).as_slice());
+                            if let Some(cksum) = cksum {
+                                if &cksum.hash == &hash {
+                                    return Err(ErrorKind::Checksum)?;
+                                }
+                            }
+
+                            let archive = BufReader::new(&buf[..]);
+                            let archive = GzDecoder::new(archive);
+                            let mut archive = Archive::new(archive);
+
+                            let mut p = self.location.clone();
+                            p.push("src");
+                            p.push(Self::get_dir(pkg, v));
+
+                            archive.unpack(&p).context(ErrorKind::CannotDownload)?;
+
+                            Ok(p)
+                        }),
+                    "file" => {
+                        let mut p = self.location.clone();
+                        p.push("src");
+                        p.push(Self::get_dir(pkg, v));
+
+                        let mut archive = fs::File::open(p).context(ErrorKind::CannotDownload)?;
+
+                        let hash = hexify_hash(
+                            Sha512::digest_reader(&mut archive)
+                                .context(ErrorKind::CannotDownload)?
+                                .as_slice(),
+                        );
+
+                        if let Some(cksum) = cksum {
+                            if &cksum.hash == &hash {
+                                return Err(ErrorKind::Checksum)?;
+                            }
+                        }
+
+                        let archive = BufReader::new(archive);
+                        let archive = GzDecoder::new(archive);
+                        let mut archive = Archive::new(archive);
+
+                        let mut p = self.location.clone();
+                        p.push("src");
+                        p.push(Self::get_dir(pkg, v));
+
+                        archive.unpack(&p).context(ErrorKind::CannotDownload)?;
+
+                        // TODO: Checksum
+
+                        Ok(p)
+                    }
                     _ => Err(Error::from(ErrorKind::CannotDownload)),
                 },
-                DirectRes::Git { repo, sub_path, tag } => {
-                    unimplemented!()
-                },
+                // TODO: Workspaces.
+                DirectRes::Git { repo, tag } => unimplemented!(),
                 DirectRes::Dir { url } => {
                     // If this package is located on disk, we just create a symlink into the cache
                     // directory.
                     let src = url.to_file_path().unwrap();
                     let mut dst = self.location.clone();
                     dst.push("src");
-                    dst.push(s.clone().to_string());
-                    if symlink_dir(src, dst).is_err() {
-                        // TODO: manually copy-paste.
-                        unimplemented!();
-                    }
-                    unimplemented!()
+                    dst.push(Self::get_dir(pkg, v));
+                    // We don't try to copy-paste at all. If we can't symlink, we just give up.
+                    symlink_dir(src, &dst).context(ErrorKind::CannotDownload)?;
+
+                    Ok(dst)
                 }
             }
         }
@@ -212,19 +258,35 @@ impl Cache {
 
     /// Check if package is downloaded and in the cache. If so, returns the path of the cached
     /// package.
-    pub fn check(&self, s: &Summary, cksum: Option<Checksum>) -> Option<PathBuf> {
+    pub fn check(&self, pkg: &PackageId, v: Option<&Version>) -> Option<PathBuf> {
         let mut path = self.location.clone();
-        path.push(s.to_string());
-        if path.exists() && (cksum.is_none() || cksum.unwrap() == self.checksum(&path)) {
+        path.push("src");
+        path.push(Self::get_dir(pkg, v));
+        if path.exists() {
             Some(path)
         } else {
             None
         }
     }
 
-    // This function assumes that the path exists.
-    fn checksum<P: AsRef<Path>>(&self, path: P) -> Checksum {
-        unimplemented!()
+    // TODO: {cabal new-build/nix}-style identifiers for downloaded packages. Instead of packages
+    // being identified by their Summary, they're identified by a hash which includes Summary and
+    // other stuff (maybe dependencies of the package, maybe features, maybe the code itself).
+    //
+    // e.g. a cached package directory used to be `group/test@test#1.0.0/`.
+    // now it'll be `test-a12f312f12edw21w/`
+    //
+    // For cabal new-build, this is specifically relevant for globally caching builds, because the
+    // deps can change output.
+    /// Gets the corresponding directory of a package. We need this because for packages which have
+    /// no associated version (i.e. git and local dependencies, where the constraints are inherent
+    /// in the resolution itself), we ignore a version specifier.
+    fn get_dir(pkg: &PackageId, v: Option<&Version>) -> String {
+        if let Resolution::Direct(_) = pkg.resolution() {
+            format!("{}", pkg)
+        } else {
+            format!("{}#{}", pkg, v.unwrap())
+        }
     }
 
     fn depreq_to_tuple(&self, n: Name, i: DepReq) -> (PackageId, Constraint) {
@@ -242,11 +304,7 @@ impl Cache {
                 let pi = PackageId::new(n, res.into());
                 (pi, Constraint::any())
             }
-            DepReq::Git {
-                git,
-                spec,
-                sub_path,
-            } => unimplemented!(),
+            DepReq::Git { git, spec } => unimplemented!(),
         }
     }
 }

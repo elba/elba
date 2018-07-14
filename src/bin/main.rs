@@ -9,6 +9,10 @@ extern crate toml;
 
 use structopt::StructOpt;
 
+// TODO: Custom tasks. elba-test is executed with elba t test.
+// Interaction with the main repo would just be implemented as a custom task.
+// Maybe tasks should be allowed to be designated in the manifest too.
+
 #[derive(StructOpt)]
 #[structopt(name = "elba", about = "An Idris package manager")]
 struct Elba {

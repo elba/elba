@@ -172,10 +172,29 @@ pub enum ChecksumFmt {
     Sha512,
 }
 
+impl FromStr for ChecksumFmt {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "sha512" => Ok(ChecksumFmt::Sha512),
+            _ => Err(ErrorKind::InvalidSourceUrl)?,
+        }
+    }
+}
+
+impl fmt::Display for ChecksumFmt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ChecksumFmt::Sha512 => write!(f, "sha512"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Checksum {
-    fmt: ChecksumFmt,
-    hash: String,
+    pub fmt: ChecksumFmt,
+    pub hash: String,
 }
 
 /// Struct `Summary` defines the summarized version of a package.
@@ -199,6 +218,10 @@ impl Summary {
 
     pub fn name(&self) -> &Name {
         &self.id.name
+    }
+
+    pub fn resolution(&self) -> &Resolution {
+        &self.id.resolution
     }
 
     pub fn version(&self) -> &Version {

@@ -11,6 +11,7 @@ use err::{Error, ErrorKind};
 use index::Indices;
 use package::{
     lockfile::Lockfile,
+    resolution::Resolution,
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
@@ -18,15 +19,11 @@ use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 
 // TODO: Patching
-// TODO: How to deal with git deps, local file deps from top-level...
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
 #[derive(Clone, Debug)]
 pub struct Retriever {
     /// The local cache of packages.
-    ///
-    /// The cache should never be used for looking up metadata of packages, unless the package has
-    /// no index (i.e. it's a direct dependency from the root).
     cache: Cache,
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
@@ -64,6 +61,10 @@ impl Retriever {
             }
         }
 
+        if let Resolution::Direct(loc) = pkg.resolution() {
+            return Ok(self.cache.metadata(pkg, None, loc)?.version);
+        }
+
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
             .indices
             .entries(pkg)?
@@ -90,15 +91,25 @@ impl Retriever {
         }
     }
 
-    // TODO: For direct deps, give up on widening immediately.
-    // TODO: if subsequent versions of a package have the same dependencies, reflect that in the
-    //       incompats
     // TODO: Incompat cache
     /// Returns a `Vec<Incompatibility>` corresponding to the package's dependencies.
     pub fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility>, Error> {
         if pkg == &self.root {
             let mut res = vec![];
             for dep in &self.root_deps {
+                res.push(Incompatibility::from_dep(
+                    pkg.clone(),
+                    (dep.0.clone(), dep.1.complement()),
+                ));
+            }
+            return Ok(res);
+        }
+
+        // If this is a DirectRes dep, we ask the cache for info.
+        if let Resolution::Direct(loc) = pkg.resolution() {
+            let deps = self.cache.metadata(pkg.id(), Some(pkg.version()), loc)?.deps;
+            let mut res = vec![];
+            for dep in deps {
                 res.push(Incompatibility::from_dep(
                     pkg.clone(),
                     (dep.0.clone(), dep.1.complement()),

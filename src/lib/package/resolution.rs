@@ -1,3 +1,4 @@
+use super::{Checksum, ChecksumFmt};
 use err::{Error, ErrorKind};
 use failure::ResultExt;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -63,15 +64,16 @@ impl fmt::Display for Resolution {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DirectRes {
     /// Git: the package originated from a git repository.
-    Git {
-        repo: Url,
-        sub_path: String,
-        tag: GitTag,
-    },
+    Git { repo: Url, tag: GitTag },
     /// Dir: the package is on disk in a folder directory.
     Dir { url: Url },
     /// Tar: the package is an archive stored somewhere.
-    Tar { url: Url },
+    ///
+    /// Tarballs are the only direct resolution which is allowed to have a checksum; this doesn't
+    /// really make sense for DirectRes::Local, and we leave validation of repositories to Git
+    /// itself. Checksums are stored in the fragment of the resolution url, with they key being the
+    /// checksum format.
+    Tar { url: Url, cksum: Option<Checksum> },
 }
 
 impl FromStr for DirectRes {
@@ -92,8 +94,21 @@ impl FromStr for DirectRes {
                 Ok(DirectRes::Dir { url })
             }
             "tar" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(DirectRes::Tar { url })
+                let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                if url.scheme() != "http" || url.scheme() != "https" || url.scheme() != "file" {
+                    return Err(ErrorKind::InvalidSourceUrl)?;
+                }
+                let cksum = url.fragment()
+                    .map(|x| x.splitn(2, '=').collect::<Vec<_>>())
+                    .and_then(|x| if x.len() == 2 { Some(x) } else { None })
+                    .and_then(|x| {
+                        Some(Checksum {
+                            fmt: ChecksumFmt::from_str(x[0]).ok()?,
+                            hash: x[1].to_string(),
+                        })
+                    });
+                url.set_query(None);
+                Ok(DirectRes::Tar { url, cksum })
             }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
@@ -105,7 +120,6 @@ impl fmt::Display for DirectRes {
         match self {
             DirectRes::Git {
                 repo: _repo,
-                sub_path: _sub_path,
                 tag: _tag,
             } => unimplemented!(),
             DirectRes::Dir { url } => {
@@ -115,7 +129,7 @@ impl fmt::Display for DirectRes {
                 s.push_str(url);
                 write!(f, "{}", s)
             }
-            DirectRes::Tar { url } => {
+            DirectRes::Tar { url, cksum: _cksum } => {
                 let url = url.as_str();
                 let mut s = String::with_capacity(url.len() + 10);
                 s.push_str("dir+");

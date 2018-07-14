@@ -4,6 +4,7 @@
 
 #[macro_use]
 extern crate failure;
+extern crate flate2;
 #[macro_use]
 extern crate indexmap;
 extern crate itertools;
@@ -15,7 +16,9 @@ extern crate serde;
 extern crate serde_derive;
 extern crate semver;
 extern crate serde_json;
+extern crate sha2;
 extern crate symlink;
+extern crate tar;
 extern crate toml;
 extern crate url;
 extern crate url_serde;
