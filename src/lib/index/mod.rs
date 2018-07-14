@@ -2,26 +2,24 @@
 //!
 //! ## Design
 //! Indices provide metadata about available packages from a particular source. Multiple indices
-//! can be specified at once, but packages will always default to using the index with the highest
-//! priority. If a user wants to use a package from a different registry, they have to explicitly specify
-//! this from their manifest. By default, the official index has the highest priority, and so the
-//! official index will be assumed to be the index where the package is located. All dependencies
-//! of a package listed in an index must have a source: either a direct source (i.e. a git repo or
-//! tarball or file directory), or a url to another index.
-//!
+//! can be specified at once, and a default index can be specified in configuration for packages
+//! with version constraints but no explicitly specified index. By default, the official index is
+//! set to be the default.
+//! 
 //! The packages that the index offers must have a direct source: they cannot point to other
 //! registries. Because the package doesn't necessarily need to be a tarball stored somewhere,
 //! indices can serve to "curate" packages from disparate repositories and other sources (think
-//! Purescript package sets).
+//! Purescript package sets). The dependencies of a package in an index must be located either in
+//! the same index or a dependent index of the current index (as specified in the index's config).
 //!
 //! Tarballs are the only source which can contain a checksum, by nature of the way they're
-//! constructed.
+//! constructed internally.
 //!
 //! A package can only be published to the official index if it only depends on packages in the
 //! official index.
 //!
 //! ## Prior art
-//! This design follows closely with that of Cargo's, specifically with their RFC for using
+//! This design follows closely with that of Cargo's, specifically with their RFC enabling
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
 mod config;
