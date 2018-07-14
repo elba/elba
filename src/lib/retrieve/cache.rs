@@ -239,7 +239,14 @@ impl Cache {
                     _ => Err(Error::from(ErrorKind::CannotDownload)),
                 },
                 // TODO: Workspaces.
-                DirectRes::Git { repo, tag } => unimplemented!(),
+                DirectRes::Git { repo, tag } => {
+                    // TODO: What should we do for git repos? Treat repos with different checked out
+                    // branches/commits as one folder or different ones? If the former, we're going
+                    // to have to make sure that only one instance of `elba` is running at a time so
+                    // that multiple copies don't try simultaneously checking out different points
+                    // of a shared git repo. The latter involves lots n lots n lots of duplication
+                    unimplemented!()
+                },
                 DirectRes::Dir { url } => {
                     // If this package is located on disk, we just create a symlink into the cache
                     // directory.
@@ -278,11 +285,16 @@ impl Cache {
     //
     // For cabal new-build, this is specifically relevant for globally caching builds, because the
     // deps can change output.
+    //
+    // However, it might be useful for us since we can hide what we're using to hash package names
+    // (for git repos, people won't know if we care about branches or not). It also looks cooler :)
     /// Gets the corresponding directory of a package. We need this because for packages which have
     /// no associated version (i.e. git and local dependencies, where the constraints are inherent
     /// in the resolution itself), we ignore a version specifier.
     fn get_dir(pkg: &PackageId, v: Option<&Version>) -> String {
         if let Resolution::Direct(_) = pkg.resolution() {
+            // TODO: What should we do for git repos? Treat repos with different checked out
+            // branches/commits as one folder or different ones?
             format!("{}", pkg)
         } else {
             format!("{}#{}", pkg, v.unwrap())
