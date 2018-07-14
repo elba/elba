@@ -62,7 +62,7 @@ impl Retriever {
         }
 
         if let Resolution::Direct(loc) = pkg.resolution() {
-            return Ok(self.cache.metadata(pkg, None, loc)?.version);
+            return Ok(self.cache.metadata(pkg, loc, None)?.version);
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
@@ -107,7 +107,7 @@ impl Retriever {
 
         // If this is a DirectRes dep, we ask the cache for info.
         if let Resolution::Direct(loc) = pkg.resolution() {
-            let deps = self.cache.metadata(pkg.id(), Some(pkg.version()), loc)?.deps;
+            let deps = self.cache.metadata(pkg.id(), loc, Some(pkg.version()))?.deps;
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(

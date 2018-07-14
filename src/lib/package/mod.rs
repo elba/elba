@@ -56,6 +56,10 @@ impl Name {
     pub fn as_str(&self) -> &str {
         &self.inner.serialization
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.inner.serialization.as_bytes()
+    }
 }
 
 impl FromStr for Name {
@@ -166,10 +170,9 @@ impl Serialize for PackageId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[serde(rename_all = "lowercase")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ChecksumFmt {
-    Sha512,
+    Sha256,
 }
 
 impl FromStr for ChecksumFmt {
@@ -177,7 +180,7 @@ impl FromStr for ChecksumFmt {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "sha512" => Ok(ChecksumFmt::Sha512),
+            "sha256" => Ok(ChecksumFmt::Sha256),
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
     }
@@ -186,15 +189,48 @@ impl FromStr for ChecksumFmt {
 impl fmt::Display for ChecksumFmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ChecksumFmt::Sha512 => write!(f, "sha512"),
+            ChecksumFmt::Sha256 => write!(f, "sha256"),
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Checksum {
     pub fmt: ChecksumFmt,
     pub hash: String,
+}
+
+impl FromStr for Checksum {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut s = s.splitn(2, '=');
+        let fmt = s.next().unwrap();
+        let hash = s.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?.to_string();
+        Ok(Checksum { fmt: fmt.parse::<ChecksumFmt>()?, hash })
+    }
+}
+
+impl fmt::Display for Checksum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}={}", self.fmt, self.hash)
+    }
+}
+
+impl<'de> Deserialize<'de> for Checksum {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for Checksum {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 
 /// Struct `Summary` defines the summarized version of a package.

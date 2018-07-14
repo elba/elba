@@ -99,15 +99,10 @@ impl FromStr for DirectRes {
                     return Err(ErrorKind::InvalidSourceUrl)?;
                 }
                 let cksum = url.fragment()
-                    .map(|x| x.splitn(2, '=').collect::<Vec<_>>())
-                    .and_then(|x| if x.len() == 2 { Some(x) } else { None })
                     .and_then(|x| {
-                        Some(Checksum {
-                            fmt: ChecksumFmt::from_str(x[0]).ok()?,
-                            hash: x[1].to_string(),
-                        })
+                        Checksum::from_str(x).ok()
                     });
-                url.set_query(None);
+                url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
@@ -124,17 +119,11 @@ impl fmt::Display for DirectRes {
             } => unimplemented!(),
             DirectRes::Dir { url } => {
                 let url = url.as_str();
-                let mut s = String::with_capacity(url.len() + 5);
-                s.push_str("dir+");
-                s.push_str(url);
-                write!(f, "{}", s)
+                write!(f, "dir+{}", url)
             }
-            DirectRes::Tar { url, cksum: _cksum } => {
+            DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
-                let mut s = String::with_capacity(url.len() + 10);
-                s.push_str("dir+");
-                s.push_str(url);
-                write!(f, "{}", s)
+                write!(f, "tar+{}{}", url, if let Some(cksum) = cksum { "#".to_string() + &cksum.to_string() } else { "".to_string() },)
             }
         }
     }

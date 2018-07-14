@@ -54,13 +54,13 @@ use flate2::read::GzDecoder;
 use indexmap::IndexMap;
 use package::{
     manifest::{DepReq, Manifest},
-    resolution::{DirectRes, IndexRes, Resolution},
+    resolution::{DirectRes, IndexRes},
     version::Constraint,
     Name, PackageId
 };
 use reqwest::Client;
 use semver::Version;
-use sha2::{Digest, Sha512};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::{prelude::*, BufReader},
@@ -96,9 +96,12 @@ pub struct CacheMeta {
 /// - `src/`: the cache of downloaded packages, in full source form.
 /// - `build/`: the cache of built packages.
 ///
-/// The src and build folders contain one folder for every group on disk. Each of those has
-/// all the packages.
-///
+/// The src and build folders contain one folder for every package on disk.
+// TODO: Maybe follow Cargo and separate into two cache locations: global (`.cargo/registry`:
+// contains caches and metadata for indices) and local (`target/`: contains non-index deps, built
+// versions of all packages i.e. ibc files, etc.).
+// TODO: Dealing with people using multiple executions of `elba` at once: make sure that one Cache
+// doesn't clobber another.
 #[derive(Debug, Clone)]
 pub struct Cache {
     location: PathBuf,
@@ -131,8 +134,8 @@ impl Cache {
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary. This is used
     /// for non-index dependencies.
-    pub fn metadata(&self, pkg: &PackageId, v: Option<&Version>, loc: &DirectRes) -> Result<CacheMeta, Error> {
-        let p = self.load(pkg, v, loc)?;
+    pub fn metadata(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<CacheMeta, Error> {
+        let p = self.load(pkg, loc, v)?;
         let mf_path = p.join("Cargo.toml");
 
         let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
@@ -170,8 +173,8 @@ impl Cache {
     ///
     /// If the package has a direct resolution of a local file directory, this just symlinks the
     /// package into the directory of the cache.
-    pub fn load(&self, pkg: &PackageId, v: Option<&Version>, loc: &DirectRes) -> Result<PathBuf, Error> {
-        if let Some(path) = self.check(pkg, v) {
+    pub fn load(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<PathBuf, Error> {
+        if let Some(path) = self.check(pkg.name(), loc, v) {
             Ok(path)
         } else {
             match loc {
@@ -184,7 +187,7 @@ impl Cache {
                             let mut buf: Vec<u8> = vec![];
                             r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
 
-                            let hash = hexify_hash(Sha512::digest(&buf[..]).as_slice());
+                            let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
                             if let Some(cksum) = cksum {
                                 if &cksum.hash == &hash {
                                     return Err(ErrorKind::Checksum)?;
@@ -197,7 +200,7 @@ impl Cache {
 
                             let mut p = self.location.clone();
                             p.push("src");
-                            p.push(Self::get_dir(pkg, v));
+                            p.push(Self::get_src_dir(pkg.name(), loc, v));
 
                             archive.unpack(&p).context(ErrorKind::CannotDownload)?;
 
@@ -206,12 +209,12 @@ impl Cache {
                     "file" => {
                         let mut p = self.location.clone();
                         p.push("src");
-                        p.push(Self::get_dir(pkg, v));
+                        p.push(Self::get_src_dir(pkg.name(), loc, v));
 
                         let mut archive = fs::File::open(p).context(ErrorKind::CannotDownload)?;
 
                         let hash = hexify_hash(
-                            Sha512::digest_reader(&mut archive)
+                            Sha256::digest_reader(&mut archive)
                                 .context(ErrorKind::CannotDownload)?
                                 .as_slice(),
                         );
@@ -228,7 +231,7 @@ impl Cache {
 
                         let mut p = self.location.clone();
                         p.push("src");
-                        p.push(Self::get_dir(pkg, v));
+                        p.push(Self::get_src_dir(pkg.name(), loc, v));
 
                         archive.unpack(&p).context(ErrorKind::CannotDownload)?;
 
@@ -253,7 +256,7 @@ impl Cache {
                     let src = url.to_file_path().unwrap();
                     let mut dst = self.location.clone();
                     dst.push("src");
-                    dst.push(Self::get_dir(pkg, v));
+                    dst.push(Self::get_src_dir(pkg.name(), loc, v));
                     // We don't try to copy-paste at all. If we can't symlink, we just give up.
                     symlink_dir(src, &dst).context(ErrorKind::CannotDownload)?;
 
@@ -265,10 +268,10 @@ impl Cache {
 
     /// Check if package is downloaded and in the cache. If so, returns the path of the cached
     /// package.
-    pub fn check(&self, pkg: &PackageId, v: Option<&Version>) -> Option<PathBuf> {
+    pub fn check(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
         let mut path = self.location.clone();
         path.push("src");
-        path.push(Self::get_dir(pkg, v));
+        path.push(Self::get_src_dir(name, loc, v));
         if path.exists() {
             Some(path)
         } else {
@@ -276,29 +279,19 @@ impl Cache {
         }
     }
 
-    // TODO: {cabal new-build/nix}-style identifiers for downloaded packages. Instead of packages
-    // being identified by their Summary, they're identified by a hash which includes Summary and
-    // other stuff (maybe dependencies of the package, maybe features, maybe the code itself).
-    //
-    // e.g. a cached package directory used to be `group/test@test#1.0.0/`.
-    // now it'll be `test-a12f312f12edw21w/`
-    //
-    // For cabal new-build, this is specifically relevant for globally caching builds, because the
-    // deps can change output.
-    //
-    // However, it might be useful for us since we can hide what we're using to hash package names
-    // (for git repos, people won't know if we care about branches or not). It also looks cooler :)
     /// Gets the corresponding directory of a package. We need this because for packages which have
     /// no associated version (i.e. git and local dependencies, where the constraints are inherent
     /// in the resolution itself), we ignore a version specifier.
-    fn get_dir(pkg: &PackageId, v: Option<&Version>) -> String {
-        if let Resolution::Direct(_) = pkg.resolution() {
-            // TODO: What should we do for git repos? Treat repos with different checked out
-            // branches/commits as one folder or different ones?
-            format!("{}", pkg)
-        } else {
-            format!("{}#{}", pkg, v.unwrap())
+    fn get_src_dir(name: &Name, loc: &DirectRes, v: Option<&Version>) -> String {
+        let mut hasher = Sha256::default();
+        hasher.input(name.as_bytes());
+        hasher.input(loc.to_string().as_bytes());
+        if let Some(v) = v {
+            hasher.input(v.to_string().as_bytes());
         }
+        let hash = hexify_hash(hasher.result().as_slice());
+
+        format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
     fn depreq_to_tuple(&self, n: Name, i: DepReq) -> (PackageId, Constraint) {
