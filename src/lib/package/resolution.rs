@@ -1,9 +1,15 @@
-use super::{Checksum, ChecksumFmt};
-use err::{Error, ErrorKind};
+use super::Checksum;
+use util::err::{Error, ErrorKind};
 use failure::ResultExt;
+use flate2::read::GzDecoder;
+use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, str::FromStr};
+use sha2::{Digest, Sha256};
+use std::{fmt, fs, path::Path, str::FromStr, io::BufReader};
+use symlink::symlink_dir;
+use tar::Archive;
 use url::Url;
+use util::{hexify_hash, lock::DirLock};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GitTag {
@@ -74,6 +80,80 @@ pub enum DirectRes {
     /// itself. Checksums are stored in the fragment of the resolution url, with they key being the
     /// checksum format.
     Tar { url: Url, cksum: Option<Checksum> },
+}
+
+impl DirectRes {
+    pub fn retrieve(&self, client: &Client, target: &DirLock) -> Result<(), Error> {
+        match self {
+            DirectRes::Tar { url, cksum } => match url.scheme() {
+                "http" | "https" => client
+                    .get(url.clone())
+                    .send()
+                    .map_err(|_| Error::from(ErrorKind::CannotDownload))
+                    .and_then(|mut r| {
+                        let mut buf: Vec<u8> = vec![];
+                        r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+
+                        let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
+                        if let Some(cksum) = cksum {
+                            if &cksum.hash == &hash {
+                                return Err(ErrorKind::Checksum)?;
+                            }
+                        }
+
+                        let archive = BufReader::new(&buf[..]);
+                        let archive = GzDecoder::new(archive);
+                        let mut archive = Archive::new(archive);
+
+                        archive.unpack(target.path()).context(ErrorKind::CannotDownload)?;
+
+                        Ok(())
+                    }),
+                "file" => {
+                    let mut archive = fs::File::open(target.path()).context(ErrorKind::CannotDownload)?;
+
+                    let hash = hexify_hash(
+                        Sha256::digest_reader(&mut archive)
+                            .context(ErrorKind::CannotDownload)?
+                            .as_slice(),
+                    );
+
+                    if let Some(cksum) = cksum {
+                        if &cksum.hash == &hash {
+                            return Err(ErrorKind::Checksum)?;
+                        }
+                    }
+
+                    let archive = BufReader::new(archive);
+                    let archive = GzDecoder::new(archive);
+                    let mut archive = Archive::new(archive);
+
+                    archive.unpack(target.path()).context(ErrorKind::CannotDownload)?;
+
+                    Ok(())
+                }
+                _ => Err(Error::from(ErrorKind::CannotDownload)),
+            },
+            // TODO: Workspaces.
+            DirectRes::Git { repo, tag } => {
+                // TODO: What should we do for git repos? Treat repos with different checked out
+                // branches/commits as one folder or different ones? If the former, we're going
+                // to have to make sure that only one instance of `elba` is running at a time so
+                // that multiple copies don't try simultaneously checking out different points
+                // of a shared git repo. The latter involves lots n lots n lots of duplication
+                unimplemented!()
+            },
+            DirectRes::Dir { url } => {
+                // If this package is located on disk, we just create a symlink into the cache
+                // directory.
+                let src = url.to_file_path().unwrap();
+                // We don't try to copy-paste at all. If we can't symlink, we just give up.
+                symlink_dir(src, target.path()).context(ErrorKind::CannotDownload)?;
+
+                Ok(())
+            }
+        }
+    }
 }
 
 impl FromStr for DirectRes {

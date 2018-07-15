@@ -13,7 +13,7 @@ use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use indexmap::IndexMap;
 use package::{
     version::{Constraint, Relation},

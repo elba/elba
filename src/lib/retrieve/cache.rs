@@ -48,15 +48,14 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use failure::ResultExt;
-use flate2::read::GzDecoder;
 use indexmap::IndexMap;
 use package::{
     manifest::{DepReq, Manifest},
     resolution::{DirectRes, IndexRes},
     version::Constraint,
-    Name, PackageId
+    Name, PackageId, Summary
 };
 use reqwest::Client;
 use semver::Version;
@@ -67,18 +66,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
-use symlink::symlink_dir;
-use tar::Archive;
-
-/// Utility function to turn an Sha2 Hash into a nice hex format
-fn hexify_hash(hash: &[u8]) -> String {
-    let mut s = String::new();
-    for byte in hash {
-        let p = format!("{:02x}", byte);
-        s.push_str(&p);
-    }
-    s
-}
+use util::{hexify_hash, lock::DirLock};
 
 /// Metadata for a package in the Cache.
 ///
@@ -101,7 +89,12 @@ pub struct CacheMeta {
 // contains caches and metadata for indices) and local (`target/`: contains non-index deps, built
 // versions of all packages i.e. ibc files, etc.).
 // TODO: Dealing with people using multiple executions of `elba` at once: make sure that one Cache
-// doesn't clobber another.
+// doesn't clobber another. See Cargo's `util/flock.rs`, the fs2 crate, etc. This way, multiple
+// copies of `elba` don't try copying over each other, etc.
+// Simple solution: use a lock file. If test.lock exists, it's locked. Otherwise, we create it
+// and now we have the lock.
+// TODO: Maybe the Cache is in charge of the Indices. This way, metadata takes into account both
+// indices and direct deps, and we don't have to discriminate between the two in the Retriever.
 #[derive(Debug, Clone)]
 pub struct Cache {
     location: PathBuf,
@@ -132,8 +125,8 @@ impl Cache {
         }
     }
 
-    /// Retrieve the metadata of a package, loading it into the cache if necessary. This is used
-    /// for non-index dependencies.
+    /// Retrieve the metadata of a package, loading it into the cache if necessary. This should
+    /// only be used for non-index dependencies.
     pub fn metadata(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<CacheMeta, Error> {
         let p = self.load(pkg, loc, v)?;
         let mf_path = p.join("Cargo.toml");
@@ -165,6 +158,7 @@ impl Cache {
     // https://stackoverflow.com/questions/49087958/getting-multiple-urls-concurrently-with-hyper
     // Info on downloading things in general:
     // https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html
+    // TODO: Return dirlock?
     /// Returns a future pointing to the path to a downloaded (and potentially extracted, if it's a
     /// tarball) package.
     ///
@@ -177,92 +171,16 @@ impl Cache {
         if let Some(path) = self.check(pkg.name(), loc, v) {
             Ok(path)
         } else {
-            match loc {
-                DirectRes::Tar { url, cksum } => match url.scheme() {
-                    "http" | "https" => self.client
-                        .get(url.clone())
-                        .send()
-                        .map_err(|_| Error::from(ErrorKind::CannotDownload))
-                        .and_then(|mut r| {
-                            let mut buf: Vec<u8> = vec![];
-                            r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+            let mut p = self.location.clone();
+            p.push("src");
+            p.push(Self::get_src_dir(pkg.name(), loc, v));
 
-                            let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
-                            if let Some(cksum) = cksum {
-                                if &cksum.hash == &hash {
-                                    return Err(ErrorKind::Checksum)?;
-                                }
-                            }
+            // TODO: Oh my god this is unsafe pls pls pls fix
+            let dir = DirLock::acquire(&p).unwrap();
+            loc.retrieve(&self.client, &dir)?;
+            dir.release().unwrap();
 
-                            let archive = BufReader::new(&buf[..]);
-                            let archive = GzDecoder::new(archive);
-                            let mut archive = Archive::new(archive);
-
-                            let mut p = self.location.clone();
-                            p.push("src");
-                            p.push(Self::get_src_dir(pkg.name(), loc, v));
-
-                            archive.unpack(&p).context(ErrorKind::CannotDownload)?;
-
-                            Ok(p)
-                        }),
-                    "file" => {
-                        let mut p = self.location.clone();
-                        p.push("src");
-                        p.push(Self::get_src_dir(pkg.name(), loc, v));
-
-                        let mut archive = fs::File::open(p).context(ErrorKind::CannotDownload)?;
-
-                        let hash = hexify_hash(
-                            Sha256::digest_reader(&mut archive)
-                                .context(ErrorKind::CannotDownload)?
-                                .as_slice(),
-                        );
-
-                        if let Some(cksum) = cksum {
-                            if &cksum.hash == &hash {
-                                return Err(ErrorKind::Checksum)?;
-                            }
-                        }
-
-                        let archive = BufReader::new(archive);
-                        let archive = GzDecoder::new(archive);
-                        let mut archive = Archive::new(archive);
-
-                        let mut p = self.location.clone();
-                        p.push("src");
-                        p.push(Self::get_src_dir(pkg.name(), loc, v));
-
-                        archive.unpack(&p).context(ErrorKind::CannotDownload)?;
-
-                        // TODO: Checksum
-
-                        Ok(p)
-                    }
-                    _ => Err(Error::from(ErrorKind::CannotDownload)),
-                },
-                // TODO: Workspaces.
-                DirectRes::Git { repo, tag } => {
-                    // TODO: What should we do for git repos? Treat repos with different checked out
-                    // branches/commits as one folder or different ones? If the former, we're going
-                    // to have to make sure that only one instance of `elba` is running at a time so
-                    // that multiple copies don't try simultaneously checking out different points
-                    // of a shared git repo. The latter involves lots n lots n lots of duplication
-                    unimplemented!()
-                },
-                DirectRes::Dir { url } => {
-                    // If this package is located on disk, we just create a symlink into the cache
-                    // directory.
-                    let src = url.to_file_path().unwrap();
-                    let mut dst = self.location.clone();
-                    dst.push("src");
-                    dst.push(Self::get_src_dir(pkg.name(), loc, v));
-                    // We don't try to copy-paste at all. If we can't symlink, we just give up.
-                    symlink_dir(src, &dst).context(ErrorKind::CannotDownload)?;
-
-                    Ok(dst)
-                }
-            }
+            Ok(p)
         }
     }
 
@@ -292,6 +210,20 @@ impl Cache {
         let hash = hexify_hash(hasher.result().as_slice());
 
         format!("{}_{}-{}", name.group(), name.name(), hash)
+    }
+
+    /// Gets the corresponding directory of a built package (with ibc files). This directory is
+    /// different from the directory for downloads because the hash takes into consideration more
+    /// factors, like the complete environment that the package was built in (i.e. all of the
+    /// exact dependencies used for this build of the package).
+    /// 
+    /// This is necessary because Idris libraries can re-export values of its dependencies; when a
+    /// dependent value changes, it changes in the library itself, causing the generated ibc to be
+    /// totally different. The same package with the same constraints can be resolved with
+    /// different versions in different contexts, so we want to make sure we're using the right
+    /// builds of every package.
+    fn get_build_dir(sum: &Summary, loc: &DirectRes, env: Vec<(PackageId, Version)>) -> String {
+        unimplemented!()
     }
 
     fn depreq_to_tuple(&self, n: Name, i: DepReq) -> (PackageId, Constraint) {

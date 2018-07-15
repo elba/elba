@@ -6,7 +6,7 @@ pub mod resolution;
 pub mod version;
 
 use self::resolution::Resolution;
-use err::*;
+use util::err::*;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};

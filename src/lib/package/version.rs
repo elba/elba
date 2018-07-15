@@ -25,7 +25,7 @@
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
 
 use self::Interval::{Closed, Open, Unbounded};
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use indexmap::IndexSet;
 use itertools::Itertools;
 use nom::types::CompleteStr;

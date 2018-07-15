@@ -1,6 +1,6 @@
 //! Configuration for Indices.
 
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use failure::ResultExt;
 use package::resolution::IndexRes;
 use std::str::FromStr;

@@ -7,7 +7,7 @@
 pub mod cache;
 
 pub use self::cache::Cache;
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use index::Indices;
 use package::{
     lockfile::Lockfile,

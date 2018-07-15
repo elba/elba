@@ -2,7 +2,7 @@
 
 use self::version::Constraint;
 use super::{resolution::IndexRes, *};
-use err::*;
+use util::err::*;
 use failure::ResultExt;
 use indexmap::IndexMap;
 use semver::Version;

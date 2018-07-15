@@ -25,7 +25,7 @@
 mod config;
 
 use self::config::IndexConfig;
-use err::{Error, ErrorKind};
+use util::err::{Error, ErrorKind};
 use failure::ResultExt;
 use indexmap::IndexMap;
 use package::{
@@ -121,7 +121,9 @@ pub struct IndexEntry {
 }
 
 // TODO: Dealing with where to download the Index, using the Config to get that info.
-// TODO: user-friendly index names? (this decouples the index from its url)
+// TODO: user-friendly index names? (this decouples the index from its url; we'd need a function to
+// turn these user-friendly names into explicitly ones)
+// TODO: This should use DirLock
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.

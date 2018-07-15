@@ -4,6 +4,8 @@
 
 // TODO: Should the lockfile store checksums? If so, of what? The tarball? The folder?
 // see https://github.com/rust-lang/cargo/issues/4800 for why we'd want this
+// If we do, when we make a new resolution in which a PackageId is shared between lockfile and
+// resolution (derived from indices and cache) but checksums differ, we should panic.
 
 use failure::ResultExt;
 use indexmap::{IndexMap, IndexSet};

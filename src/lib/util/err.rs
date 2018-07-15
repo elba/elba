@@ -3,8 +3,6 @@
 use failure::{Backtrace, Context, Fail};
 use std::fmt::{self, Display};
 
-pub type Res<T> = Result<T, Error>;
-
 #[derive(Debug)]
 pub struct Error {
     inner: Context<ErrorKind>,
@@ -60,6 +58,8 @@ pub enum ErrorKind {
     CannotDownload,
     #[fail(display = "Checksum error.")]
     Checksum,
+    #[fail(display = "Resource is locked.")]
+    Locked,
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,
