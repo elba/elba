@@ -21,7 +21,7 @@ use semver::Version;
 // TODO: Patching
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Retriever {
     /// The local cache of packages.
     cache: Cache,

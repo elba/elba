@@ -40,6 +40,8 @@ enum Cmd {
     Install { specifier: String },
     #[structopt(name = "uninstall")]
     Uninstall { name: String },
+    #[structopt(name = "repl")]
+    Repl,
 }
 
 #[derive(StructOpt)]

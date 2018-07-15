@@ -30,4 +30,4 @@ pub mod index;
 pub mod package;
 pub mod resolve;
 pub mod retrieve;
-mod util;
+pub mod util;

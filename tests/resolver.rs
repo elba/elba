@@ -11,6 +11,7 @@ use elba::{
     },
     resolve::Resolver,
     retrieve::{Cache, Retriever},
+    util::DirLock,
 };
 use semver::Version;
 use std::{path::PathBuf, str::FromStr};
@@ -33,6 +34,8 @@ fn indices() -> Indices {
     let mut path = PathBuf::new();
     path.push(start);
     path.push("tests/data/index");
+
+    let path = DirLock::acquire(path);
 
     let v = vec![Index::from_disk(url, path).unwrap()];
 

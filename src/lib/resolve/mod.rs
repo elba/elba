@@ -23,7 +23,7 @@ use retrieve::Retriever;
 use semver::Version;
 use std::cmp;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Resolver {
     /// The current step.
     step: u16,

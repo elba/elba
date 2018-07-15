@@ -5,8 +5,7 @@ use flate2::read::GzDecoder;
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
-use std::{fmt, fs, path::Path, str::FromStr, io::BufReader};
-use symlink::symlink_dir;
+use std::{fmt, fs, str::FromStr, io::BufReader};
 use tar::Archive;
 use url::Url;
 use util::{hexify_hash, lock::DirLock};
@@ -96,7 +95,7 @@ impl DirectRes {
 
                         let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
                         if let Some(cksum) = cksum {
-                            if &cksum.hash == &hash {
+                            if cksum.hash == hash {
                                 return Err(ErrorKind::Checksum)?;
                             }
                         }
@@ -119,7 +118,7 @@ impl DirectRes {
                     );
 
                     if let Some(cksum) = cksum {
-                        if &cksum.hash == &hash {
+                        if cksum.hash == hash {
                             return Err(ErrorKind::Checksum)?;
                         }
                     }
@@ -143,13 +142,8 @@ impl DirectRes {
                 // of a shared git repo. The latter involves lots n lots n lots of duplication
                 unimplemented!()
             },
-            DirectRes::Dir { url } => {
-                // If this package is located on disk, we just create a symlink into the cache
-                // directory.
-                let src = url.to_file_path().unwrap();
-                // We don't try to copy-paste at all. If we can't symlink, we just give up.
-                symlink_dir(src, target.path()).context(ErrorKind::CannotDownload)?;
-
+            DirectRes::Dir { url: _url } => {
+                // If this package is located on disk, we don't have to do anything...
                 Ok(())
             }
         }

@@ -85,14 +85,6 @@ pub struct CacheMeta {
 /// - `build/`: the cache of built packages.
 ///
 /// The src and build folders contain one folder for every package on disk.
-// TODO: Maybe follow Cargo and separate into two cache locations: global (`.cargo/registry`:
-// contains caches and metadata for indices) and local (`target/`: contains non-index deps, built
-// versions of all packages i.e. ibc files, etc.).
-// TODO: Dealing with people using multiple executions of `elba` at once: make sure that one Cache
-// doesn't clobber another. See Cargo's `util/flock.rs`, the fs2 crate, etc. This way, multiple
-// copies of `elba` don't try copying over each other, etc.
-// Simple solution: use a lock file. If test.lock exists, it's locked. Otherwise, we create it
-// and now we have the lock.
 // TODO: Maybe the Cache is in charge of the Indices. This way, metadata takes into account both
 // indices and direct deps, and we don't have to discriminate between the two in the Retriever.
 #[derive(Debug, Clone)]
@@ -105,10 +97,6 @@ pub struct Cache {
 impl Cache {
     pub fn from_disk(location: PathBuf, def_index: IndexRes) -> Self {
         let mut loc = location.clone();
-        loc.push("dl");
-        let _ = fs::create_dir_all(&loc);
-
-        loc.pop();
         loc.push("src");
         let _ = fs::create_dir_all(&loc);
 
@@ -164,9 +152,6 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    ///
-    /// If the package has a direct resolution of a local file directory, this just symlinks the
-    /// package into the directory of the cache.
     pub fn load(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<PathBuf, Error> {
         if let Some(path) = self.check(pkg.name(), loc, v) {
             Ok(path)
@@ -175,10 +160,8 @@ impl Cache {
             p.push("src");
             p.push(Self::get_src_dir(pkg.name(), loc, v));
 
-            // TODO: Oh my god this is unsafe pls pls pls fix
-            let dir = DirLock::acquire(&p).unwrap();
+            let dir = DirLock::acquire(&p).context(ErrorKind::Locked)?;
             loc.retrieve(&self.client, &dir)?;
-            dir.release().unwrap();
 
             Ok(p)
         }
@@ -187,6 +170,10 @@ impl Cache {
     /// Check if package is downloaded and in the cache. If so, returns the path of the cached
     /// package.
     pub fn check(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
+        if let DirectRes::Dir { url } = loc {
+            return Some(url.to_file_path().unwrap());
+        }
+
         let mut path = self.location.clone();
         path.push("src");
         path.push(Self::get_src_dir(name, loc, v));
@@ -205,7 +192,9 @@ impl Cache {
         hasher.input(name.as_bytes());
         hasher.input(loc.to_string().as_bytes());
         if let Some(v) = v {
-            hasher.input(v.to_string().as_bytes());
+            if let DirectRes::Tar { url: _url, cksum: _cksum } = loc {
+                hasher.input(v.to_string().as_bytes());
+            }
         }
         let hash = hexify_hash(hasher.result().as_slice());
 
@@ -223,7 +212,16 @@ impl Cache {
     /// different versions in different contexts, so we want to make sure we're using the right
     /// builds of every package.
     fn get_build_dir(sum: &Summary, loc: &DirectRes, env: Vec<(PackageId, Version)>) -> String {
-        unimplemented!()
+        let mut hasher = Sha256::default();
+        hasher.input(sum.to_string().as_bytes());
+        hasher.input(loc.to_string().as_bytes());
+        for (pid, v) in env {
+            hasher.input(pid.to_string().as_bytes());
+            hasher.input(v.to_string().as_bytes());
+        }
+        let hash = hexify_hash(hasher.result().as_slice());
+
+        format!("{}_{}-{}", sum.name().group(), sum.name().name(), hash)
     }
 
     fn depreq_to_tuple(&self, n: Name, i: DepReq) -> (PackageId, Constraint) {

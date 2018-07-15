@@ -25,11 +25,10 @@
 mod config;
 
 use self::config::IndexConfig;
-use util::err::{Error, ErrorKind};
+use util::{err::{Error, ErrorKind}, lock::DirLock};
 use failure::ResultExt;
 use indexmap::IndexMap;
 use package::{
-    manifest::Manifest,
     resolution::{DirectRes, IndexRes, Resolution},
     version::Constraint,
     *,
@@ -39,7 +38,6 @@ use serde_json;
 use std::{
     fs,
     io::{self, prelude::*, BufReader},
-    path::PathBuf,
     str::FromStr,
 };
 use url::Url;
@@ -54,7 +52,7 @@ pub struct Dep {
     pub req: Constraint,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Indices {
     /// The indices being used.
     ///
@@ -123,26 +121,24 @@ pub struct IndexEntry {
 // TODO: Dealing with where to download the Index, using the Config to get that info.
 // TODO: user-friendly index names? (this decouples the index from its url; we'd need a function to
 // turn these user-friendly names into explicitly ones)
-// TODO: This should use DirLock
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Index {
     /// Indicates identifying information about the index
     pub id: IndexRes,
     /// Indicates where this index is stored on-disk.
-    pub path: PathBuf,
+    pub path: DirLock,
     /// The configuration of this index.
     pub config: IndexConfig,
 }
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn from_disk(url: Url, path: PathBuf) -> Result<Self, Error> {
+    pub fn from_disk(url: Url, path: DirLock) -> Result<Self, Error> {
         let id = IndexRes { url };
-        let mut pn = path.clone();
-        pn.push("index.toml");
+        let pn = path.path().join("index.toml");
         let file = fs::File::open(pn).context(ErrorKind::InvalidIndex)?;
         let mut file = BufReader::new(file);
         let mut contents = String::new();
@@ -153,16 +149,9 @@ impl Index {
         Ok(Index { id, path, config })
     }
 
-    pub fn add(&self, manifest: &Manifest) {
-        unimplemented!()
-    }
-
     pub fn entries(&self, name: &Name) -> Result<IndexMap<Version, IndexEntry>, Error> {
         let mut res = indexmap!();
-        let mut path = self.path.clone();
-        path.push(name.group());
-        path.push(name.name());
-
+        let path = self.path.path().join(name.as_str());
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
         let r = io::BufReader::new(&file);
 
