@@ -1,28 +1,22 @@
-use super::Checksum;
-use util::err::{Error, ErrorKind};
+use super::{manifest::PkgGitSpecifier, Checksum};
 use failure::ResultExt;
 use flate2::read::GzDecoder;
+use git2::Repository;
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
-use std::{fmt, fs, str::FromStr, io::BufReader};
+use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
 use tar::Archive;
 use url::Url;
+use util::err::{Error, ErrorKind};
 use util::{hexify_hash, lock::DirLock};
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GitTag {
-    Commit(String),
-    Tag(String),
-}
 
 /// The possible places from which a package can be resolved.
 ///
 /// There are two main sources from which a package can originate: a Direct source (a path or a
 /// tarball online or a git repo) and an Index (an indirect source which accrues metadata about
 /// Direct sources
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Eq, Hash)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Resolution {
     Direct(DirectRes),
     Index(IndexRes),
@@ -66,12 +60,30 @@ impl fmt::Display for Resolution {
     }
 }
 
+impl Serialize for Resolution {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Resolution {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DirectRes {
+    // TODO: Internally, git doesn't care if you're looking at a branch, tag, or commit. They're
+    // all revparsed the same way. Maybe we shouldn't distinguish between them either.
     /// Git: the package originated from a git repository.
-    Git { repo: Url, tag: GitTag },
+    Git { repo: Url, tag: PkgGitSpecifier },
     /// Dir: the package is on disk in a folder directory.
-    Dir { url: Url },
+    Dir { url: PathBuf },
     /// Tar: the package is an archive stored somewhere.
     ///
     /// Tarballs are the only direct resolution which is allowed to have a checksum; this doesn't
@@ -82,6 +94,7 @@ pub enum DirectRes {
 }
 
 impl DirectRes {
+    // TODO: argument progress: impl Fn(u8) (u8 = 0-100)
     pub fn retrieve(&self, client: &Client, target: &DirLock) -> Result<(), Error> {
         match self {
             DirectRes::Tar { url, cksum } => match url.scheme() {
@@ -104,12 +117,15 @@ impl DirectRes {
                         let archive = GzDecoder::new(archive);
                         let mut archive = Archive::new(archive);
 
-                        archive.unpack(target.path()).context(ErrorKind::CannotDownload)?;
+                        archive
+                            .unpack(target.path())
+                            .context(ErrorKind::CannotDownload)?;
 
                         Ok(())
                     }),
                 "file" => {
-                    let mut archive = fs::File::open(target.path()).context(ErrorKind::CannotDownload)?;
+                    let mut archive =
+                        fs::File::open(target.path()).context(ErrorKind::CannotDownload)?;
 
                     let hash = hexify_hash(
                         Sha256::digest_reader(&mut archive)
@@ -127,21 +143,43 @@ impl DirectRes {
                     let archive = GzDecoder::new(archive);
                     let mut archive = Archive::new(archive);
 
-                    archive.unpack(target.path()).context(ErrorKind::CannotDownload)?;
+                    archive
+                        .unpack(target.path())
+                        .context(ErrorKind::CannotDownload)?;
 
                     Ok(())
                 }
                 _ => Err(Error::from(ErrorKind::CannotDownload)),
             },
-            // TODO: Workspaces.
             DirectRes::Git { repo, tag } => {
-                // TODO: What should we do for git repos? Treat repos with different checked out
-                // branches/commits as one folder or different ones? If the former, we're going
-                // to have to make sure that only one instance of `elba` is running at a time so
-                // that multiple copies don't try simultaneously checking out different points
-                // of a shared git repo. The latter involves lots n lots n lots of duplication
-                unimplemented!()
-            },
+                // If we find a directory which already has a repo, we just check out the correct
+                // version of it. Whether or not a new dir is created isn't our job, that's for the
+                // Cache. If the Cache points to a directory that already exists, it means that the
+                // branch data or w/e is irrelevant.
+                let repo = if target.path().is_dir() {
+                    Repository::open(target.path()).context(ErrorKind::CannotDownload)?
+                // TODO: Update submodules...
+                // TODO: Fetch from remote...
+                } else {
+                    let url = repo.as_str();
+                    Repository::clone_recurse(url, target.path())
+                        .context(ErrorKind::CannotDownload)?
+                };
+
+                let branch = match tag {
+                    PkgGitSpecifier::Branch(a) => a,
+                    PkgGitSpecifier::Commit(a) => a,
+                    PkgGitSpecifier::Tag(a) => a,
+                };
+
+                let obj = repo
+                    .revparse_single(&branch)
+                    .context(ErrorKind::CannotDownload)?;
+                repo.checkout_tree(&obj, None)
+                    .context(ErrorKind::CannotDownload)?;
+
+                Ok(())
+            }
             DirectRes::Dir { url: _url } => {
                 // If this package is located on disk, we don't have to do anything...
                 Ok(())
@@ -159,12 +197,24 @@ impl FromStr for DirectRes {
         let url = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
 
         match utype {
-            "git" => unimplemented!(),
+            "git" => {
+                let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                let tag = url
+                    .fragment()
+                    .and_then(|s| PkgGitSpecifier::from_str(s).ok())
+                    .unwrap_or_else(PkgGitSpecifier::default);
+
+                url.set_fragment(None);
+                Ok(DirectRes::Git { repo: url, tag })
+            }
             "dir" => {
                 let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
                 if url.scheme() != "file" {
                     return Err(ErrorKind::InvalidSourceUrl)?;
                 }
+                // We manually do this because to_file_path always gives us an error :v It's dirty,
+                // but it Works(tm)
+                let url = PathBuf::from(&url.as_str()[7..]);
                 Ok(DirectRes::Dir { url })
             }
             "tar" => {
@@ -172,10 +222,7 @@ impl FromStr for DirectRes {
                 if url.scheme() != "http" || url.scheme() != "https" || url.scheme() != "file" {
                     return Err(ErrorKind::InvalidSourceUrl)?;
                 }
-                let cksum = url.fragment()
-                    .and_then(|x| {
-                        Checksum::from_str(x).ok()
-                    });
+                let cksum = url.fragment().and_then(|x| Checksum::from_str(x).ok());
                 url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
@@ -187,17 +234,23 @@ impl FromStr for DirectRes {
 impl fmt::Display for DirectRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DirectRes::Git {
-                repo: _repo,
-                tag: _tag,
-            } => unimplemented!(),
+            DirectRes::Git { repo, tag } => write!(f, "dir+{}#{}", repo, tag),
             DirectRes::Dir { url } => {
-                let url = url.as_str();
+                let url = Url::from_directory_path(url).unwrap();
                 write!(f, "dir+{}", url)
             }
             DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
-                write!(f, "tar+{}{}", url, if let Some(cksum) = cksum { "#".to_string() + &cksum.to_string() } else { "".to_string() },)
+                write!(
+                    f,
+                    "tar+{}{}",
+                    url,
+                    if let Some(cksum) = cksum {
+                        "#".to_string() + &cksum.to_string()
+                    } else {
+                        "".to_string()
+                    },
+                )
             }
         }
     }

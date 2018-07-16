@@ -1,10 +1,10 @@
 //! Configuration for Indices.
 
-use util::err::{Error, ErrorKind};
 use failure::ResultExt;
 use package::resolution::IndexRes;
 use std::str::FromStr;
 use toml;
+use util::err::{Error, ErrorKind};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct IndexConfig {

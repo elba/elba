@@ -5,7 +5,7 @@
 //! can be specified at once, and a default index can be specified in configuration for packages
 //! with version constraints but no explicitly specified index. By default, the official index is
 //! set to be the default.
-//! 
+//!
 //! The packages that the index offers must have a direct source: they cannot point to other
 //! registries. Because the package doesn't necessarily need to be a tarball stored somewhere,
 //! indices can serve to "curate" packages from disparate repositories and other sources (think
@@ -25,7 +25,6 @@
 mod config;
 
 use self::config::IndexConfig;
-use util::{err::{Error, ErrorKind}, lock::DirLock};
 use failure::ResultExt;
 use indexmap::IndexMap;
 use package::{
@@ -41,6 +40,10 @@ use std::{
     str::FromStr,
 };
 use url::Url;
+use util::{
+    err::{Error, ErrorKind},
+    lock::DirLock,
+};
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

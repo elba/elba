@@ -6,10 +6,10 @@ pub mod resolution;
 pub mod version;
 
 use self::resolution::Resolution;
-use util::err::*;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
+use util::err::*;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
@@ -206,8 +206,14 @@ impl FromStr for Checksum {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut s = s.splitn(2, '=');
         let fmt = s.next().unwrap();
-        let hash = s.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?.to_string();
-        Ok(Checksum { fmt: fmt.parse::<ChecksumFmt>()?, hash })
+        let hash = s
+            .next()
+            .ok_or_else(|| ErrorKind::InvalidSourceUrl)?
+            .to_string();
+        Ok(Checksum {
+            fmt: fmt.parse::<ChecksumFmt>()?,
+            hash,
+        })
     }
 }
 

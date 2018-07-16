@@ -13,7 +13,6 @@ use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
-use util::err::{Error, ErrorKind};
 use indexmap::IndexMap;
 use package::{
     version::{Constraint, Relation},
@@ -22,6 +21,7 @@ use package::{
 use retrieve::Retriever;
 use semver::Version;
 use std::cmp;
+use util::err::{Error, ErrorKind};
 
 #[derive(Debug)]
 pub struct Resolver {

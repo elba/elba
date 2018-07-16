@@ -1,20 +1,22 @@
 //! Package manifest files.
 
 use self::version::Constraint;
-use super::{resolution::IndexRes, *};
-use util::err::*;
+use super::{
+    resolution::{DirectRes, IndexRes},
+    *,
+};
 use failure::ResultExt;
 use indexmap::IndexMap;
 use semver::Version;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 use toml;
 use url::Url;
 use url_serde;
+use util::err::*;
 
 /// A relative file path (not module path)
 type PathV = String;
 
-// TODO: Workspaces. Maybe just have a Workspace.toml file.
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
     package: PackageInfo,
@@ -23,6 +25,8 @@ pub struct Manifest {
     #[serde(default = "IndexMap::new")]
     dev_dependencies: IndexMap<Name, DepReq>,
     targets: Targets,
+    #[serde(default)]
+    workspace: IndexMap<Name, String>,
 }
 
 impl Manifest {
@@ -58,8 +62,7 @@ pub enum DepReq {
         registry: IndexRes,
     },
     Local {
-        #[serde(with = "url_serde")]
-        path: Url,
+        path: PathBuf,
     },
     Git {
         #[serde(with = "url_serde")]
@@ -70,12 +73,70 @@ pub enum DepReq {
     },
 }
 
-#[derive(Deserialize, Debug)]
+impl DepReq {
+    pub fn into_dep(self, def_index: IndexRes, n: Name) -> (PackageId, Constraint) {
+        match self {
+            DepReq::Registry(c) => {
+                let pi = PackageId::new(n, def_index.into());
+                (pi, c)
+            }
+            DepReq::RegLong { con, registry } => {
+                let pi = PackageId::new(n, registry.into());
+                (pi, con)
+            }
+            DepReq::Local { path } => {
+                let res = DirectRes::Dir { url: path };
+                let pi = PackageId::new(n, res.into());
+                (pi, Constraint::any())
+            }
+            DepReq::Git { git, spec } => {
+                let res = DirectRes::Git {
+                    repo: git,
+                    tag: spec,
+                };
+                let pi = PackageId::new(n, res.into());
+                (pi, Constraint::any())
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum PkgGitSpecifier {
     Branch(String),
     Commit(String),
     Tag(String),
+}
+
+impl FromStr for PkgGitSpecifier {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut s = s.splitn(2, '=');
+        let fmt = s.next().unwrap();
+        let spec = s
+            .next()
+            .ok_or_else(|| ErrorKind::InvalidSourceUrl)?
+            .to_string();
+
+        match fmt {
+            "branch" => Ok(PkgGitSpecifier::Branch(spec)),
+            "commit" => Ok(PkgGitSpecifier::Commit(spec)),
+            "tag" => Ok(PkgGitSpecifier::Tag(spec)),
+            _ => Err(ErrorKind::InvalidSourceUrl)?,
+        }
+    }
+}
+
+impl fmt::Display for PkgGitSpecifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PkgGitSpecifier::Branch(a) => write!(f, "branch={}", a),
+            PkgGitSpecifier::Commit(a) => write!(f, "branch={}", a),
+            PkgGitSpecifier::Tag(a) => write!(f, "branch={}", a),
+        }
+    }
 }
 
 impl Default for PkgGitSpecifier {
@@ -105,22 +166,6 @@ struct Target {
 struct LibTarget {
     name: String,
     exports: Vec<PathV>,
-}
-
-#[derive(Deserialize, Debug)]
-struct Features {
-    default: Vec<String>,
-    #[serde(flatten)]
-    other: IndexMap<String, Vec<String>>,
-}
-
-impl Default for Features {
-    fn default() -> Self {
-        Features {
-            default: vec![],
-            other: IndexMap::new(),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -7,7 +7,6 @@
 pub mod cache;
 
 pub use self::cache::Cache;
-use util::err::{Error, ErrorKind};
 use index::Indices;
 use package::{
     lockfile::Lockfile,
@@ -17,6 +16,7 @@ use package::{
 };
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
+use util::err::{Error, ErrorKind};
 
 // TODO: Patching
 /// Retrieves the best packages using both the indices available and a lockfile.
@@ -107,7 +107,10 @@ impl Retriever {
 
         // If this is a DirectRes dep, we ask the cache for info.
         if let Resolution::Direct(loc) = pkg.resolution() {
-            let deps = self.cache.metadata(pkg.id(), loc, Some(pkg.version()))?.deps;
+            let deps = self
+                .cache
+                .metadata(pkg.id(), loc, Some(pkg.version()))?
+                .deps;
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(

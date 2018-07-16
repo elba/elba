@@ -48,14 +48,13 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use util::err::{Error, ErrorKind};
 use failure::ResultExt;
 use indexmap::IndexMap;
 use package::{
-    manifest::{DepReq, Manifest},
+    manifest::Manifest,
     resolution::{DirectRes, IndexRes},
     version::Constraint,
-    Name, PackageId, Summary
+    Name, PackageId, Summary,
 };
 use reqwest::Client;
 use semver::Version;
@@ -66,6 +65,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
+use util::err::{Error, ErrorKind};
 use util::{hexify_hash, lock::DirLock};
 
 /// Metadata for a package in the Cache.
@@ -115,9 +115,14 @@ impl Cache {
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary. This should
     /// only be used for non-index dependencies.
-    pub fn metadata(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<CacheMeta, Error> {
+    pub fn metadata(
+        &self,
+        pkg: &PackageId,
+        loc: &DirectRes,
+        v: Option<&Version>,
+    ) -> Result<CacheMeta, Error> {
         let p = self.load(pkg, loc, v)?;
-        let mf_path = p.join("Cargo.toml");
+        let mf_path = p.path().join("Cargo.toml");
 
         let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
         let mut file = BufReader::new(file);
@@ -131,7 +136,7 @@ impl Cache {
 
         // We ignore dev-dependencies because those are only relevant if that package is the root
         for (n, dep) in manifest.dependencies {
-            let (pid, c) = self.depreq_to_tuple(n, dep);
+            let (pid, c) = dep.into_dep(self.def_index.clone(), n);
             deps.insert(pid, c);
         }
 
@@ -146,32 +151,37 @@ impl Cache {
     // https://stackoverflow.com/questions/49087958/getting-multiple-urls-concurrently-with-hyper
     // Info on downloading things in general:
     // https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html
-    // TODO: Return dirlock?
     /// Returns a future pointing to the path to a downloaded (and potentially extracted, if it's a
     /// tarball) package.
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    pub fn load(&self, pkg: &PackageId, loc: &DirectRes, v: Option<&Version>) -> Result<PathBuf, Error> {
+    pub fn load(
+        &self,
+        pkg: &PackageId,
+        loc: &DirectRes,
+        v: Option<&Version>,
+    ) -> Result<DirLock, Error> {
         if let Some(path) = self.check(pkg.name(), loc, v) {
-            Ok(path)
+            DirLock::acquire(path)
         } else {
             let mut p = self.location.clone();
             p.push("src");
             p.push(Self::get_src_dir(pkg.name(), loc, v));
 
-            let dir = DirLock::acquire(&p).context(ErrorKind::Locked)?;
+            let dir = DirLock::acquire(&p)?;
             loc.retrieve(&self.client, &dir)?;
 
-            Ok(p)
+            Ok(dir)
         }
     }
 
+    // TODO: Workspaces for git repos.
     /// Check if package is downloaded and in the cache. If so, returns the path of the cached
     /// package.
     pub fn check(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
         if let DirectRes::Dir { url } = loc {
-            return Some(url.to_file_path().unwrap());
+            return Some(url.clone());
         }
 
         let mut path = self.location.clone();
@@ -187,25 +197,39 @@ impl Cache {
     /// Gets the corresponding directory of a package. We need this because for packages which have
     /// no associated version (i.e. git and local dependencies, where the constraints are inherent
     /// in the resolution itself), we ignore a version specifier.
+    ///
+    /// Note: with regard to git repos, we treat the same repo with different checked out commits/
+    /// tags as completely different repos.
     fn get_src_dir(name: &Name, loc: &DirectRes, v: Option<&Version>) -> String {
         let mut hasher = Sha256::default();
         hasher.input(name.as_bytes());
         hasher.input(loc.to_string().as_bytes());
         if let Some(v) = v {
-            if let DirectRes::Tar { url: _url, cksum: _cksum } = loc {
-                hasher.input(v.to_string().as_bytes());
-            }
+            hasher.input(v.to_string().as_bytes());
         }
         let hash = hexify_hash(hasher.result().as_slice());
 
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
+    pub fn lock_build_dir(
+        &self,
+        sum: &Summary,
+        loc: &DirectRes,
+        env: Vec<(PackageId, Version)>,
+    ) -> Result<DirLock, Error> {
+        let path = self
+            .location
+            .join("build")
+            .join(Self::get_build_dir(sum, loc, env));
+        DirLock::acquire(path)
+    }
+
     /// Gets the corresponding directory of a built package (with ibc files). This directory is
     /// different from the directory for downloads because the hash takes into consideration more
     /// factors, like the complete environment that the package was built in (i.e. all of the
     /// exact dependencies used for this build of the package).
-    /// 
+    ///
     /// This is necessary because Idris libraries can re-export values of its dependencies; when a
     /// dependent value changes, it changes in the library itself, causing the generated ibc to be
     /// totally different. The same package with the same constraints can be resolved with
@@ -222,24 +246,5 @@ impl Cache {
         let hash = hexify_hash(hasher.result().as_slice());
 
         format!("{}_{}-{}", sum.name().group(), sum.name().name(), hash)
-    }
-
-    fn depreq_to_tuple(&self, n: Name, i: DepReq) -> (PackageId, Constraint) {
-        match i {
-            DepReq::Registry(c) => {
-                let pi = PackageId::new(n, self.def_index.clone().into());
-                (pi, c)
-            }
-            DepReq::RegLong { con, registry } => {
-                let pi = PackageId::new(n, registry.into());
-                (pi, con)
-            }
-            DepReq::Local { path } => {
-                let res = DirectRes::Dir { url: path };
-                let pi = PackageId::new(n, res.into());
-                (pi, Constraint::any())
-            }
-            DepReq::Git { git, spec } => unimplemented!(),
-        }
     }
 }

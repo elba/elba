@@ -1,7 +1,7 @@
 extern crate elba;
 extern crate url;
 
-use elba::{index::Index, package::Name};
+use elba::{index::Index, package::Name, util::lock::DirLock};
 use std::{path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -12,7 +12,7 @@ fn index_success() {
     let mut path = PathBuf::new();
     path.push(start);
     path.push("tests/data/index");
-
+    let path = DirLock::acquire(path).unwrap();
     let i = Index::from_disk(url, path).unwrap();
 
     let vs = i.entries(&Name::from_str("no_conflict/root").unwrap());

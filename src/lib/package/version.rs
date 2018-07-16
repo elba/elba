@@ -25,13 +25,13 @@
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
 
 use self::Interval::{Closed, Open, Unbounded};
-use util::err::{Error, ErrorKind};
 use indexmap::IndexSet;
 use itertools::Itertools;
 use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{cmp, fmt, str::FromStr};
+use util::err::{Error, ErrorKind};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Relation {
