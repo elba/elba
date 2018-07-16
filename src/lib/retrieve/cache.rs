@@ -205,7 +205,15 @@ impl Cache {
         hasher.input(name.as_bytes());
         hasher.input(loc.to_string().as_bytes());
         if let Some(v) = v {
-            hasher.input(v.to_string().as_bytes());
+            // We only care about the version of the package at this source directory if it came
+            // from a tarball
+            if let DirectRes::Tar {
+                url: _url,
+                cksum: _cksum,
+            } = loc
+            {
+                hasher.input(v.to_string().as_bytes());
+            }
         }
         let hash = hexify_hash(hasher.result().as_slice());
 
