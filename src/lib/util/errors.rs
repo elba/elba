@@ -1,9 +1,12 @@
 // `err,rs` - because nothing ever goes right
 
+use std::process::{ExitStatus, Output};
+
 // TODO: More principled error handling.
 //       Manifests and Constraints and whatever all have their own error enums. This kind enum just
 //       provides context as to the error. So we'd have `ReqError::InvalidSigil` contextualized
 //       with an `ErrorKind::InvalidLockfile`, etc.
+// TODO: Intend to split this big enum into small structs error.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
     #[fail(display = "Invalid lockfile.")]
@@ -33,4 +36,13 @@ pub enum ErrorKind {
     #[doc(hidden)]
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,
+}
+
+/// Process errors
+#[derive(Debug, Fail)]
+#[fail(display = "{}", desc)]
+pub struct ProcessError {
+    pub desc: String,
+    pub exit: Option<ExitStatus>,
+    pub output: Option<Output>,
 }

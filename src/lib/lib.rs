@@ -18,6 +18,7 @@ extern crate serde_derive;
 extern crate semver;
 extern crate serde_json;
 extern crate sha2;
+extern crate shell_escape;
 #[macro_use]
 extern crate slog;
 extern crate symlink;
