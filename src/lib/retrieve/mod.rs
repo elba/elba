@@ -16,35 +16,42 @@ use package::{
 };
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
+use slog::Logger;
 use util::err::{Error, ErrorKind};
 
 // TODO: Patching
+// TODO: Multiple root packages so we can support workspaces
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
 #[derive(Debug)]
-pub struct Retriever {
+pub struct Retriever<'cache> {
     /// The local cache of packages.
-    cache: Cache,
+    cache: &'cache Cache,
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
     indices: Indices,
     lockfile: Lockfile,
+    pub logger: Logger,
 }
 
-impl Retriever {
+impl<'cache> Retriever<'cache> {
     pub fn new(
-        cache: Cache,
+        plog: &Logger,
+        cache: &'cache Cache,
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
         indices: Indices,
         lockfile: Lockfile,
     ) -> Self {
+        let logger = plog.new(o!("root" => root.to_string()));
+
         Retriever {
             cache,
             root,
             root_deps,
             indices,
             lockfile,
+            logger,
         }
     }
 

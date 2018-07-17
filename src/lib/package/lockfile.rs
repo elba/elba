@@ -90,8 +90,6 @@ dependencies = [
 ]
         "#;
 
-        println!("{:#?}", Lockfile::from_str(lockfile));
-
         assert!(Lockfile::from_str(lockfile).is_ok());
     }
 }

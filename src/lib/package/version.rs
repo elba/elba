@@ -976,10 +976,7 @@ mod tests {
     fn test_parse_range_manual() {
         let vs = vec![">= 1.0.0 < 2.0.0", ">= 1.0.0", "< 2.0.0"]
             .into_iter()
-            .map(|s| {
-                println!("{:#?}", range(CompleteStr(s)));
-                range(CompleteStr(s)).unwrap().1
-            })
+            .map(|s| range(CompleteStr(s)).unwrap().1)
             .collect::<Vec<_>>();
 
         let ns = vec![

@@ -17,7 +17,5 @@ fn index_success() {
 
     let vs = i.entries(&Name::from_str("no_conflict/root").unwrap());
 
-    println!("{:#?}", vs);
-
     assert!(vs.is_ok())
 }

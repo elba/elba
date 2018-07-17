@@ -20,11 +20,12 @@ use package::{
 };
 use retrieve::Retriever;
 use semver::Version;
+use slog::Logger;
 use std::cmp;
 use util::err::{Error, ErrorKind};
 
 #[derive(Debug)]
-pub struct Resolver {
+pub struct Resolver<'cache> {
     /// The current step.
     step: u16,
     level: u16,
@@ -33,11 +34,12 @@ pub struct Resolver {
     derivations: IndexMap<PackageId, (bool, Constraint)>,
     incompats: Vec<Incompatibility>,
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
-    retriever: Retriever,
+    retriever: &'cache mut Retriever<'cache>,
+    pub logger: Logger,
 }
 
-impl Resolver {
-    pub fn new(retriever: Retriever) -> Self {
+impl<'cache> Resolver<'cache> {
+    pub fn new(plog: &Logger, retriever: &'cache mut Retriever<'cache>) -> Self {
         let step = 1;
         let level = 0;
         let assignments = vec![];
@@ -45,6 +47,7 @@ impl Resolver {
         let incompat_ixs = indexmap!();
         let decisions = indexmap!();
         let derivations = indexmap!();
+        let logger = plog.new(o!("phase" => "resolve"));
         Resolver {
             step,
             level,
@@ -54,15 +57,19 @@ impl Resolver {
             decisions,
             derivations,
             retriever,
+            logger,
         }
     }
 
     pub fn solve(&mut self) -> Result<(), String> {
+        info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
         if r.is_err() {
+            error!(self.logger, "solve failed");
             Err(self.pp_error(self.incompats.len() - 1))
         } else {
+            info!(self.logger, "solve successful");
             Ok(())
         }
     }
@@ -169,7 +176,7 @@ impl Resolver {
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
         let mut inc = inc;
         let mut new_incompatibility = false;
-
+        debug!(self.logger, "entering conflict resolution");
         while !self.is_failure(&self.incompats[inc]) {
             let i = self.incompats[inc].clone();
             let mut most_recent_term: Option<(&PackageId, &Constraint)> = None;
@@ -279,8 +286,9 @@ impl Resolver {
 
     fn backtrack(&mut self, previous_satisfier_level: u16) {
         let mut packages = indexset!();
+        debug!(self.logger, "backtracking"; "from" => self.level, "to" => previous_satisfier_level);
         self.level = previous_satisfier_level;
-
+        
         loop {
             let last = self.assignments.pop().unwrap();
             if last.level() > previous_satisfier_level {
@@ -615,6 +623,13 @@ impl Resolver {
 
     fn decision(&mut self, pkg: PackageId, version: Version) {
         self.level += 1;
+        debug!(
+            self.logger, "new decision";
+            "step" => self.step,
+            "level" => self.level,
+            "package" => pkg.to_string(),
+            "version" => version.to_string()
+        );
         let a = Assignment::new(
             self.step,
             self.level,
@@ -627,6 +642,13 @@ impl Resolver {
     }
 
     fn derivation(&mut self, pkg: PackageId, c: Constraint, cause: usize, positive: bool) {
+        debug!(
+            self.logger, "new derivation";
+            "step" => self.step,
+            "level" => self.level,
+            "package" => pkg.to_string(),
+            "constraint" => c.to_string()
+        );
         let a = Assignment::new(
             self.step,
             self.level,

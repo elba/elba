@@ -18,14 +18,16 @@ extern crate serde_derive;
 extern crate semver;
 extern crate serde_json;
 extern crate sha2;
+#[macro_use]
+extern crate slog;
 extern crate symlink;
 extern crate tar;
 extern crate toml;
 extern crate url;
 extern crate url_serde;
 
+pub mod build;
 pub mod cli;
-pub mod compiler;
 pub mod config;
 pub mod index;
 pub mod package;

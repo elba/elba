@@ -59,6 +59,7 @@ use package::{
 use reqwest::Client;
 use semver::Version;
 use sha2::{Digest, Sha256};
+use slog::Logger;
 use std::{
     fs,
     io::{prelude::*, BufReader},
@@ -92,10 +93,11 @@ pub struct Cache {
     location: PathBuf,
     def_index: IndexRes,
     client: Client,
+    pub logger: Logger,
 }
 
 impl Cache {
-    pub fn from_disk(location: PathBuf, def_index: IndexRes) -> Self {
+    pub fn from_disk(plog: &Logger, location: PathBuf, def_index: IndexRes) -> Self {
         let mut loc = location.clone();
         loc.push("src");
         let _ = fs::create_dir_all(&loc);
@@ -105,11 +107,13 @@ impl Cache {
         let _ = fs::create_dir_all(&loc);
 
         let client = Client::new();
+        let logger = plog.new(o!("location" => loc.to_string_lossy().into_owned()));
 
         Cache {
             location,
             def_index,
             client,
+            logger,
         }
     }
 

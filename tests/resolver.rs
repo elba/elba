@@ -1,5 +1,11 @@
 extern crate elba;
+#[macro_use]
+extern crate lazy_static;
 extern crate semver;
+#[macro_use]
+extern crate slog;
+extern crate slog_async;
+extern crate slog_term;
 extern crate url;
 
 use elba::{
@@ -14,8 +20,14 @@ use elba::{
     util::lock::DirLock,
 };
 use semver::Version;
+use slog::*;
 use std::{path::PathBuf, str::FromStr};
 use url::Url;
+
+lazy_static! {
+    static ref LOGGER: Logger = new_logger();
+    static ref CACHE: Cache = cache();
+}
 
 macro_rules! sum {
     ($a:tt, $b:tt) => {{
@@ -26,6 +38,14 @@ macro_rules! sum {
         );
         Summary::new(root_pkg, Version::parse($b).unwrap())
     }};
+}
+
+fn new_logger() -> Logger {
+    let decorator = slog_term::TermDecorator::new().build();
+    let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+
+    Logger::root(drain, o!())
 }
 
 fn indices() -> Indices {
@@ -50,10 +70,10 @@ fn cache() -> Cache {
     path.push("tests/data/cache");
 
     let def_ix = IndexRes { url: ix_url };
-    Cache::from_disk(path, def_ix)
+    Cache::from_disk(&LOGGER, path, def_ix)
 }
 
-fn resolver(root: Summary) -> Resolver {
+fn retriever(root: Summary) -> Retriever<'static> {
     let mut ixs = indices();
 
     let root_deps = ixs
@@ -65,52 +85,56 @@ fn resolver(root: Summary) -> Resolver {
         .map(|d| (PackageId::new(d.name, Resolution::Index(d.index)), d.req))
         .collect::<Vec<_>>();
 
-    let retriever = Retriever::new(cache(), root, root_deps, ixs, Lockfile::default());
+    Retriever::new(&CACHE.logger.clone(), &CACHE, root, root_deps, ixs, Lockfile::default())
+}
 
-    Resolver::new(retriever)
+fn resolver<'a>(retriever: &'a mut Retriever<'a>) -> Resolver<'a> {
+    Resolver::new(&retriever.logger.clone(), retriever)
 }
 
 #[test]
 fn resolve_no_conflict() {
-    let mut resolver = resolver(sum!("no_conflict/root", "1.0.0"));
+    let mut retriever = retriever(sum!("no_conflict/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
 
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_avoid_conflict() {
-    let mut resolver = resolver(sum!("avoid_conflict/root", "1.0.0"));
+    let mut retriever = retriever(sum!("avoid_conflict/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
 
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_res_simple() {
-    let mut resolver = resolver(sum!("conflict_res_simple/root", "1.0.0"));
+    let mut retriever = retriever(sum!("conflict_res_simple/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
 
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_res_partial() {
-    let mut resolver = resolver(sum!("conflict_res_partial/root", "1.0.0"));
+    let mut retriever = retriever(sum!("conflict_res_partial/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_simple_report() {
-    let mut resolver = resolver(sum!("conflict_simple/root", "1.0.0"));
+    let mut retriever = retriever(sum!("conflict_simple/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
     let msg = resolver.solve();
-    println!();
-    println!("{}", msg.clone().unwrap_err());
     assert!(msg.is_err())
 }
 
 #[test]
 fn resolve_conflict_complex_report() {
-    let mut resolver = resolver(sum!("conflict_complex/root", "1.0.0"));
+    let mut retriever = retriever(sum!("conflict_complex/root", "1.0.0"));
+    let mut resolver = resolver(&mut retriever);
     let msg = resolver.solve();
-    println!();
-    println!("{}", msg.clone().unwrap_err());
     assert!(msg.is_err())
 }
