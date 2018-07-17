@@ -1,5 +1,5 @@
 use super::{manifest::PkgGitSpecifier, Checksum};
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::Repository;
 use reqwest::Client;
@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
 use tar::Archive;
 use url::Url;
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 use util::{hexify_hash, lock::DirLock};
 
 /// The possible places from which a package can be resolved.

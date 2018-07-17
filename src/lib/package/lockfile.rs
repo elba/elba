@@ -7,7 +7,7 @@
 // If we do, when we make a new resolution in which a PackageId is shared between lockfile and
 // resolution (derived from indices and cache) but checksums differ, we should panic.
 
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use toml;
 

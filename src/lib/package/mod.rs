@@ -6,10 +6,11 @@ pub mod resolution;
 pub mod version;
 
 use self::resolution::Resolution;
+use failure::Error;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
-use util::err::*;
+use util::errors::ErrorKind;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?

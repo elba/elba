@@ -48,7 +48,7 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
     manifest::Manifest,
@@ -66,7 +66,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 use util::{hexify_hash, lock::DirLock};
 
 /// Metadata for a package in the Cache.

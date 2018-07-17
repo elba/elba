@@ -1,6 +1,6 @@
 //! Utility functions.
 
-pub mod err;
+pub mod errors;
 pub mod lock;
 
 /// Turns an SHA2 hash into a nice hexified string.

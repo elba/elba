@@ -13,6 +13,7 @@ use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
+use failure::Error;
 use indexmap::IndexMap;
 use package::{
     version::{Constraint, Relation},
@@ -22,7 +23,7 @@ use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
 use std::cmp;
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 
 #[derive(Debug)]
 pub struct Resolver<'cache> {
@@ -288,7 +289,7 @@ impl<'cache> Resolver<'cache> {
         let mut packages = indexset!();
         debug!(self.logger, "backtracking"; "from" => self.level, "to" => previous_satisfier_level);
         self.level = previous_satisfier_level;
-        
+
         loop {
             let last = self.assignments.pop().unwrap();
             if last.level() > previous_satisfier_level {
