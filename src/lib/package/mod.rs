@@ -106,24 +106,28 @@ impl AsRef<str> for Name {
         self.as_str()
     }
 }
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PackageId {
+    inner: Rc<PackageIdInner>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct PackageIdInner {
     pub name: Name,
     pub resolution: Resolution,
 }
 
 impl PackageId {
     pub fn new(name: Name, resolution: Resolution) -> Self {
-        PackageId { name, resolution }
+        PackageId { inner: Rc::new(PackageIdInner { name, resolution }) }
     }
 
     pub fn name(&self) -> &Name {
-        &self.name
+        &self.inner.name
     }
 
     pub fn resolution(&self) -> &Resolution {
-        &self.resolution
+        &self.inner.resolution
     }
 }
 
@@ -138,19 +142,19 @@ impl FromStr for PackageId {
         let name = Name::from_str(name)?;
         let resolution = Resolution::from_str(url)?;
 
-        Ok(PackageId { name, resolution })
+        Ok(PackageId::new(name, resolution))
     }
 }
 
 impl fmt::Debug for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PackageId(\"{}@{}\")", self.name, self.resolution)
+        write!(f, "PackageId(\"{}@{}\")", self.name(), self.resolution())
     }
 }
 
 impl fmt::Display for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{}", self.name, self.resolution)
+        write!(f, "{}@{}", self.name(), self.resolution())
     }
 }
 
@@ -259,11 +263,11 @@ impl Summary {
     }
 
     pub fn name(&self) -> &Name {
-        &self.id.name
+        &self.id.name()
     }
 
     pub fn resolution(&self) -> &Resolution {
-        &self.id.resolution
+        &self.id.resolution()
     }
 
     pub fn version(&self) -> &Version {

@@ -176,7 +176,7 @@ impl<'cache> Resolver<'cache> {
     fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
         let mut inc = inc;
         let mut new_incompatibility = false;
-        debug!(self.logger, "entering conflict resolution");
+        trace!(self.logger, "entering conflict resolution");
         while !self.is_failure(&self.incompats[inc]) {
             let i = self.incompats[inc].clone();
             let mut most_recent_term: Option<(&PackageId, &Constraint)> = None;
@@ -286,7 +286,7 @@ impl<'cache> Resolver<'cache> {
 
     fn backtrack(&mut self, previous_satisfier_level: u16) {
         let mut packages = indexset!();
-        debug!(self.logger, "backtracking"; "from" => self.level, "to" => previous_satisfier_level);
+        trace!(self.logger, "backtracking"; "from" => self.level, "to" => previous_satisfier_level);
         self.level = previous_satisfier_level;
         
         loop {
@@ -623,7 +623,7 @@ impl<'cache> Resolver<'cache> {
 
     fn decision(&mut self, pkg: PackageId, version: Version) {
         self.level += 1;
-        debug!(
+        trace!(
             self.logger, "new decision";
             "step" => self.step,
             "level" => self.level,
@@ -642,7 +642,7 @@ impl<'cache> Resolver<'cache> {
     }
 
     fn derivation(&mut self, pkg: PackageId, c: Constraint, cause: usize, positive: bool) {
-        debug!(
+        trace!(
             self.logger, "new derivation";
             "step" => self.step,
             "level" => self.level,
