@@ -41,11 +41,14 @@ macro_rules! sum {
 }
 
 fn new_logger() -> Logger {
+    /*
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::CompactFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
+    */
 
-    Logger::root(drain, o!())
+    // I don't wanna see no logging output!
+    Logger::root(slog::Discard, o!())
 }
 
 fn indices() -> Indices {
@@ -85,7 +88,14 @@ fn retriever(root: Summary) -> Retriever<'static> {
         .map(|d| (PackageId::new(d.name, Resolution::Index(d.index)), d.req))
         .collect::<Vec<_>>();
 
-    Retriever::new(&CACHE.logger.clone(), &CACHE, root, root_deps, ixs, Lockfile::default())
+    Retriever::new(
+        &CACHE.logger.clone(),
+        &CACHE,
+        root,
+        root_deps,
+        ixs,
+        Lockfile::default(),
+    )
 }
 
 fn resolver<'a>(retriever: &'a mut Retriever<'a>) -> Resolver<'a> {
@@ -95,38 +105,35 @@ fn resolver<'a>(retriever: &'a mut Retriever<'a>) -> Resolver<'a> {
 #[test]
 fn resolve_no_conflict() {
     let mut retriever = retriever(sum!("no_conflict/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
-
+    let resolver = resolver(&mut retriever);
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_avoid_conflict() {
     let mut retriever = retriever(sum!("avoid_conflict/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
-
+    let resolver = resolver(&mut retriever);
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_res_simple() {
     let mut retriever = retriever(sum!("conflict_res_simple/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
-
+    let resolver = resolver(&mut retriever);
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_res_partial() {
     let mut retriever = retriever(sum!("conflict_res_partial/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
+    let resolver = resolver(&mut retriever);
     assert!(resolver.solve().is_ok())
 }
 
 #[test]
 fn resolve_conflict_simple_report() {
     let mut retriever = retriever(sum!("conflict_simple/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
+    let resolver = resolver(&mut retriever);
     let msg = resolver.solve();
     assert!(msg.is_err())
 }
@@ -134,7 +141,7 @@ fn resolve_conflict_simple_report() {
 #[test]
 fn resolve_conflict_complex_report() {
     let mut retriever = retriever(sum!("conflict_complex/root", "1.0.0"));
-    let mut resolver = resolver(&mut retriever);
+    let resolver = resolver(&mut retriever);
     let msg = resolver.solve();
     assert!(msg.is_err())
 }

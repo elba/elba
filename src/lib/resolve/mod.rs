@@ -18,10 +18,11 @@ use package::{
     version::{Constraint, Relation},
     PackageId, Summary,
 };
+use petgraph::Graph;
 use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
-use std::cmp;
+use std::{cmp, collections::VecDeque};
 use util::err::{Error, ErrorKind};
 
 #[derive(Debug)]
@@ -61,7 +62,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), String> {
+    pub fn solve(mut self) -> Result<Graph<Summary, ()>, String> {
         info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
@@ -70,11 +71,11 @@ impl<'cache> Resolver<'cache> {
             Err(self.pp_error(self.incompats.len() - 1))
         } else {
             info!(self.logger, "solve successful");
-            Ok(())
+            Ok(r.unwrap())
         }
     }
 
-    fn solve_loop(&mut self) -> Result<(), Error> {
+    fn solve_loop(&mut self) -> Result<Graph<Summary, ()>, Error> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -85,8 +86,41 @@ impl<'cache> Resolver<'cache> {
             next = self.choose_pkg_version();
         }
 
-        // TODO: Return the solution!
-        Ok(())
+        // To build the tree, we're gonna go through all our dependencies and get their deps,
+        // and build our tree with a BFS. It's one last inefficient process before we have our
+        // nice resolution... oh well.
+        let mut tree = Graph::new();
+        let mut set = indexmap!();
+        let mut q = VecDeque::new();
+        let root = self.retriever.root().clone();
+        let root_node = tree.add_node(root.clone());
+        set.insert(root, root_node);
+        q.push_back(root_node);
+
+        while let Some(pid) = q.pop_front() {
+            // At this point, we know there has to be dependencies for these packages.
+            let deps = self.retriever.incompats(&tree[pid]).unwrap();
+            for inc in deps {
+                let pkg = inc.deps.get_index(1).unwrap().0;
+                let ver = &self.decisions[pkg];
+                let sum = Summary::new(pkg.clone(), ver.clone());
+
+                let nix = if set.contains_key(&sum) {
+                    set[&sum]
+                // We don't push to q here because if it's already in the set, the else must
+                // have run before, meaning it's already been in the q.
+                } else {
+                    let nix = tree.add_node(sum.clone());
+                    set.insert(sum, nix);
+                    q.push_back(nix);
+                    nix
+                };
+
+                tree.add_edge(pid, nix, ());
+            }
+        }
+
+        Ok(tree)
     }
 
     // 1: Unit propagation
@@ -288,7 +322,7 @@ impl<'cache> Resolver<'cache> {
         let mut packages = indexset!();
         trace!(self.logger, "backtracking"; "from" => self.level, "to" => previous_satisfier_level);
         self.level = previous_satisfier_level;
-        
+
         loop {
             let last = self.assignments.pop().unwrap();
             if last.level() > previous_satisfier_level {

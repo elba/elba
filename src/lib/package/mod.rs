@@ -119,7 +119,9 @@ pub struct PackageIdInner {
 
 impl PackageId {
     pub fn new(name: Name, resolution: Resolution) -> Self {
-        PackageId { inner: Rc::new(PackageIdInner { name, resolution }) }
+        PackageId {
+            inner: Rc::new(PackageIdInner { name, resolution }),
+        }
     }
 
     pub fn name(&self) -> &Name {
