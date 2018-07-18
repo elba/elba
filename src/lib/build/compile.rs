@@ -5,17 +5,17 @@ use std::path::PathBuf;
 
 use failure::{err_msg, Error};
 
-use super::{BuildContext, TargetDir};
+use super::context::{BuildConfig, BuildContext, BuildDir};
 
 #[derive(Debug)]
 pub struct CompileInvocation {
     src: PathBuf,
     deps_build: Vec<PathBuf>,
-    target_dir: TargetDir,
+    build_dir: BuildDir,
 }
 
 impl CompileInvocation {
-    pub fn excute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
+    pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
         for dep in &self.deps_build {
             if dep
                 .extension()
@@ -29,7 +29,7 @@ impl CompileInvocation {
             let dep_file_name = dep
                 .file_name()
                 .ok_or(err_msg("Dependency build refs to a non-file"))?;
-            fs::copy(dep, self.target_dir.build.join(dep_file_name))?;
+            fs::copy(dep, self.build_dir.build.join(dep_file_name))?;
         }
 
         // TODO: Error struct
@@ -37,7 +37,7 @@ impl CompileInvocation {
             .src
             .file_name()
             .ok_or(err_msg("Src refs to a non-file"))?;
-        let src_dest = self.target_dir.build.join(src_file_name);
+        let src_dest = self.build_dir.build.join(src_file_name);
         fs::copy(&self.src, &src_dest)?;
 
         let mut target = src_dest.clone();
@@ -46,7 +46,7 @@ impl CompileInvocation {
         // Invoke compiler
         bcx.compiler
             .process()
-            .cwd(&self.target_dir.build)
+            .cwd(&self.build_dir.build)
             .arg("--check")
             .arg(src_file_name)
             .exec()?;
@@ -60,8 +60,10 @@ impl CompileInvocation {
 
         fs::copy(
             &target,
-            self.target_dir.root.join(&target.file_name().unwrap()),
+            self.build_dir.root.join(&target.file_name().unwrap()),
         )?;
+
+        fs::remove_dir_all(&self.build_dir.build)?;
 
         Ok(())
     }
@@ -71,18 +73,17 @@ impl CompileInvocation {
 pub struct CodegenInvocation {
     src: PathBuf,
     output: String,
-    target_dir: TargetDir,
+    backend: String,
+    build_dir: BuildDir,
 }
 
 impl CodegenInvocation {
-    pub fn excute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
-        let backend: &str = bcx.cfg.backend.as_ref().unwrap();
-
+    pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
         // Invoke compiler
         bcx.compiler
             .process()
-            .cwd(&self.target_dir.root)
-            .args(&["--codegen", backend])
+            .cwd(&self.build_dir.root)
+            .args(&["--codegen", &self.backend])
             .args(&["-o", &self.output])
             .arg(&self.src)
             .exec()?;

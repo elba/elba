@@ -11,8 +11,6 @@ use shell_escape::escape;
 use util::errors::ProcessError;
 
 /// A builder object for an external process, similar to `std::process::Command`.
-// TODO: move ProcessBuilder into utils once we need to invoke process
-// by other modules
 #[derive(Clone, Debug)]
 pub struct ProcessBuilder {
     /// The program to execute.
