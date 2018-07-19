@@ -2,7 +2,6 @@
 
 pub mod errors;
 pub mod lock;
-pub mod process_builder;
 
 /// Turns an SHA2 hash into a nice hexified string.
 pub fn hexify_hash(hash: &[u8]) -> String {

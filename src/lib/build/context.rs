@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 
 use failure::Error;
 use petgraph::Graph;
 
 use package::Summary;
 use util::lock::DirLock;
-use util::process_builder::ProcessBuilder;
 
 /// An unit that elba knows how to build it
 // #[derive(Debug)]
@@ -51,8 +51,8 @@ impl Compiler {
         }
     }
 
-    /// Get a process builder set up to use the found compiler
-    pub fn process(&self) -> ProcessBuilder {
-        ProcessBuilder::new(&self.path)
+    /// Get a process set up to use the found compiler
+    pub fn process(&self) -> Command {
+        Command::new(&self.path)
     }
 }

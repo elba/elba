@@ -19,7 +19,7 @@ pub struct CompileInvocation {
 
 impl CompileInvocation {
     pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
-        // Setup file structure of dependencies 
+        // set up file structure of dependencies
         for (name, dep_build) in &self.dep_builds {
             if dep_build
                 .extension()
@@ -47,13 +47,13 @@ impl CompileInvocation {
         let mut target = src_dest.clone();
         target.set_extension("ibc");
 
-        // Invoke compiler
+        // invoke compiler
         bcx.compiler
             .process()
-            .cwd(&self.build_dir.build)
+            .current_dir(&self.build_dir.build)
             .arg("--check")
             .arg(src_file_name)
-            .exec()?;
+            .spawn()?;
 
         if !target.exists() {
             bail!(
@@ -83,14 +83,14 @@ pub struct CodegenInvocation {
 
 impl CodegenInvocation {
     pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
-        // Invoke compiler
+        // invoke compiler
         bcx.compiler
             .process()
-            .cwd(&self.build_dir.root)
+            .current_dir(&self.build_dir.root)
             .args(&["--codegen", &self.backend])
             .args(&["-o", &self.output])
             .arg(&self.src)
-            .exec()?;
+            .spawn()?;
 
         Ok(())
     }

@@ -37,12 +37,3 @@ pub enum ErrorKind {
     #[fail(display = "This should be impossible")]
     __Nonexhaustive,
 }
-
-/// Process errors
-#[derive(Debug, Fail)]
-#[fail(display = "{}", desc)]
-pub struct ProcessError {
-    pub desc: String,
-    pub exit: Option<ExitStatus>,
-    pub output: Option<Output>,
-}
