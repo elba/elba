@@ -1,4 +1,8 @@
-# elba - a package manager for Idris
+# elba
+[![Build Status](https://travis-ci.com/dcao/elba.svg?branch=master)](https://travis-ci.com/dcao/elba)
+
+A modern and (hopefully!) fast package manager for Idris.
+
 ## Installation
 `elba` is written in Rust, so the Cargo and the Rust compiler are required for building.
 
