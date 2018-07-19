@@ -1,12 +1,6 @@
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-
-use failure::Error;
-use petgraph::Graph;
-
 use package::Summary;
-use util::lock::DirLock;
+use petgraph::Graph;
+use std::{path::PathBuf, process::Command};
 
 /// An unit that elba knows how to build it
 // #[derive(Debug)]
@@ -44,15 +38,22 @@ pub struct Compiler {
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    // TODO: Actually lookup the complier instead of the hard-coded string.
+    // TODO: Actually lookup the compiler instead of the hard-coded string.
     pub fn new() -> Compiler {
-        Compiler {
-            path: PathBuf::from("idris"),
-        }
+        Compiler::default()
     }
 
     /// Get a process set up to use the found compiler
     pub fn process(&self) -> Command {
         Command::new(&self.path)
+    }
+}
+
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Compiler {
+            path: PathBuf::from("idris"),
+        }
     }
 }

@@ -48,7 +48,6 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use failure::err_msg;
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
@@ -57,23 +56,18 @@ use package::{
     version::Constraint,
     Name, PackageId, Summary,
 };
-use petgraph::graph::NodeIndex;
-use petgraph::Graph;
 use reqwest::Client;
-use resolve::resolve::Resolve;
+use resolve::solve::Solve;
 use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::{
     fs,
     io::{prelude::*, BufReader},
     path::PathBuf,
     str::FromStr,
 };
-use util::errors::ErrorKind;
-use util::{hexify_hash, lock::DirLock};
+use util::{errors::ErrorKind, hexify_hash, lock::DirLock};
 
 /// Metadata for a package in the Cache.
 ///
@@ -230,50 +224,23 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    pub fn lock_build_dir(
+    // Formerly `check`
+    pub fn checkout_source(
         &self,
-        sum: &Summary,
+        pkg: &PackageId,
         loc: &DirectRes,
-        env: Vec<(PackageId, Version)>,
-    ) -> Result<DirLock, Error> {
-        let path = self
-            .location
-            .join("build")
-            .join(Self::get_build_dir(sum, loc, env));
-        DirLock::acquire(path)
-    }
-
-    /// Gets the corresponding directory of a built package (with ibc files). This directory is
-    /// different from the directory for downloads because the hash takes into consideration more
-    /// factors, like the complete environment that the package was built in (i.e. all of the
-    /// exact dependencies used for this build of the package).
-    ///
-    /// This is necessary because Idris libraries can re-export values of its dependencies; when a
-    /// dependent value changes, it changes in the library itself, causing the generated ibc to be
-    /// totally different. The same package with the same constraints can be resolved with
-    /// different versions in different contexts, so we want to make sure we're using the right
-    /// builds of every package.
-    fn get_build_dir(sum: &Summary, loc: &DirectRes, env: Vec<(PackageId, Version)>) -> String {
-        let mut hasher = Sha256::default();
-        hasher.input(sum.to_string().as_bytes());
-        hasher.input(loc.to_string().as_bytes());
-        for (pid, v) in env {
-            hasher.input(pid.to_string().as_bytes());
-            hasher.input(v.to_string().as_bytes());
-        }
-        let hash = hexify_hash(hasher.result().as_slice());
-
-        format!("{}_{}-{}", sum.name().group(), sum.name().name(), hash)
-    }
-
-    // New interface intended to replace `check`
-    pub fn checkout_source(&mut self, sum: Summary) -> Option<Source> {
+        v: Option<&Version>,
+    ) -> Option<Source> {
         unimplemented!()
     }
 
-    // Replacing `lock_build_dir`
-    pub fn checkout_build(&mut self, build: Build) -> Option<Binary> {
-        unimplemented!()
+    // Formerly `lock_build_dir`
+    pub fn checkout_build(&self, build: Build) -> Result<Binary, Error> {
+        let path = self.location.join("build").join(build.dir_name());
+
+        let binary_path = DirLock::acquire(path)?;
+
+        Ok(Binary { build, binary_path })
     }
 
     pub fn store_build(&mut self, binary: Binary) {
@@ -283,9 +250,10 @@ impl Cache {
 
 /// Information about the source of package that is available somewhere in the file system.
 ///
-/// A package is a `Elba.toml` file plus all the files that are part of it.
+/// A package is a manifest file plus all the files that are part of it.
 #[derive(Debug)]
 pub struct Source {
+    // TODO: CacheMeta instead?
     /// The package's manifest
     manifest: Manifest,
     /// The root of the package
@@ -296,28 +264,56 @@ pub struct Source {
 #[derive(Debug)]
 pub struct Build {
     pub summary: Summary,
+    /// The actual place from which the package is downloaded. This is so that we get a different
+    /// hash if the index changes the location of a package from underneath us.
+    pub location: DirectRes,
     pub hash: String,
 }
 
 impl Build {
-    pub fn new(summary: Summary, resolve: &Resolve) -> Self {
+    pub fn new(summary: Summary, location: DirectRes, resolve: &Solve) -> Self {
         let mut hasher = Sha256::default();
         hasher.input(summary.to_string().as_bytes());
+        hasher.input(location.to_string().as_bytes());
         for dep in resolve.deps(&summary) {
             hasher.input(dep.id.to_string().as_bytes());
             hasher.input(dep.version.to_string().as_bytes());
         }
         let hash = hexify_hash(hasher.result().as_slice());
 
-        Build { summary, hash }
+        Build {
+            summary,
+            location,
+            hash,
+        }
+    }
+
+    /// Gets the corresponding directory name of a built package (with ibc files). This directory is
+    /// different from the directory for downloads because the hash takes into consideration more
+    /// factors, like the complete environment that the package was built in (i.e. all of the
+    /// exact dependencies used for this build of the package).
+    ///
+    /// This is necessary because Idris libraries can re-export values of its dependencies; when a
+    /// dependent value changes, it changes in the library itself, causing the generated ibc to be
+    /// totally different. The same package with the same constraints can be resolved with
+    /// different versions in different contexts, so we want to make sure we're using the right
+    /// builds of every package.
+
+    pub fn dir_name(&self) -> String {
+        format!(
+            "{}_{}-{}",
+            self.summary.name().group(),
+            self.summary.name().name(),
+            self.hash
+        )
     }
 }
 
 /// Information about the build of library that is available somewhere in the file system.
 #[derive(Debug)]
 pub struct Binary {
-    // The build version of library
+    // The built version of the library
     build: Build,
     /// The path to ibc binary
-    binary_path: PathBuf,
+    binary_path: DirLock,
 }

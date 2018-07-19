@@ -7,7 +7,6 @@ use failure::{err_msg, Error};
 
 use super::context::BuildContext;
 use package::Name;
-use retrieve::cache::Source;
 use util::lock::DirLock;
 
 #[derive(Debug)]
@@ -40,7 +39,7 @@ impl CompileInvocation {
         let src_file_name = &self
             .src
             .file_name()
-            .ok_or(err_msg("Src refs to a non-file"))?;
+            .ok_or_else(|| err_msg("Src refs to a non-file"))?;
         let src_dest = self.build_dir.build.join(src_file_name);
         fs::copy(&self.src, &src_dest)?;
 

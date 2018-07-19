@@ -1,16 +1,16 @@
 use package::Summary;
 use petgraph::graph::NodeIndex;
-use petgraph::visit::{Bfs, IntoNodeReferences, Visitable, Walker, WalkerIter};
+use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
 use petgraph::Graph;
 
 /// Represents a fully resolved package dependency graph.
-pub struct Resolve {
+pub struct Solve {
     graph: Graph<Summary, ()>,
 }
 
-impl Resolve {
+impl Solve {
     pub fn new(graph: Graph<Summary, ()>) -> Self {
-        Resolve { graph }
+        Solve { graph }
     }
 
     /// Recursively traverse all dependencies of a given root, with breadth first

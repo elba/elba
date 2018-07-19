@@ -1,5 +1,4 @@
 #![feature(nll)]
-#![allow(unused_imports, unused_variables, dead_code)]
 
 //! A package manager for the Idris language.
 

@@ -8,12 +8,12 @@
 
 pub mod assignment;
 pub mod incompat;
-pub mod resolve;
+pub mod solve;
 
 use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
-    resolve::Resolve,
+    solve::Solve,
 };
 use failure::Error;
 use indexmap::IndexMap;
@@ -65,7 +65,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(mut self) -> Result<Resolve, String> {
+    pub fn solve(mut self) -> Result<Solve, String> {
         info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
@@ -78,7 +78,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Resolve, Error> {
+    fn solve_loop(&mut self) -> Result<Solve, Error> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -123,7 +123,7 @@ impl<'cache> Resolver<'cache> {
             }
         }
 
-        Ok(Resolve::new(tree))
+        Ok(Solve::new(tree))
     }
 
     // 1: Unit propagation

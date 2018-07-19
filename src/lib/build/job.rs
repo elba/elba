@@ -1,9 +1,7 @@
 use build::context::BuildContext;
 use failure::Error;
-use package::manifest::Manifest;
 use petgraph::Graph;
 use retrieve::cache::Source;
-use std::path::PathBuf;
 
 pub fn plan(root: Job, bcx: &BuildContext) -> JobQueue {
     unimplemented!()

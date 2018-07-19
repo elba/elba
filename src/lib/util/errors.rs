@@ -1,12 +1,12 @@
-// `err,rs` - because nothing ever goes right
+//! Because nothing ever works correctly...
 
-use std::process::{ExitStatus, Output};
+pub use failure::Error;
+
+pub type Res<T> = Result<T, Error>;
 
 // TODO: More principled error handling.
-//       Manifests and Constraints and whatever all have their own error enums. This kind enum just
-//       provides context as to the error. So we'd have `ReqError::InvalidSigil` contextualized
-//       with an `ErrorKind::InvalidLockfile`, etc.
-// TODO: Intend to split this big enum into small structs error.
+// This big enum shouldn't exist; instead, we should have individual structs and enums which
+// implement Fail for each type of error: Index failures, Parsing failures, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
     #[fail(display = "Invalid lockfile.")]
