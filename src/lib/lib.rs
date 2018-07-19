@@ -21,6 +21,7 @@ extern crate sha2;
 extern crate shell_escape;
 #[macro_use]
 extern crate slog;
+extern crate petgraph;
 extern crate symlink;
 extern crate tar;
 extern crate toml;
