@@ -5,31 +5,35 @@ use std::path::PathBuf;
 
 use failure::{err_msg, Error};
 
-use super::context::{BuildConfig, BuildContext, BuildDir};
+use super::context::BuildContext;
+use package::Name;
+use retrieve::cache::Source;
+use util::lock::DirLock;
 
 #[derive(Debug)]
 pub struct CompileInvocation {
     src: PathBuf,
-    deps_build: Vec<PathBuf>,
+    dep_builds: Vec<(Name, PathBuf)>,
     build_dir: BuildDir,
 }
 
 impl CompileInvocation {
     pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
-        for dep in &self.deps_build {
-            if dep
+        // Setup file structure of dependencies 
+        for (name, dep_build) in &self.dep_builds {
+            if dep_build
                 .extension()
                 .filter(|ext| ext.to_str() == Some("ibc"))
                 .is_none()
             {
-                bail!("Dependency build '{:?}' is supposed to be .ibc", dep);
+                bail!("Dependency build '{:?}' is supposed to be .ibc", dep_build);
             }
 
-            // TODO: Error struct
-            let dep_file_name = dep
-                .file_name()
-                .ok_or(err_msg("Dependency build refs to a non-file"))?;
-            fs::copy(dep, self.build_dir.build.join(dep_file_name))?;
+            let mut dep_file_dest = self.build_dir.build.join(name.group());
+            dep_file_dest.set_file_name(name.name());
+            dep_file_dest.set_extension("ibc");
+
+            fs::copy(dep_build, dep_file_dest)?;
         }
 
         // TODO: Error struct
@@ -89,5 +93,29 @@ impl CodegenInvocation {
             .exec()?;
 
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct BuildDir {
+    lock: DirLock,
+    pub root: PathBuf,
+    pub build: PathBuf,
+}
+
+impl BuildDir {
+    pub fn new(lock: DirLock) -> Result<Self, Error> {
+        let root = lock.path().to_path_buf();
+
+        let layout = BuildDir {
+            lock,
+            root: root.clone(),
+            build: root.join("build"),
+        };
+
+        fs::create_dir(&layout.root)?;
+        fs::create_dir(&layout.build)?;
+
+        Ok(layout)
     }
 }

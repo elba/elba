@@ -241,9 +241,6 @@ impl Serialize for Checksum {
 }
 
 /// Struct `Summary` defines the summarized version of a package.
-///
-/// The type parameter `T` allows us to use this struct for both resolved and unresolved
-/// dependencies.
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Summary {
     pub id: PackageId,

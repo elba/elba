@@ -1,11 +1,33 @@
+use std::fs;
 use std::path::PathBuf;
 
+use failure::Error;
+use petgraph::Graph;
+
+use package::Summary;
 use util::lock::DirLock;
 use util::process_builder::ProcessBuilder;
 
-// TODO: dependency graph, triple target
-pub struct BuildContext {
+/// An unit that elba knows how to build it
+// #[derive(Debug)]
+// pub struct Unit<'a> {
+//     summary: Summary,
+//     resolve: &'a Graph<Summary, ()>,
+// }
+
+// impl<'a> Unit<'a> {
+//     pub fn new(summary: Summary, bcx: BuildContext<'a>) -> Self {
+//         Unit {
+//             summary,
+//             resolve: bcx.resolve
+//         }
+//     }
+// }
+
+// TODO: triple target
+pub struct BuildContext<'a> {
     pub compiler: Compiler,
+    pub resolve: &'a Graph<Summary, ()>,
 }
 
 // TODO: Verbosity, Total checking
@@ -32,26 +54,5 @@ impl Compiler {
     /// Get a process builder set up to use the found compiler
     pub fn process(&self) -> ProcessBuilder {
         ProcessBuilder::new(&self.path)
-    }
-}
-
-#[derive(Debug)]
-pub struct BuildDir {
-    lock: DirLock,
-    pub root: PathBuf,
-    pub deps: PathBuf,
-    pub build: PathBuf,
-}
-
-impl BuildDir {
-    pub fn new(lock: DirLock) -> Self {
-        let root = lock.path().to_path_buf();
-
-        BuildDir {
-            lock,
-            root: root.clone(),
-            deps: root.join("deps"),
-            build: root.join("build"),
-        }
     }
 }
