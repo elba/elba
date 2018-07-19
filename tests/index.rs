@@ -16,6 +16,6 @@ fn index_success() {
     let i = Index::from_disk(url, path).unwrap();
 
     let vs = i.entries(&Name::from_str("no_conflict/root").unwrap());
-
-    assert!(vs.is_ok())
+    vs.unwrap();
+    // assert!(vs.is_ok())
 }

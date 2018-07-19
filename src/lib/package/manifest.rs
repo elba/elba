@@ -5,14 +5,14 @@ use super::{
     resolution::{DirectRes, IndexRes},
     *,
 };
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
 use std::{path::PathBuf, str::FromStr};
 use toml;
 use url::Url;
 use url_serde;
-use util::err::*;
+use util::errors::*;
 
 /// A relative file path (not module path)
 type PathV = String;

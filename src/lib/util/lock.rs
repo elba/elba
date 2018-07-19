@@ -3,8 +3,8 @@
 //! As it is currently designed, `elba` doesn't need to lock individual files. It does, however,
 //! need to lock directories to prevent other processes from using them.
 
-use super::err::{Error, ErrorKind};
-use failure::ResultExt;
+use super::errors::ErrorKind;
+use failure::{Error, ResultExt};
 use std::{
     fs,
     path::{Path, PathBuf},

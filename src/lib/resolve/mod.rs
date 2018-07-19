@@ -8,11 +8,14 @@
 
 pub mod assignment;
 pub mod incompat;
+pub mod resolve;
 
 use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
+    resolve::Resolve,
 };
+use failure::Error;
 use indexmap::IndexMap;
 use package::{
     version::{Constraint, Relation},
@@ -23,7 +26,7 @@ use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
 use std::{cmp, collections::VecDeque};
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 
 #[derive(Debug)]
 pub struct Resolver<'cache> {
@@ -62,7 +65,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(mut self) -> Result<Graph<Summary, ()>, String> {
+    pub fn solve(mut self) -> Result<Resolve, String> {
         info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
@@ -75,7 +78,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Graph<Summary, ()>, Error> {
+    fn solve_loop(&mut self) -> Result<Resolve, Error> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -120,7 +123,7 @@ impl<'cache> Resolver<'cache> {
             }
         }
 
-        Ok(tree)
+        Ok(Resolve::new(tree))
     }
 
     // 1: Unit propagation

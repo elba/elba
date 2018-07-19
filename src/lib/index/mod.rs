@@ -25,7 +25,7 @@
 mod config;
 
 use self::config::IndexConfig;
-use failure::ResultExt;
+use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
@@ -40,10 +40,7 @@ use std::{
     str::FromStr,
 };
 use url::Url;
-use util::{
-    err::{Error, ErrorKind},
-    lock::DirLock,
-};
+use util::{errors::ErrorKind, lock::DirLock};
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

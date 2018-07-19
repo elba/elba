@@ -6,10 +6,11 @@ pub mod resolution;
 pub mod version;
 
 use self::resolution::Resolution;
+use failure::Error;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, rc::Rc, str::FromStr};
-use util::err::*;
+use util::errors::ErrorKind;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
@@ -106,30 +107,24 @@ impl AsRef<str> for Name {
         self.as_str()
     }
 }
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct PackageId {
-    inner: Rc<PackageIdInner>,
-}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct PackageIdInner {
+pub struct PackageId {
     pub name: Name,
     pub resolution: Resolution,
 }
 
 impl PackageId {
     pub fn new(name: Name, resolution: Resolution) -> Self {
-        PackageId {
-            inner: Rc::new(PackageIdInner { name, resolution }),
-        }
+        PackageId { name, resolution }
     }
 
     pub fn name(&self) -> &Name {
-        &self.inner.name
+        &self.name
     }
 
     pub fn resolution(&self) -> &Resolution {
-        &self.inner.resolution
+        &self.resolution
     }
 }
 
@@ -144,19 +139,19 @@ impl FromStr for PackageId {
         let name = Name::from_str(name)?;
         let resolution = Resolution::from_str(url)?;
 
-        Ok(PackageId::new(name, resolution))
+        Ok(PackageId { name, resolution })
     }
 }
 
 impl fmt::Debug for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PackageId(\"{}@{}\")", self.name(), self.resolution())
+        write!(f, "PackageId(\"{}@{}\")", self.name, self.resolution)
     }
 }
 
 impl fmt::Display for PackageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{}", self.name(), self.resolution())
+        write!(f, "{}@{}", self.name, self.resolution)
     }
 }
 
@@ -246,9 +241,6 @@ impl Serialize for Checksum {
 }
 
 /// Struct `Summary` defines the summarized version of a package.
-///
-/// The type parameter `T` allows us to use this struct for both resolved and unresolved
-/// dependencies.
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct Summary {
     pub id: PackageId,
@@ -265,11 +257,11 @@ impl Summary {
     }
 
     pub fn name(&self) -> &Name {
-        &self.id.name()
+        &self.id.name
     }
 
     pub fn resolution(&self) -> &Resolution {
-        &self.id.resolution()
+        &self.id.resolution
     }
 
     pub fn version(&self) -> &Version {

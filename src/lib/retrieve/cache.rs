@@ -48,7 +48,8 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use failure::ResultExt;
+use failure::err_msg;
+use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
     manifest::Manifest,
@@ -56,17 +57,22 @@ use package::{
     version::Constraint,
     Name, PackageId, Summary,
 };
+use petgraph::graph::NodeIndex;
+use petgraph::Graph;
 use reqwest::Client;
+use resolve::resolve::Resolve;
 use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::{
     fs,
     io::{prelude::*, BufReader},
     path::PathBuf,
     str::FromStr,
 };
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 use util::{hexify_hash, lock::DirLock};
 
 /// Metadata for a package in the Cache.
@@ -259,4 +265,59 @@ impl Cache {
 
         format!("{}_{}-{}", sum.name().group(), sum.name().name(), hash)
     }
+
+    // New interface intended to replace `check`
+    pub fn checkout_source(&mut self, sum: Summary) -> Option<Source> {
+        unimplemented!()
+    }
+
+    // Replacing `lock_build_dir`
+    pub fn checkout_build(&mut self, build: Build) -> Option<Binary> {
+        unimplemented!()
+    }
+
+    pub fn store_build(&mut self, binary: Binary) {
+        unimplemented!()
+    }
+}
+
+/// Information about the source of package that is available somewhere in the file system.
+///
+/// A package is a `Elba.toml` file plus all the files that are part of it.
+#[derive(Debug)]
+pub struct Source {
+    /// The package's manifest
+    manifest: Manifest,
+    /// The root of the package
+    manifest_path: PathBuf,
+}
+
+/// Defines a specific build version of library to distinguish between builds with various dependencies.
+#[derive(Debug)]
+pub struct Build {
+    pub summary: Summary,
+    pub hash: String,
+}
+
+impl Build {
+    pub fn new(summary: Summary, resolve: &Resolve) -> Self {
+        let mut hasher = Sha256::default();
+        hasher.input(summary.to_string().as_bytes());
+        for dep in resolve.deps(&summary) {
+            hasher.input(dep.id.to_string().as_bytes());
+            hasher.input(dep.version.to_string().as_bytes());
+        }
+        let hash = hexify_hash(hasher.result().as_slice());
+
+        Build { summary, hash }
+    }
+}
+
+/// Information about the build of library that is available somewhere in the file system.
+#[derive(Debug)]
+pub struct Binary {
+    // The build version of library
+    build: Build,
+    /// The path to ibc binary
+    binary_path: PathBuf,
 }

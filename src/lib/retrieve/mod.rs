@@ -7,6 +7,7 @@
 pub mod cache;
 
 pub use self::cache::Cache;
+use failure::Error;
 use index::Indices;
 use package::{
     lockfile::Lockfile,
@@ -17,7 +18,7 @@ use package::{
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
-use util::err::{Error, ErrorKind};
+use util::errors::ErrorKind;
 
 // TODO: Patching
 // TODO: Multiple root packages so we can support workspaces
