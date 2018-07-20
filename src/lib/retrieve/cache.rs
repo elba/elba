@@ -256,8 +256,41 @@ pub struct Source {
     // TODO: CacheMeta instead?
     /// The package's manifest
     manifest: Manifest,
+    location: DirectRes,
+    // TODO: Should this be a DirLock?
     /// The root of the package
-    manifest_path: PathBuf,
+    path: PathBuf,
+}
+
+impl Source {
+    /// Returns a hash of the Source's "contents."
+    /// 
+    /// The purpose of this is for builds. The resolution graph only stores Summaries. If we were
+    /// to rely solely on hashing the Summaries of a package's dependencies to determine if we need
+    /// to rebuild a package, we'd run into a big problem: a package would only get rebuilt iff its
+    /// own version changed or a version of one of its dependents changed. This is a problem for
+    /// DirectRes deps, since they can change often without changing their version, leading to
+    /// erroneous cases where packages aren't rebuilt. Even if we were to use the hash that
+    /// determines the folder name of a package, it wouldn't be enough. Local dependencies' folder
+    /// names never change and don't have a hash, and git repos which pin themselves to a branch
+    /// can maintain the same hash while updating their contents.
+    /// 
+    /// To remedy this, we'd like to have a hash that indicates that the file contents of a Source
+    /// have changed, but having to hash hundreds directories sounds slow. 
+    /// 
+    /// To keep things performant, we don't actually hash every file in a directory. Instead, we
+    /// use metadata which could indicate if the directory's contents have changed.
+    /// 
+    ///   - For tarballs with a checksum, we use that checksum.
+    ///   - For git repos, we use the current commit hash.
+    ///   - For everything else, we checksum it ourselves.
+    /// 
+    /// Note that this hash differs from the hash used to determine if a package needs to be
+    /// redownloaded completely; for git repos, if the resolution is to use master, then the same
+    /// folder will be used, but will be checked out to the latest master every time.
+    pub fn hash(&self) -> String {
+        unimplemented!()
+    }
 }
 
 /// Defines a specific build version of library to distinguish between builds with various dependencies.
@@ -271,6 +304,12 @@ pub struct Build {
 }
 
 impl Build {
+    // TODO: DirectRes deps, like git repos pinned to master or a local dir, can change under our
+    // feet, which should prompt a new build, but doesn't atm. We should keep track of more metadata.
+    // We could accomplish this if the Solve stored Sources instead of Summaries - Sources have a
+    // hash method that tells us if their contents have changed.
+    // Instead, we should just take a single Graph of Sources (maybe sources are the edge idk),
+    // and hash the hash() of every source from the root and down to its deps.
     pub fn new(summary: Summary, location: DirectRes, resolve: &Solve) -> Self {
         let mut hasher = Sha256::default();
         hasher.input(summary.to_string().as_bytes());

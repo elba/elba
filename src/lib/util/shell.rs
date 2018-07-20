@@ -1,17 +1,12 @@
 //! Deals with pretty-printing information to the user (i.e. not logs; those are for debugging
 //! purposes, not for the user to see.)
 
-// TODO: impl Shell should have warn, error, info
+use super::config::Verbosity;
 
-/// The requested verbosity of output
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Verbosity {
-    Verbose,
-    Normal,
-    Quiet,
-}
+// TODO: impl Shell should have warn, error, info
 
 #[derive(Debug, Clone)]
 pub struct Shell {
+    try_color: bool,
     verbosity: Verbosity,
 }

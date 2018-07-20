@@ -32,6 +32,24 @@ pub fn new(ctx: NewCtx) -> Res<()> {
 
     fs::create_dir_all(path).context(format_err!("could not create dir {}", path.display()))?;
 
+    let target = if ctx.bin {
+        format!(
+            r#"[[targets.bin]]
+name = "{}"
+main = "src/Main.idr"
+
+"#,
+            name.name()
+        )
+    } else {
+        format!(
+            r#"[targets.lib]
+path = "src/"
+
+"#,
+        )
+    };
+
     write(
         &ctx.path.join("Elba.toml"),
         format!(
@@ -41,8 +59,9 @@ version = "0.1.0"
 authors = [{}]
 
 [dependencies]
-"#,
-            name, author,
+
+{}"#,
+            name, author, target
         ).as_bytes(),
     )?;
 

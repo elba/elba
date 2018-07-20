@@ -6,13 +6,12 @@ extern crate clap;
 extern crate elba;
 #[macro_use]
 extern crate failure;
-extern crate inflector;
 extern crate toml;
 
 mod cmds;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
-use elba::util::config::Config;
+use elba::util::config::{Config, Verbosity};
 use failure::Error;
 
 // Interaction with the main repo would just be implemented as a custom task.
@@ -28,9 +27,27 @@ fn cli() -> App<'static, 'static> {
         .arg(
             Arg::with_name("verbose")
                 .short("v")
-                .help("Verbose output (-vv = Very Verbose)")
-                .multiple(true)
-                .global(true),
+                .help("Verbose output")
+                .global(true)
+                .conflicts_with("quiet"),
+        )
+        .arg(
+            Arg::with_name("quiet")
+                .help("Quiet output")
+                .global(true)
+        )
+        .arg(
+            Arg::with_name("color")
+                .long("color")
+                .help("Force-enable color output")
+                .global(true)
+                .conflicts_with("no-color")
+        )
+        .arg(
+            Arg::with_name("no-color")
+                .long("no-color")
+                .help("Disable color output")
+                .global(true)
         )
         .subcommands(cmds::subcommands())
 }
@@ -72,6 +89,24 @@ fn go() -> Result<(), Error> {
     // TODO: Actually get correct config
     let mut config = Config::default();
     let args = expand_aliases(&mut config, args)?;
+
+    let verbosity = if args.is_present("verbose") {
+        Some(Verbosity::Verbose)
+    } else if args.is_present("quiet") {
+        Some(Verbosity::Quiet)
+    } else {
+        None
+    };
+
+    let color = if args.is_present("color") {
+        Some(true)
+    } else if args.is_present("no-color") {
+        Some(false)
+    } else {
+        None
+    };
+
+    config.configure(verbosity, color);
 
     let (cmd, subcommand_args) = match args.subcommand() {
         (cmd, Some(args)) => (cmd, args),

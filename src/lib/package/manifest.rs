@@ -14,9 +14,6 @@ use url::Url;
 use url_serde;
 use util::errors::*;
 
-/// A relative file path (not module path)
-type PathV = String;
-
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
     package: PackageInfo,
@@ -147,9 +144,9 @@ impl Default for PkgGitSpecifier {
 
 #[derive(Deserialize, Debug)]
 struct Targets {
-    lib: Option<LibTarget>,
+    lib: Option<Target>,
     #[serde(default = "Vec::new")]
-    bin: Vec<Target>,
+    bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
     test: Vec<Target>,
     #[serde(default = "Vec::new")]
@@ -158,14 +155,14 @@ struct Targets {
 
 #[derive(Deserialize, Debug)]
 struct Target {
-    name: String,
-    path: PathV, // TODO: paths?
+    path: PathBuf,
 }
 
 #[derive(Deserialize, Debug)]
-struct LibTarget {
+struct BinTarget {
     name: String,
-    exports: Vec<PathV>,
+    // For binaries, benches, and tests, this should point to a file with a Main module.
+    main: PathBuf,
 }
 
 #[cfg(test)]
