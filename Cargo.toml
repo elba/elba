@@ -5,6 +5,7 @@ authors = ["David Cao <dcao@protonmail.com>"]
 license = "MIT"
 
 [dependencies]
+clap = "2"
 digest = { version = "0.7", features = ["std"]}
 failure = "0.1"
 flate2 = "1.0"
@@ -23,7 +24,6 @@ shell-escape = "0.1"
 slog = { version = "2", features = ["max_level_trace", "release_max_level_warn"] }
 slog-async = "2"
 slog-term = "2"
-structopt = "0.2"
 symlink = "0.1"
 tar = "0.4"
 toml = "0.4"

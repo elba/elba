@@ -30,7 +30,6 @@ extern crate url_serde;
 
 pub mod build;
 pub mod cli;
-pub mod config;
 pub mod index;
 pub mod package;
 pub mod resolve;

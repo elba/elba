@@ -49,7 +49,6 @@ impl Compiler {
     }
 }
 
-
 impl Default for Compiler {
     fn default() -> Self {
         Compiler {
