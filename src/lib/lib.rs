@@ -8,6 +8,7 @@ extern crate flate2;
 extern crate git2;
 #[macro_use]
 extern crate indexmap;
+extern crate inflector;
 extern crate itertools;
 #[macro_use]
 extern crate nom;

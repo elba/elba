@@ -4,7 +4,9 @@
 #[macro_use]
 extern crate clap;
 extern crate elba;
+#[macro_use]
 extern crate failure;
+extern crate inflector;
 extern crate toml;
 
 mod cmds;
@@ -65,7 +67,7 @@ fn expand_aliases(
     Ok(args)
 }
 
-fn main() -> Result<(), Error> {
+fn go() -> Result<(), Error> {
     let args = cli().get_matches();
     // TODO: Actually get correct config
     let mut config = Config::default();
@@ -84,4 +86,14 @@ fn main() -> Result<(), Error> {
     }
 
     cmds::execute_external(cmd, subcommand_args)
+}
+
+// TODO: Actually pretty-print the error, using the `Shell` struct.
+// See cargo::exit_with_error and main.rs in the cargo bin.
+fn main() {
+    let res = go();
+
+    if let Err(e) = res {
+        println!("[err] {}", e);
+    }
 }

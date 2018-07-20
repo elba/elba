@@ -11,6 +11,7 @@ use indexmap::IndexMap;
 // TODO: Indices
 #[derive(Deserialize, Serialize)]
 pub struct Config {
+    pub profile: Option<Profile>,
     #[serde(default = "default_aliases")]
     pub alias: IndexMap<String, String>,
 }
@@ -18,6 +19,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            profile: None,
             alias: default_aliases(),
         }
     }
@@ -30,4 +32,10 @@ fn default_aliases() -> IndexMap<String, String> {
         "t".to_owned() => "test".to_owned(),
         "r".to_owned() => "run".to_owned(),
     )
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Profile {
+    pub name: String,
+    pub email: String,
 }

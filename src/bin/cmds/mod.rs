@@ -1,15 +1,20 @@
+mod new;
+
 use clap::{App, ArgMatches};
-use elba::util::config::Config;
+use elba::util::{config::Config, errors::Res};
 use failure::Error;
 
-pub type Exec = fn(&mut Config, &ArgMatches) -> Result<(), Error>;
+pub type Exec = fn(&mut Config, &ArgMatches) -> Res<()>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
-    vec![]
+    vec![
+        new::cli()
+    ]
 }
 
 pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
+        "new" => Some(new::exec),
         _ => None,
     }
 }
