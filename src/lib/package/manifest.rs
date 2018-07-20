@@ -188,14 +188,11 @@ license = 'MIT'
 
 [[targets.bin]]
 name = 'bin1'
-path = 'src/bin/Here.idr'
+main = 'src/bin/Here.idr'
 
 [targets.lib]
-name = 'lib1'
-exports = [
-    'src/lib/This.idr',
-    'src/lib/That.idr',
-]"#;
+path = "src/lib/"
+"#;
 
         assert!(Manifest::from_str(manifest).is_ok());
     }

@@ -3,6 +3,9 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
 use petgraph::Graph;
 
+// TODO: We need a Graph of Sources for the build process, but we can't get Sources for all of our
+// dependencies until after dependency resolution (when the Solve is returned) and package retrieval.
+// How should we have this Graph of Sources? How should we create one?
 /// Represents a fully resolved package dependency graph.
 pub struct Solve {
     graph: Graph<Summary, ()>,
