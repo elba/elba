@@ -50,6 +50,7 @@
 
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
+use index::{Index, Indices};
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, IndexRes},
@@ -74,6 +75,7 @@ use util::{errors::ErrorKind, hexify_hash, lock::DirLock};
 /// Note that if a root depends directly on a git repo or path, it doesn't necessarily have a
 /// Constraint (the constraint is contained in the Resolution - use *this* directory or *this*
 /// git commit), so for those packages the Constraint is just "any."
+#[derive(Debug)]
 pub struct CacheMeta {
     pub version: Version,
     pub deps: IndexMap<PackageId, Constraint>,
@@ -98,16 +100,12 @@ pub struct Cache {
 
 impl Cache {
     pub fn from_disk(plog: &Logger, location: PathBuf, def_index: IndexRes) -> Self {
-        let mut loc = location.clone();
-        loc.push("src");
-        let _ = fs::create_dir_all(&loc);
-
-        loc.pop();
-        loc.push("build");
-        let _ = fs::create_dir_all(&loc);
+        let _ = fs::create_dir_all(location.join("src"));
+        let _ = fs::create_dir_all(location.join("build"));
+        let _ = fs::create_dir_all(location.join("indices"));
 
         let client = Client::new();
-        let logger = plog.new(o!("location" => loc.to_string_lossy().into_owned()));
+        let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
 
         Cache {
             location,
@@ -119,12 +117,12 @@ impl Cache {
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary. This should
     /// only be used for non-index dependencies.
-    pub fn metadata(
+    pub fn checkout_source(
         &self,
         pkg: &PackageId,
         loc: &DirectRes,
         v: Option<&Version>,
-    ) -> Result<CacheMeta, Error> {
+    ) -> Result<Source, Error> {
         let p = self.load(pkg, loc, v)?;
         let mf_path = p.path().join("Cargo.toml");
 
@@ -139,14 +137,21 @@ impl Cache {
         let mut deps = indexmap!();
 
         // We ignore dev-dependencies because those are only relevant if that package is the root
-        for (n, dep) in manifest.dependencies {
-            let (pid, c) = dep.into_dep(self.def_index.clone(), n);
+        for (n, dep) in &manifest.dependencies {
+            let dep = dep.clone();
+            let (pid, c) = dep.into_dep(self.def_index.clone(), n.clone());
             deps.insert(pid, c);
         }
 
         let meta = CacheMeta { deps, version };
 
-        Ok(meta)
+        let source = Source {
+            manifest,
+            meta,
+            location: loc.clone(),
+            path: p,
+        };
+        Ok(source)
     }
 
     // TODO: In the future (heh), return Box<Future<Item = PathBuf, Error = Error>> and use async
@@ -167,7 +172,7 @@ impl Cache {
         v: Option<&Version>,
     ) -> Result<DirLock, Error> {
         if let Some(path) = self.check(pkg.name(), loc, v) {
-            DirLock::acquire(path)
+            DirLock::acquire(&path)
         } else {
             let mut p = self.location.clone();
             p.push("src");
@@ -224,27 +229,63 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    // Formerly `check`
-    pub fn checkout_source(
-        &self,
-        pkg: &PackageId,
-        loc: &DirectRes,
-        v: Option<&Version>,
-    ) -> Option<Source> {
-        unimplemented!()
+    fn get_index_dir(loc: &DirectRes) -> String {
+        let mut hasher = Sha256::default();
+        hasher.input(loc.to_string().as_bytes());
+        hexify_hash(hasher.result().as_slice())
     }
 
     // Formerly `lock_build_dir`
     pub fn checkout_build(&self, build: Build) -> Result<Binary, Error> {
         let path = self.location.join("build").join(build.dir_name());
 
-        let binary_path = DirLock::acquire(path)?;
+        let binary_path = DirLock::acquire(&path)?;
 
         Ok(Binary { build, binary_path })
     }
 
-    pub fn store_build(&mut self, binary: Binary) {
-        unimplemented!()
+    // TODO: We do a lot of silent erroring. Is that good?
+    pub fn get_indices(&self, index_reses: &[DirectRes]) -> Indices {
+        let mut indices = vec![];
+
+        for index in index_reses {
+            // We special-case a local dir index because `dir` won't exist for it.
+            if let DirectRes::Dir { url } = index {
+                let lock = if let Ok(dir) = DirLock::acquire(url) {
+                    dir
+                } else {
+                    continue;
+                };
+                let ix = Index::from_disk(index.clone(), lock);
+                if let Ok(ix) = ix {
+                    indices.push(ix);
+                }
+                continue;
+            }
+
+            let dir = if let Ok(dir) = DirLock::acquire(&self.location.join(Self::get_index_dir(index))) {
+                dir
+            } else {
+                continue;
+            };
+
+            if dir.path().exists() {
+                let ix = Index::from_disk(index.clone(), dir);
+                if let Ok(ix) = ix {
+                    indices.push(ix);
+                }
+                continue;
+            }
+
+            if index.retrieve(&self.client, &dir).is_ok() {
+                let ix = Index::from_disk(index.clone(), dir);
+                if let Ok(ix) = ix {
+                    indices.push(ix);
+                }
+            }
+        }
+
+        Indices::new(indices)
     }
 }
 
@@ -253,13 +294,13 @@ impl Cache {
 /// A package is a manifest file plus all the files that are part of it.
 #[derive(Debug)]
 pub struct Source {
-    // TODO: CacheMeta instead?
     /// The package's manifest
-    manifest: Manifest,
-    location: DirectRes,
+    pub manifest: Manifest,
+    pub meta: CacheMeta,
+    pub location: DirectRes,
     // TODO: Should this be a DirLock?
     /// The root of the package
-    path: PathBuf,
+    pub path: DirLock,
 }
 
 impl Source {
@@ -293,6 +334,7 @@ impl Source {
     }
 }
 
+// TODO: I don't think the struct is necessary; just throw this stuff into Cache
 /// Defines a specific build version of library to distinguish between builds with various dependencies.
 #[derive(Debug)]
 pub struct Build {
@@ -314,7 +356,8 @@ impl Build {
         let mut hasher = Sha256::default();
         hasher.input(summary.to_string().as_bytes());
         hasher.input(location.to_string().as_bytes());
-        for dep in resolve.deps(&summary) {
+        // We assume here that the summary is for-sure in the resolution tree.
+        for dep in resolve.deps(&summary).unwrap() {
             hasher.input(dep.id.to_string().as_bytes());
             hasher.input(dep.version.to_string().as_bytes());
         }

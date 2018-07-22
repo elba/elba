@@ -1,4 +1,6 @@
 mod new;
+mod init;
+mod lock;
 
 use clap::{App, ArgMatches};
 use elba::util::{config::Config, errors::Res};
@@ -8,13 +10,17 @@ pub type Exec = fn(&mut Config, &ArgMatches) -> Res<()>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
-        new::cli()
+        new::cli(),
+        init::cli(),
+        lock::cli(),
     ]
 }
 
 pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
         "new" => Some(new::exec),
+        "init" => Some(init::exec),
+        "lock" => Some(lock::exec),
         _ => None,
     }
 }

@@ -13,6 +13,8 @@ use toml;
 
 use super::*;
 
+// TODO: What if Lockfiles were just Graph<Summary, ()>?
+
 #[derive(Clone, Debug)]
 pub struct Lockfile {
     pub packages: IndexMap<PackageId, (Version, Vec<Summary>)>,
@@ -79,14 +81,14 @@ mod tests {
     fn valid_lockfile() {
         let lockfile = r#"
 [[packages]]
-id = "terminator/one@index+https://elba.io/pkg"
+id = "terminator/one@index+tar+https://elba.io/pkg"
 version = "0.1.4"
 
 [[packages]]
 id = "good/package@dir+file:///here/there"
 version = "1.0.5-alpha.5-zeta.15"
 dependencies = [
-    { id = "terminator/one@index+https://elba.io/pkg", version = "0.1.4" }
+    { id = "terminator/one@index+tar+https://elba.io/pkg", version = "0.1.4" }
 ]
         "#;
 

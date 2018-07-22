@@ -6,7 +6,9 @@
 //!
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
-use indexmap::IndexMap;
+use package::resolution::DirectRes;
+use indexmap::{IndexMap, IndexSet};
+use std::path::PathBuf;
 
 /// The requested verbosity of output
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
@@ -17,7 +19,6 @@ pub enum Verbosity {
     Quiet,
 }
 
-// TODO: Indices
 #[derive(Deserialize, Serialize)]
 pub struct Config {
     pub profile: Option<Profile>,
@@ -25,6 +26,12 @@ pub struct Config {
     pub term: Term,
     #[serde(default = "default_aliases")]
     pub alias: IndexMap<String, String>,
+    #[serde(default)]
+    pub directories: Directories,
+    // First index = default.
+    // In future, default for "indices" should be only official index..
+    #[serde(default)]
+    pub indices: IndexSet<DirectRes>,
 }
 
 impl Config {
@@ -35,6 +42,12 @@ impl Config {
         if let Some(c) = color {
             self.term.color = c;
         }
+
+        self.merge_env()
+    }
+
+    fn merge_env(&mut self) {
+        // TODO
     }
 }
 
@@ -44,6 +57,8 @@ impl Default for Config {
             profile: None,
             term: Term::default(),
             alias: default_aliases(),
+            directories: Directories::default(),
+            indices: IndexSet::default(),
         }
     }
 }
@@ -74,6 +89,21 @@ impl Default for Term {
         Term {
             color: true,
             verbosity: Verbosity::Normal,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Directories {
+    cache: PathBuf,
+    rest: PathBuf,
+}
+
+impl Default for Directories {
+    fn default() -> Self {
+        Directories {
+            cache: "~/.elba".to_owned().into(),
+            rest: "~/.elba".to_owned().into(),
         }
     }
 }

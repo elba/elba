@@ -70,7 +70,7 @@ impl<'cache> Retriever<'cache> {
         }
 
         if let Resolution::Direct(loc) = pkg.resolution() {
-            return Ok(self.cache.metadata(pkg, loc, None)?.version);
+            return Ok(self.cache.checkout_source(pkg, loc, None)?.meta.version);
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
@@ -117,7 +117,8 @@ impl<'cache> Retriever<'cache> {
         if let Resolution::Direct(loc) = pkg.resolution() {
             let deps = self
                 .cache
-                .metadata(pkg.id(), loc, Some(pkg.version()))?
+                .checkout_source(pkg.id(), loc, Some(pkg.version()))?
+                .meta
                 .deps;
             let mut res = vec![];
             for dep in deps {

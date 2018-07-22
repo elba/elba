@@ -14,6 +14,27 @@ use url::Url;
 use url_serde;
 use util::errors::*;
 
+// TODO: Package aliasing. Have dummy alias files in the root target folder.
+//
+// e.g. to alias `me/lightyear` with default root module `Me.Lightyear` as the module
+// `Yeet.Lightyeet`, in the target folder, we make the following file in the proper directory
+// (directory won't matter for Blodwen/Idris 2):
+//
+// ```idris
+// module Yeet.Lightyeet
+//
+// import public Me.Lightyear
+// ```
+//
+// Behind the scenes, we build this as its own package with the package it's aliasing as
+// its only dependency, throw it in the global cache, and add this to the import dir of the root
+// package instead of the original.
+//
+// I guess this also means that each package should declare their (root) module(s), so that we
+// can identify conflicts ahead of time without having to guess that it's always gonna be Group.Name
+//
+// With this in place, we can safely avoid module namespace conflicts.
+
 #[derive(Deserialize, Debug)]
 pub struct Manifest {
     package: PackageInfo,
@@ -50,7 +71,7 @@ struct PackageInfo {
     license: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum DepReq {
     Registry(Constraint),

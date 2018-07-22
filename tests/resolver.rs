@@ -9,12 +9,12 @@ extern crate slog_term;
 extern crate url;
 
 use elba::{
-    index::{Index, Indices},
     package::{
         lockfile::Lockfile,
-        resolution::{IndexRes, Resolution},
+        resolution::{IndexRes, DirectRes, Resolution},
         Name, PackageId, Summary,
     },
+    index::{Index, Indices},
     resolve::Resolver,
     retrieve::{Cache, Retriever},
     util::lock::DirLock,
@@ -22,7 +22,6 @@ use elba::{
 use semver::Version;
 use slog::*;
 use std::{path::PathBuf, str::FromStr};
-use url::Url;
 
 lazy_static! {
     static ref LOGGER: Logger = new_logger();
@@ -34,7 +33,7 @@ macro_rules! sum {
         let root_name = Name::from_str($a).unwrap();
         let root_pkg = PackageId::new(
             root_name,
-            Resolution::Index(IndexRes::from_str("index+file://data/index/").unwrap()),
+            Resolution::Index(IndexRes::from_str("index+dir+file://data/index/").unwrap()),
         );
         Summary::new(root_pkg, Version::parse($b).unwrap())
     }};
@@ -51,14 +50,25 @@ fn new_logger() -> Logger {
     Logger::root(slog::Discard, o!())
 }
 
+// Even though we could use &CACHE.get_indices, we don't here.
+//
+// Cache assumes that for an Index located on disk, the public-facing DirectRes and the local path
+// perfectly match, which is a reasonable real-world assumption. However, we can't do the env! trick
+// in the indices themselves, where you HAVE to specify the index of a package's dependencies,
+// which would mean that I'd end up having to hard-code my personal directory tree :v
+//
+// One reasonable solution would be to change index.toml such that index dependencies are specified
+// in IndexMap form, and indices would be referred to in dependencies by their "short" name. A method
+// dependencies() would turn short names into proper `DirectRes` structs. By doing this, we could
+// do the env! trick within just the index.toml file.  
 fn indices() -> Indices {
-    let url = Url::from_str("file://data/index/").unwrap();
+    let url = DirectRes::from_str("dir+file://data/index/").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::new();
     path.push(start);
     path.push("tests/data/index");
 
-    let path = DirLock::acquire(path).unwrap();
+    let path = DirLock::acquire(&path).unwrap();
 
     let v = vec![Index::from_disk(url, path).unwrap()];
 
@@ -66,13 +76,12 @@ fn indices() -> Indices {
 }
 
 fn cache() -> Cache {
-    let ix_url = Url::from_str("file://data/index/").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::new();
     path.push(start);
     path.push("tests/data/cache");
 
-    let def_ix = IndexRes { url: ix_url };
+    let def_ix = IndexRes { res: DirectRes::from_str("dir+file://data/index").unwrap() };
     Cache::from_disk(&LOGGER, path, def_ix)
 }
 

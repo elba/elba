@@ -17,20 +17,24 @@ pub fn new(ctx: NewCtx) -> Res<()> {
     if fs::metadata(path).is_ok() {
         bail!(
             "destination `{}` already exists\n\n\
-             create a new `Elba.toml` manifest file in the directory instead.",
+             create a new `elba.toml` manifest file in the directory instead.",
             path.display()
         )
     }
 
-    let name = &ctx.name;
+    fs::create_dir_all(path).context(format_err!("could not create dir {}", path.display()))?;
 
+    init(ctx)
+}
+
+pub fn init(ctx: NewCtx) -> Res<()> {
+    let name = &ctx.name;
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)
     } else {
         format!("")
     };
-
-    fs::create_dir_all(path).context(format_err!("could not create dir {}", path.display()))?;
+    let path = &ctx.path;
 
     let target = if ctx.bin {
         format!(
@@ -51,7 +55,7 @@ path = "src/"
     };
 
     write(
-        &ctx.path.join("Elba.toml"),
+        &ctx.path.join("elba.toml"),
         format!(
             r#"[package]
 name = "{}"

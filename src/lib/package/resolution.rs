@@ -117,6 +117,8 @@ impl DirectRes {
                         let archive = GzDecoder::new(archive);
                         let mut archive = Archive::new(archive);
 
+                        fs::create_dir(target.path())?;
+
                         archive
                             .unpack(target.path())
                             .context(ErrorKind::CannotDownload)?;
@@ -219,7 +221,7 @@ impl FromStr for DirectRes {
             }
             "tar" => {
                 let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                if url.scheme() != "http" || url.scheme() != "https" || url.scheme() != "file" {
+                if url.scheme() != "http" && url.scheme() != "https" && url.scheme() != "file" {
                     return Err(ErrorKind::InvalidSourceUrl)?;
                 }
                 let cksum = url.fragment().and_then(|x| Checksum::from_str(x).ok());
@@ -236,8 +238,7 @@ impl fmt::Display for DirectRes {
         match self {
             DirectRes::Git { repo, tag } => write!(f, "dir+{}#{}", repo, tag),
             DirectRes::Dir { url } => {
-                let url = Url::from_directory_path(url).unwrap();
-                write!(f, "dir+{}", url)
+                write!(f, "dir+file://{}", url.display())
             }
             DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
@@ -258,7 +259,7 @@ impl fmt::Display for DirectRes {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IndexRes {
-    pub url: Url,
+    pub res: DirectRes,
 }
 
 impl FromStr for IndexRes {
@@ -271,8 +272,8 @@ impl FromStr for IndexRes {
 
         match utype {
             "index" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                Ok(IndexRes { url })
+                let res = DirectRes::from_str(url).context(ErrorKind::InvalidSourceUrl)?;
+                Ok(IndexRes { res })
             }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
@@ -281,10 +282,10 @@ impl FromStr for IndexRes {
 
 impl fmt::Display for IndexRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let url = self.url.as_str();
+        let url = self.res.to_string();
         let mut s = String::with_capacity(url.len() + 10);
         s.push_str("index+");
-        s.push_str(url);
+        s.push_str(&url);
         write!(f, "{}", s)
     }
 }

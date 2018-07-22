@@ -39,7 +39,6 @@ use std::{
     io::{self, prelude::*, BufReader},
     str::FromStr,
 };
-use url::Url;
 use util::{errors::ErrorKind, lock::DirLock};
 
 /// A dependency.
@@ -136,8 +135,8 @@ pub struct Index {
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn from_disk(url: Url, path: DirLock) -> Result<Self, Error> {
-        let id = IndexRes { url };
+    pub fn from_disk(res: DirectRes, path: DirLock) -> Result<Self, Error> {
+        let id = IndexRes { res };
         let pn = path.path().join("index.toml");
         let file = fs::File::open(pn).context(ErrorKind::InvalidIndex)?;
         let mut file = BufReader::new(file);
