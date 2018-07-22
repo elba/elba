@@ -262,6 +262,12 @@ pub struct IndexRes {
     pub res: DirectRes,
 }
 
+impl From<DirectRes> for IndexRes {
+    fn from(d: DirectRes) -> Self {
+        IndexRes { res: d }
+    }
+}
+
 impl FromStr for IndexRes {
     type Err = Error;
 

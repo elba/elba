@@ -10,12 +10,11 @@ pub use self::cache::Cache;
 use failure::Error;
 use index::Indices;
 use package::{
-    lockfile::Lockfile,
     resolution::Resolution,
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
-use resolve::incompat::{Incompatibility, IncompatibilityCause};
+use resolve::{incompat::{Incompatibility, IncompatibilityCause}, solve::Solve};
 use semver::Version;
 use slog::Logger;
 use util::errors::ErrorKind;
@@ -31,7 +30,7 @@ pub struct Retriever<'cache> {
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
     indices: Indices,
-    lockfile: Lockfile,
+    lockfile: Solve,
     pub logger: Logger,
 }
 
@@ -42,7 +41,7 @@ impl<'cache> Retriever<'cache> {
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
         indices: Indices,
-        lockfile: Lockfile,
+        lockfile: Solve,
     ) -> Self {
         let logger = plog.new(o!("root" => root.to_string()));
 
@@ -63,14 +62,18 @@ impl<'cache> Retriever<'cache> {
         con: &Constraint,
         minimize: bool,
     ) -> Result<Version, Error> {
-        if let Some((v, _)) = self.lockfile.packages.get(pkg) {
-            if con.satisfies(v) {
-                return Ok(v.clone());
+        if let Some(v) = self.lockfile.get_pkg_version(pkg) {
+            if con.satisfies(&v) {
+                return Ok(v);
             }
         }
 
         if let Resolution::Direct(loc) = pkg.resolution() {
             return Ok(self.cache.checkout_source(pkg, loc, None)?.meta.version);
+        }
+
+        if let Resolution::Root = pkg.resolution() {
+            return Ok(self.root.version.clone());
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self

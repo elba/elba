@@ -1,10 +1,12 @@
-use package::{Summary, lockfile::Lockfile};
+use package::{resolution::Resolution, Summary, PackageId, lockfile::{LockfileToml, LockedPkg}};
 use petgraph::{Direction, graph::NodeIndex, visit::{Bfs, IntoNodeReferences, Walker}, Graph};
 use retrieve::cache::Source;
+use semver::Version;
 
 pub type SourceSolve = Graph<Source, ()>;
 
 /// Represents a fully resolved package dependency graph.
+#[derive(Debug, Clone)]
 pub struct Solve {
     graph: Graph<Summary, ()>,
 }
@@ -22,20 +24,33 @@ impl Solve {
             .map(move |node_id| &self.graph[node_id]))
     }
 
-    fn find_node(&self, node: &Summary) -> Option<NodeIndex> {
+    pub fn find_node(&self, node: &Summary) -> Option<NodeIndex> {
         self.graph
             .node_references()
             .find(|(_, summary)| *summary == node)
             .map(|(index, _)| index)
     }
+
+    pub fn get_pkg_version(&self, node: &PackageId) -> Option<Version> {
+        self.graph
+            .node_references()
+            .find(|(_, sum)| sum.id() == node)
+            .map(|(_, sum)| sum.version().clone())
+    }
 }
 
-impl Into<Lockfile> for Solve {
-    fn into(self) -> Lockfile {
-        let mut packages = indexmap!();
+impl Into<LockfileToml> for Solve {
+    fn into(self) -> LockfileToml {
+        let mut packages = indexset!();
 
-        // The root package is always at nix 0.
-        let deps = Bfs::new(&self.graph, NodeIndex::new(0))
+        // Just in case the root node ain't at 0
+        let root = self.graph
+            .node_references()
+            .find(|(_, sum)| *sum.resolution() == Resolution::Root)
+            .map(|(index, _)| index)
+            .unwrap_or_else(|| NodeIndex::new(0));
+
+        let deps = Bfs::new(&self.graph, root)
             .iter(&self.graph);
 
         for nix in deps {
@@ -47,9 +62,50 @@ impl Into<Lockfile> for Solve {
                 this_deps.push(self.graph[dep].clone());
             }
             
-            packages.insert(pkg.id.clone(), (pkg.version.clone(), this_deps));
+            packages.insert(LockedPkg { sum: pkg.clone(), dependencies: this_deps });
         }
 
-        Lockfile { packages }
+        LockfileToml { packages }
+    }
+}
+
+// TODO: verify that this is a valid solve
+impl From<LockfileToml> for Solve {
+    fn from(f: LockfileToml) -> Self {
+        let mut tree = Graph::new();
+        let mut set = indexmap!();
+
+        // We don't assume that nix 0 is root here.
+        for pkg in f.packages {
+            let nix = if set.contains_key(&pkg.sum) {
+                set[&pkg.sum]
+            } else {
+                let nix = tree.add_node(pkg.sum.clone());
+                set.insert(pkg.sum, nix);
+                nix
+            };
+
+            for dep in pkg.dependencies {
+                let dep_nix = if set.contains_key(&dep) {
+                    set[&dep]
+                } else {
+                    let nix = tree.add_node(dep.clone());
+                    set.insert(dep, nix);
+                    nix
+                };
+
+                tree.add_edge(nix, dep_nix, ());
+            }
+        }
+
+        Solve::new(tree)
+    }
+}
+
+impl Default for Solve {
+    fn default() -> Self {
+        Solve {
+            graph: Graph::new()
+        }
     }
 }

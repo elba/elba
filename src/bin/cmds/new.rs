@@ -24,10 +24,10 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         None
     };
     let cdir = current_dir().context(format_err!("couldn't get current dir; doesn't exist or no permissions..."))?;
-    let path = cdir.join(format!("{}", name.name()));
+    let path = cdir.join(name.name().to_string());
 
     let new_ctx = new::NewCtx {
-        path: path,
+        path,
         author,
         name,
         bin,

@@ -77,7 +77,7 @@ impl Incompatibility {
             IncompatibilityCause::Unavailable => {
                 assert!(self.deps.len() == 1);
                 let package = self.deps.get_index(0).unwrap();
-                format!("no versions of {} match {}", package.0, package.1)
+                format!("{} {} is unavailable", package.0, package.1)
             }
             IncompatibilityCause::Root => "the root package was chosen".to_string(),
             IncompatibilityCause::Derived(_, _) => {

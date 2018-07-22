@@ -32,7 +32,7 @@ pub fn init(ctx: NewCtx) -> Res<()> {
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)
     } else {
-        format!("")
+        "".to_string()
     };
     let path = &ctx.path;
 
@@ -46,12 +46,10 @@ main = "src/Main.idr"
             name.name()
         )
     } else {
-        format!(
-            r#"[targets.lib]
+        r#"[targets.lib]
 path = "src/"
 
-"#,
-        )
+"#.to_string()
     };
 
     write(
@@ -84,11 +82,9 @@ authors = [{}]
         fs::create_dir_all(path.join("src")).context(format_err!("could not create dir {}", path.display()))?;
         write(
             &path.join("src/Main.idr"),
-            format!(
-                r#"module Main
+            br#"module Main
 
 "#,
-            ).as_bytes()
         )?;
     }
 

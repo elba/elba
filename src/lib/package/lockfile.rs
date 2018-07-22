@@ -2,65 +2,23 @@
 //!
 //! Lockfiles are created based on dependency constraints, and ensure that builds are repeatable
 
-// TODO: Should the lockfile store checksums? If so, of what? The tarball? The folder?
-// see https://github.com/rust-lang/cargo/issues/4800 for why we'd want this
-// If we do, when we make a new resolution in which a PackageId is shared between lockfile and
-// resolution (derived from indices and cache) but checksums differ, we should panic.
-
 use failure::{Error, ResultExt};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use toml;
 
 use super::*;
 
-// TODO: What if Lockfiles were just Graph<Summary, ()>?
-
-#[derive(Clone, Debug)]
-pub struct Lockfile {
-    pub packages: IndexMap<PackageId, (Version, Vec<Summary>)>,
-}
-
-impl FromStr for Lockfile {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let toml = LockfileToml::from_str(s)?;
-
-        Ok(toml.into())
-    }
-}
-
-impl Default for Lockfile {
-    fn default() -> Self {
-        Lockfile {
-            packages: indexmap!(),
-        }
-    }
-}
-
-impl From<LockfileToml> for Lockfile {
-    fn from(l: LockfileToml) -> Self {
-        let mut packages = indexmap!();
-        for package in l.packages {
-            let s = package.sum;
-            packages.insert(s.id, (s.version, package.dependencies));
-        }
-
-        Lockfile { packages }
-    }
-}
-
 #[derive(Clone, Deserialize, Debug, Serialize)]
-struct LockfileToml {
-    packages: IndexSet<LockedPkg>,
+pub struct LockfileToml {
+    pub packages: IndexSet<LockedPkg>,
 }
 
 #[derive(Clone, Deserialize, Debug, Serialize, PartialEq, Eq, Hash)]
-struct LockedPkg {
+pub struct LockedPkg {
     #[serde(flatten)]
-    sum: Summary,
+    pub sum: Summary,
     #[serde(default = "Vec::new")]
-    dependencies: Vec<Summary>,
+    pub dependencies: Vec<Summary>,
 }
 
 impl FromStr for LockfileToml {
@@ -92,6 +50,6 @@ dependencies = [
 ]
         "#;
 
-        assert!(Lockfile::from_str(lockfile).is_ok());
+        assert!(LockfileToml::from_str(lockfile).is_ok());
     }
 }

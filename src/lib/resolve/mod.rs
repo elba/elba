@@ -65,13 +65,13 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(mut self) -> Result<Solve, String> {
+    pub fn solve(mut self) -> Result<Solve, Error> {
         info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
         if r.is_err() {
             error!(self.logger, "solve failed");
-            Err(self.pp_error(self.incompats.len() - 1))
+            Err(format_err!("{}", self.pp_error(self.incompats.len() - 1)))
         } else {
             info!(self.logger, "solve successful");
             Ok(r.unwrap())
@@ -442,6 +442,7 @@ impl<'cache> Resolver<'cache> {
     // 4: Error reporting
     // cause things go bad
     fn pp_error(&self, root_icix: usize) -> String {
+        // TODO: We can build a proper Graph<usize /* ix of incompat */, ()> now
         let mut s = String::new();
         let mut ic_occur = indexmap!();
         let mut linum: IndexMap<usize, u16> = indexmap!();
@@ -463,11 +464,10 @@ impl<'cache> Resolver<'cache> {
             }
         }
 
+        s.push_str("version solving has failed:");
+        s.push_str("\n");
+        s.push_str("\n");
         self.pp_err_recur(root_icix, &ic_occur, &mut linum, &mut cur_linum, &mut s);
-
-        s.push_str("\n");
-        s.push_str("Thus, version solving has failed.");
-        s.push_str("\n");
 
         s
     }
@@ -707,7 +707,9 @@ impl<'cache> Resolver<'cache> {
         cause: IncompatibilityCause,
     ) -> usize {
         let new_ix = self.incompats.len();
-        self.incompats.push(Incompatibility::new(pkgs, cause));
+        let ic = Incompatibility::new(pkgs, cause);
+        trace!(self.logger, "new incompat"; "incompat" => format!("{:?}", ic));
+        self.incompats.push(ic);
         self.incompat_ixs(new_ix);
 
         new_ix

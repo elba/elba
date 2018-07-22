@@ -1,7 +1,8 @@
 use clap::{App, ArgMatches, SubCommand};
-use elba::{cli::new, package::Name, util::{config::Config, errors::Res}};
+use elba::{cli::build, util::{config::Config, errors::Res}};
 use failure::ResultExt;
 use std::env::current_dir;
+use slog::{Discard, Logger};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("lock")
@@ -9,23 +10,18 @@ pub fn cli() -> App<'static, 'static> {
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
-    let name = &*args.value_of_lossy("name").unwrap();
-    let name = Name::new(name.to_owned(), name.to_owned());
-    let bin = !args.is_present("lib");
-    let author = if let Some(profile) = &c.profile {
-        Some((profile.name.clone(), profile.email.clone()))
-    } else {
-        None
-    };
-    let cdir = current_dir().context(format_err!("couldn't get current dir; doesn't exist or no permissions..."))?;
-    let path = cdir.join(format!("{}", name.name()));
+    let project = current_dir().context(format_err!("couldn't get current dir; doesn't exist or no permissions..."))?;
+    let indices = c.indices.iter().cloned().collect::<Vec<_>>();
+    let global_cache = c.directories.cache.clone();
 
-    let new_ctx = new::NewCtx {
-        path: path,
-        author,
-        name,
-        bin,
+    // TODO: Proper log output etc.
+    let logger = Logger::root(Discard, o!());
+
+    let ctx = build::BuildCtx {
+        project, indices, global_cache, logger
     };
 
-    new::new(new_ctx)
+    build::lock(&ctx)?;
+
+    Ok(())
 }

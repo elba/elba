@@ -8,7 +8,7 @@
 
 use package::resolution::DirectRes;
 use indexmap::{IndexMap, IndexSet};
-use std::path::PathBuf;
+use std::{env::home_dir, path::PathBuf};
 
 /// The requested verbosity of output
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
@@ -95,15 +95,16 @@ impl Default for Term {
 
 #[derive(Deserialize, Serialize)]
 pub struct Directories {
-    cache: PathBuf,
-    rest: PathBuf,
+    pub cache: PathBuf,
+    pub rest: PathBuf,
 }
 
 impl Default for Directories {
     fn default() -> Self {
         Directories {
-            cache: "~/.elba".to_owned().into(),
-            rest: "~/.elba".to_owned().into(),
+            // TOOD: no unwrapperino pls
+            cache: home_dir().unwrap().join(".elba"),
+            rest: home_dir().unwrap().join(".elba"),
         }
     }
 }

@@ -10,12 +10,11 @@ extern crate url;
 
 use elba::{
     package::{
-        lockfile::Lockfile,
         resolution::{IndexRes, DirectRes, Resolution},
         Name, PackageId, Summary,
     },
     index::{Index, Indices},
-    resolve::Resolver,
+    resolve::{Resolver, solve::Solve},
     retrieve::{Cache, Retriever},
     util::lock::DirLock,
 };
@@ -103,7 +102,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         root,
         root_deps,
         ixs,
-        Lockfile::default(),
+        Solve::default(),
     )
 }
 
