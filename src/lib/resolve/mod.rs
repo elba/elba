@@ -21,7 +21,7 @@ use package::{
     version::{Constraint, Relation},
     PackageId, Summary,
 };
-use petgraph::Graph;
+use petgraph::{Graph, Direction, graphmap::{DiGraphMap, NodeTrait}};
 use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
@@ -444,30 +444,21 @@ impl<'cache> Resolver<'cache> {
     fn pp_error(&self, root_icix: usize) -> String {
         // TODO: We can build a proper Graph<usize /* ix of incompat */, ()> now
         let mut s = String::new();
-        let mut ic_occur = indexmap!();
         let mut linum: IndexMap<usize, u16> = indexmap!();
         let mut cur_linum = 1;
+        let mut ics = DiGraphMap::<usize, ()>::new();
         for (ix, i) in self.incompats.iter().enumerate() {
-            if !ic_occur.contains_key(&ix) {
-                ic_occur.insert(ix, 0);
-            }
-
+            ics.add_node(ix);
             if let Some((l, r)) = i.derived() {
-                {
-                    let l = ic_occur.entry(l).or_insert_with(|| 0);
-                    *l += 1;
-                }
-                {
-                    let r = ic_occur.entry(r).or_insert_with(|| 0);
-                    *r += 1;
-                }
+                ics.add_edge(ix, l, ());
+                ics.add_edge(ix, r, ());
             }
         }
 
         s.push_str("version solving has failed:");
         s.push_str("\n");
         s.push_str("\n");
-        self.pp_err_recur(root_icix, &ic_occur, &mut linum, &mut cur_linum, &mut s);
+        self.pp_err_recur(root_icix, &ics, &mut linum, &mut cur_linum, &mut s);
 
         s
     }
@@ -475,16 +466,16 @@ impl<'cache> Resolver<'cache> {
     fn pp_err_recur(
         &self,
         icix: usize,
-        ic_occur: &IndexMap<usize, u16>,
+        ics: &DiGraphMap<usize, ()>,
         linum: &mut IndexMap<usize, u16>,
         cur_linum: &mut u16,
         out: &mut String,
     ) {
         let root = &self.incompats[icix];
-        let (left_ix, right_ix) = root.derived().unwrap();
+        let (left_ix, right_ix) = get_two(ics, icix).unwrap();
         let (left, right) = (&self.incompats[left_ix], &self.incompats[right_ix]);
 
-        match (left.derived(), right.derived()) {
+        match (get_two(ics, left_ix), get_two(ics, right_ix)) {
             (Some((l1, l2)), Some((r1, r2))) => {
                 // Case 1 in the Pubgrub doc
                 let left_line = linum.get(&left_ix).cloned();
@@ -496,7 +487,7 @@ impl<'cache> Resolver<'cache> {
                         out.push_str(&left.show_combine(right, Some(l), Some(r)));
                     }
                     (Some(l), None) => {
-                        self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                        self.pp_err_recur(right_ix, ics, linum, cur_linum, out);
                         out.push_str("And because ");
                         out.push_str(&left.show());
                         out.push_str(" (");
@@ -504,7 +495,7 @@ impl<'cache> Resolver<'cache> {
                         out.push_str(")");
                     }
                     (None, Some(r)) => {
-                        self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                        self.pp_err_recur(right_ix, ics, linum, cur_linum, out);
                         out.push_str("And because ");
                         out.push_str(&right.show());
                         out.push_str(" (");
@@ -512,30 +503,25 @@ impl<'cache> Resolver<'cache> {
                         out.push_str(")");
                     }
                     (None, None) => {
-                        let l1_i = &self.incompats[l1];
-                        let l2_i = &self.incompats[l2];
-                        let r1_i = &self.incompats[r1];
-                        let r2_i = &self.incompats[r2];
-
                         match (
-                            l1_i.derived(),
-                            l2_i.derived(),
-                            r1_i.derived(),
-                            r2_i.derived(),
+                            get_two(ics, l1),
+                            get_two(ics, l2),
+                            get_two(ics, r1),
+                            get_two(ics, r2),
                         ) {
                             (Some(_), Some(_), Some(_), Some(_))
                             | (Some(_), Some(_), None, None) => {
-                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
-                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(right_ix, ics, linum, cur_linum, out);
+                                self.pp_err_recur(left_ix, ics, linum, cur_linum, out);
                                 out.push_str("Thus");
                             }
                             (None, None, Some(_), Some(_)) => {
-                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
-                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(left_ix, ics, linum, cur_linum, out);
+                                self.pp_err_recur(right_ix, ics, linum, cur_linum, out);
                                 out.push_str("Thus");
                             }
                             _ => {
-                                self.pp_err_recur(left_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(left_ix, ics, linum, cur_linum, out);
                                 if !linum.contains_key(&left_ix) {
                                     // Remove the \n from before
                                     out.pop();
@@ -547,7 +533,7 @@ impl<'cache> Resolver<'cache> {
                                     out.push_str("\n");
                                 }
                                 out.push_str("\n");
-                                self.pp_err_recur(right_ix, ic_occur, linum, cur_linum, out);
+                                self.pp_err_recur(right_ix, ics, linum, cur_linum, out);
 
                                 // TODO: This just feels wrong
                                 // "Associate this line number with the first cause"
@@ -590,11 +576,11 @@ impl<'cache> Resolver<'cache> {
                     out.push_str("Because ");
                     out.push_str(&external.show_combine(derived, None, Some(l)));
                 } else {
-                    let d2 = &self.incompats[derived_ix].derived();
+                    let d2 = get_two(ics, derived_ix);
                     if d2.is_some()
-                        && ((self.incompats[d2.unwrap().0].is_derived()
+                        && ((get_two(ics, d2.unwrap().0).is_some()
                             && !linum.contains_key(&d2.unwrap().0))
-                            ^ (self.incompats[d2.unwrap().1].is_derived()
+                            ^ (get_two(ics, d2.unwrap().1).is_some()
                                 && !linum.contains_key(&d2.unwrap().1)))
                     {
                         let a = &self.incompats[d2.unwrap().0];
@@ -610,11 +596,11 @@ impl<'cache> Resolver<'cache> {
                             _ => unreachable!(),
                         };
 
-                        self.pp_err_recur(prior_derived_ix, ic_occur, linum, cur_linum, out);
+                        self.pp_err_recur(prior_derived_ix, ics, linum, cur_linum, out);
                         out.push_str("And because ");
                         out.push_str(&prior_external.show_combine(external, None, None));
                     } else {
-                        self.pp_err_recur(derived_ix, ic_occur, linum, cur_linum, out);
+                        self.pp_err_recur(derived_ix, ics, linum, cur_linum, out);
                         out.push_str("And because ");
                         out.push_str(&external.show());
                     }
@@ -625,7 +611,7 @@ impl<'cache> Resolver<'cache> {
         out.push_str(", ");
         out.push_str(&root.show());
         out.push('.');
-        if ic_occur[&icix] >= 2 {
+        if ics.neighbors_directed(icix, Direction::Incoming).count() >= 2 {
             out.push_str(" (");
             out.push_str(&cur_linum.to_string());
             out.push(')');
@@ -723,5 +709,16 @@ impl<'cache> Resolver<'cache> {
                 .or_insert_with(Vec::new)
                 .push(icix);
         }
+    }
+}
+
+fn get_two<T: NodeTrait, E>(graph: &DiGraphMap<T, E>, root: T) -> Option<(T, T)> {
+    let xs = graph.neighbors_directed(root, Direction::Outgoing).collect::<Vec<_>>();
+    if xs.len() == 2 {
+        Some((xs[0], xs[1]))
+    } else if xs.len() == 1 {
+        Some((xs[0], xs[0]))
+    } else {
+        None
     }
 }
