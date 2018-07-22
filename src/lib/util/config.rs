@@ -6,9 +6,10 @@
 //!
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
+use directories::BaseDirs;
 use package::resolution::DirectRes;
 use indexmap::{IndexMap, IndexSet};
-use std::{env::home_dir, path::PathBuf};
+use std::path::PathBuf;
 
 /// The requested verbosity of output
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
@@ -103,8 +104,8 @@ impl Default for Directories {
     fn default() -> Self {
         Directories {
             // TOOD: no unwrapperino pls
-            cache: home_dir().unwrap().join(".elba"),
-            rest: home_dir().unwrap().join(".elba"),
+            cache: BaseDirs::new().unwrap().home_dir().join(".elba"),
+            rest: BaseDirs::new().unwrap().home_dir().join(".elba"),
         }
     }
 }

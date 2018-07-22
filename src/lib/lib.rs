@@ -2,6 +2,7 @@
 
 //! A package manager for the Idris language.
 
+extern crate directories;
 #[macro_use]
 extern crate failure;
 extern crate flate2;
