@@ -263,7 +263,7 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) = DirLock::acquire(&self.location.join(Self::get_index_dir(index))) {
+            let dir = if let Ok(dir) = DirLock::acquire(&self.location.join("indices").join(Self::get_index_dir(index))) {
                 dir
             } else {
                 continue;
