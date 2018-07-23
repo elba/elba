@@ -31,6 +31,7 @@ tar = "0.4"
 toml = "0.4"
 url = "1.7"
 url_serde = "0.2"
+walkdir = "2"
 
 [dev-dependencies]
 lazy_static = "1"

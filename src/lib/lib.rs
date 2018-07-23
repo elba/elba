@@ -29,6 +29,7 @@ extern crate tar;
 extern crate toml;
 extern crate url;
 extern crate url_serde;
+extern crate walkdir;
 
 pub mod build;
 pub mod cli;

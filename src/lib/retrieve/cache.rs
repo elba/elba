@@ -50,15 +50,14 @@
 
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
-use indexmap::IndexMap;
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, IndexRes},
-    version::Constraint,
-    Name, PackageId, Summary,
+    Name, PackageId,
 };
+use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
 use reqwest::Client;
-use resolve::solve::Solve;
+use resolve::solve::SourceSolve;
 use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
@@ -68,18 +67,13 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
-use util::{errors::ErrorKind, hexify_hash, lock::DirLock};
-
-/// Metadata for a package in the Cache.
-///
-/// Note that if a root depends directly on a git repo or path, it doesn't necessarily have a
-/// Constraint (the constraint is contained in the Resolution - use *this* directory or *this*
-/// git commit), so for those packages the Constraint is just "any."
-#[derive(Debug)]
-pub struct CacheMeta {
-    pub version: Version,
-    pub deps: IndexMap<PackageId, Constraint>,
-}
+use tar::Builder;
+use util::{
+    copy,
+    errors::{ErrorKind, Res},
+    hexify_hash,
+    lock::DirLock,
+};
 
 /// A Cache of downloaded packages and packages with no other Index.
 ///
@@ -93,7 +87,7 @@ pub struct CacheMeta {
 #[derive(Debug, Clone)]
 pub struct Cache {
     location: PathBuf,
-    def_index: IndexRes,
+    pub def_index: IndexRes,
     client: Client,
     pub logger: Logger,
 }
@@ -115,15 +109,14 @@ impl Cache {
         }
     }
 
-    /// Retrieve the metadata of a package, loading it into the cache if necessary. This should
-    /// only be used for non-index dependencies.
+    /// Retrieve the metadata of a package, loading it into the cache if necessary.
     pub fn checkout_source(
         &self,
         pkg: &PackageId,
         loc: &DirectRes,
         v: Option<&Version>,
     ) -> Result<Source, Error> {
-        let p = self.load(pkg, loc, v)?;
+        let p = self.load_source(pkg, loc, v)?;
         let mf_path = p.path().join("Cargo.toml");
 
         let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
@@ -133,25 +126,8 @@ impl Cache {
             .context(ErrorKind::InvalidIndex)?;
 
         let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
-        let version = manifest.version().clone();
-        let mut deps = indexmap!();
 
-        // We ignore dev-dependencies because those are only relevant if that package is the root
-        for (n, dep) in &manifest.dependencies {
-            let dep = dep.clone();
-            let (pid, c) = dep.into_dep(self.def_index.clone(), n.clone());
-            deps.insert(pid, c);
-        }
-
-        let meta = CacheMeta { deps, version };
-
-        let source = Source {
-            manifest,
-            meta,
-            location: loc.clone(),
-            path: p,
-        };
-        Ok(source)
+        Source::from_folder(manifest, loc.clone(), p)
     }
 
     // TODO: In the future (heh), return Box<Future<Item = PathBuf, Error = Error>> and use async
@@ -165,18 +141,18 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    pub fn load(
+    fn load_source(
         &self,
         pkg: &PackageId,
         loc: &DirectRes,
         v: Option<&Version>,
     ) -> Result<DirLock, Error> {
-        if let Some(path) = self.check(pkg.name(), loc, v) {
+        if let Some(path) = self.check_source(pkg.name(), loc, v) {
             DirLock::acquire(&path)
         } else {
             let mut p = self.location.clone();
             p.push("src");
-            p.push(Self::get_src_dir(pkg.name(), loc, v));
+            p.push(Self::get_source_dir(pkg.name(), loc, v));
 
             let dir = DirLock::acquire(&p)?;
             loc.retrieve(&self.client, &dir)?;
@@ -186,16 +162,16 @@ impl Cache {
     }
 
     // TODO: Workspaces for git repos.
-    /// Check if package is downloaded and in the cache. If so, returns the path of the cached
+    /// Check if package is downloaded and in the cache. If so, returns the path of source of the cached
     /// package.
-    pub fn check(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
+    fn check_source(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
         if let DirectRes::Dir { url } = loc {
             return Some(url.clone());
         }
 
         let mut path = self.location.clone();
         path.push("src");
-        path.push(Self::get_src_dir(name, loc, v));
+        path.push(Self::get_source_dir(name, loc, v));
         if path.exists() {
             Some(path)
         } else {
@@ -209,7 +185,7 @@ impl Cache {
     ///
     /// Note: with regard to git repos, we treat the same repo with different checked out commits/
     /// tags as completely different repos.
-    fn get_src_dir(name: &Name, loc: &DirectRes, v: Option<&Version>) -> String {
+    fn get_source_dir(name: &Name, loc: &DirectRes, v: Option<&Version>) -> String {
         let mut hasher = Sha256::default();
         hasher.input(name.as_bytes());
         hasher.input(loc.to_string().as_bytes());
@@ -229,19 +205,65 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
+    pub fn checkout_build(&self, root: &Source, graph: &SourceSolve) -> Result<Binary, Error> {
+        let binary_path = self.load_build(root, graph)?;
+        Ok(Binary { binary_path })
+    }
+
+    /// Acquires a lock on a build directory, copying the files from the source if needed.
+    fn load_build(&self, root: &Source, graph: &SourceSolve) -> Result<DirLock, Error> {
+        if let Some(path) = self.check_build(root, graph) {
+            DirLock::acquire(&path)
+        } else {
+            let p = self
+                .location
+                .join("build")
+                .join(Self::get_build_dir(root, graph));
+
+            let dir = DirLock::acquire(&p)?;
+
+            copy(root.path.path(), dir.path())?;
+
+            Ok(dir)
+        }
+    }
+
+    fn check_build(&self, root: &Source, graph: &SourceSolve) -> Option<PathBuf> {
+        let path = self
+            .location
+            .join("build")
+            .join(Self::get_build_dir(root, graph));
+
+        if path.exists() {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    fn get_build_dir(root: &Source, graph: &SourceSolve) -> String {
+        let mut hasher = Sha256::default();
+
+        let rix = graph
+            .node_references()
+            .find(|(_, s)| root.hash == s.hash)
+            .map(|(ix, _)| ix)
+            .unwrap();
+
+        let search = Bfs::new(graph, rix).iter(graph);
+
+        for pkg in search {
+            let src = &graph[pkg];
+            hasher.input(&src.hash.as_bytes());
+        }
+
+        hexify_hash(hasher.result().as_slice())
+    }
+
     fn get_index_dir(loc: &DirectRes) -> String {
         let mut hasher = Sha256::default();
         hasher.input(loc.to_string().as_bytes());
         hexify_hash(hasher.result().as_slice())
-    }
-
-    // Formerly `lock_build_dir`
-    pub fn checkout_build(&self, build: Build) -> Result<Binary, Error> {
-        let path = self.location.join("build").join(build.dir_name());
-
-        let binary_path = DirLock::acquire(&path)?;
-
-        Ok(Binary { build, binary_path })
     }
 
     // TODO: We do a lot of silent erroring. Is that good?
@@ -295,23 +317,20 @@ impl Cache {
 }
 
 /// Information about the source of package that is available somewhere in the file system.
-///
-/// A package is a manifest file plus all the files that are part of it.
+/// Packages are stored as directories on disk (not archives because it would just be a bunch of
+/// pointless unpacking-repacking).
 #[derive(Debug)]
 pub struct Source {
     /// The package's manifest
-    pub manifest: Manifest,
-    pub meta: CacheMeta,
+    pub meta: Manifest,
     pub location: DirectRes,
-    // TODO: Should this be a DirLock?
-    /// The root of the package
+    /// The path to the package.
     pub path: DirLock,
+    pub hash: String,
 }
 
 impl Source {
-    /// Returns a hash of the Source's "contents."
-    ///
-    /// The purpose of this is for builds. The resolution graph only stores Summaries. If we were
+    /// The purpose of having a hash is for builds. The resolution graph only stores Summaries. If we were
     /// to rely solely on hashing the Summaries of a package's dependencies to determine if we need
     /// to rebuild a package, we'd run into a big problem: a package would only get rebuilt iff its
     /// own version changed or a version of one of its dependents changed. This is a problem for
@@ -321,86 +340,44 @@ impl Source {
     /// names never change and don't have a hash, and git repos which pin themselves to a branch
     /// can maintain the same hash while updating their contents.
     ///
+    /// Not only that, but stray ibc files and other miscellaneous crap could get into the source
+    /// directory, which would force us to rebuild yet again.
+    ///
     /// To remedy this, we'd like to have a hash that indicates that the file contents of a Source
-    /// have changed, but having to hash hundreds directories sounds slow.
+    /// have changed.
     ///
-    /// To keep things performant, we don't actually hash every file in a directory. Instead, we
-    /// use metadata which could indicate if the directory's contents have changed.
-    ///
-    ///   - For tarballs with a checksum, we use that checksum.
-    ///   - For git repos, we use the current commit hash.
-    ///   - For everything else, we checksum it ourselves.
-    ///
-    /// Note that this hash differs from the hash used to determine if a package needs to be
+    /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    pub fn hash(&self) -> String {
-        unimplemented!()
-    }
-}
+    pub fn from_folder(meta: Manifest, location: DirectRes, path: DirLock) -> Res<Self> {
+        // Pack into a tar file to hash it quickly
+        let f = fs::File::create(path.path().with_extension("tar"))?;
+        let mut ar = Builder::new(f);
+        ar.append_dir_all("irrelevant", path.path())?;
 
-// TODO: I don't think the struct is necessary; just throw this stuff into Cache
-/// Defines a specific build version of library to distinguish between builds with various dependencies.
-#[derive(Debug)]
-pub struct Build {
-    pub summary: Summary,
-    /// The actual place from which the package is downloaded. This is so that we get a different
-    /// hash if the index changes the location of a package from underneath us.
-    pub location: DirectRes,
-    pub hash: String,
-}
+        let _ = ar.into_inner()?;
 
-impl Build {
-    // TODO: DirectRes deps, like git repos pinned to master or a local dir, can change under our
-    // feet, which should prompt a new build, but doesn't atm. We should keep track of more metadata.
-    // We could accomplish this if the Solve stored Sources instead of Summaries - Sources have a
-    // hash method that tells us if their contents have changed.
-    // Instead, we should just take a single Graph of Sources (maybe sources are the edge idk),
-    // and hash the hash() of every source from the root and down to its deps.
-    pub fn new(summary: Summary, location: DirectRes, resolve: &Solve) -> Self {
-        let mut hasher = Sha256::default();
-        hasher.input(summary.to_string().as_bytes());
-        hasher.input(location.to_string().as_bytes());
-        // We assume here that the summary is for-sure in the resolution tree.
-        for dep in resolve.deps(&summary).unwrap() {
-            hasher.input(dep.id.to_string().as_bytes());
-            hasher.input(dep.version.to_string().as_bytes());
-        }
-        let hash = hexify_hash(hasher.result().as_slice());
+        let p = path.path().with_extension("tar");
+        let mut file = fs::File::open(&p)?;
+        let result = Sha256::digest_reader(&mut file)?;
+        let hash = hexify_hash(result.as_slice());
 
-        Build {
-            summary,
+        // The tarball is useless to us now.
+        drop(file);
+        fs::remove_file(p)?;
+
+        Ok(Source {
+            meta,
             location,
+            path,
             hash,
-        }
-    }
-
-    /// Gets the corresponding directory name of a built package (with ibc files). This directory is
-    /// different from the directory for downloads because the hash takes into consideration more
-    /// factors, like the complete environment that the package was built in (i.e. all of the
-    /// exact dependencies used for this build of the package).
-    ///
-    /// This is necessary because Idris libraries can re-export values of its dependencies; when a
-    /// dependent value changes, it changes in the library itself, causing the generated ibc to be
-    /// totally different. The same package with the same constraints can be resolved with
-    /// different versions in different contexts, so we want to make sure we're using the right
-    /// builds of every package.
-
-    pub fn dir_name(&self) -> String {
-        format!(
-            "{}_{}-{}",
-            self.summary.name().group(),
-            self.summary.name().name(),
-            self.hash
-        )
+        })
     }
 }
 
 /// Information about the build of library that is available somewhere in the file system.
 #[derive(Debug)]
 pub struct Binary {
-    // The built version of the library
-    build: Build,
     /// The path to ibc binary
     binary_path: DirLock,
 }

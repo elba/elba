@@ -72,7 +72,12 @@ impl<'cache> Retriever<'cache> {
         }
 
         if let Resolution::Direct(loc) = pkg.resolution() {
-            return Ok(self.cache.checkout_source(pkg, loc, None)?.meta.version);
+            return Ok(self
+                .cache
+                .checkout_source(pkg, loc, None)?
+                .meta
+                .version()
+                .clone());
         }
 
         if let Resolution::Root = pkg.resolution() {
@@ -125,7 +130,7 @@ impl<'cache> Retriever<'cache> {
                 .cache
                 .checkout_source(pkg.id(), loc, Some(pkg.version()))?
                 .meta
-                .deps;
+                .deps(&self.cache.def_index, false);
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(

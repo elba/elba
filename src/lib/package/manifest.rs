@@ -56,6 +56,25 @@ impl Manifest {
     pub fn version(&self) -> &Version {
         &self.package.version
     }
+
+    pub fn deps(&self, def_index: &IndexRes, dev_deps: bool) -> IndexMap<PackageId, Constraint> {
+        let mut deps = indexmap!();
+        for (n, dep) in &self.dependencies {
+            let dep = dep.clone();
+            let (pid, c) = dep.into_dep(def_index.clone(), n.clone());
+            deps.insert(pid, c);
+        }
+
+        if dev_deps {
+            for (n, dep) in &self.dev_dependencies {
+                let dep = dep.clone();
+                let (pid, c) = dep.into_dep(def_index.clone(), n.clone());
+                deps.insert(pid, c);
+            }
+        }
+
+        deps
+    }
 }
 
 impl FromStr for Manifest {
