@@ -68,18 +68,25 @@ authors = [{}]
     )?;
 
     if !ctx.bin {
-        fs::create_dir_all(path.join(format!("src/{}", name.group().to_pascal_case()))).context(format_err!("could not create dir {}", path.display()))?;
+        fs::create_dir_all(path.join(format!("src/{}", name.group().to_pascal_case())))
+            .context(format_err!("could not create dir {}", path.display()))?;
         write(
-            &path.join(format!("src/{}/{}.idr", name.group().to_pascal_case(), name.name().to_pascal_case())),
+            &path.join(format!(
+                "src/{}/{}.idr",
+                name.group().to_pascal_case(),
+                name.name().to_pascal_case()
+            )),
             format!(
                 r#"module {}.{}
 
 "#,
-                name.group().to_pascal_case(), name.name().to_pascal_case()
-            ).as_bytes()
+                name.group().to_pascal_case(),
+                name.name().to_pascal_case()
+            ).as_bytes(),
         )?;
     } else {
-        fs::create_dir_all(path.join("src")).context(format_err!("could not create dir {}", path.display()))?;
+        fs::create_dir_all(path.join("src"))
+            .context(format_err!("could not create dir {}", path.display()))?;
         write(
             &path.join("src/Main.idr"),
             br#"module Main

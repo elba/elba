@@ -9,12 +9,12 @@ extern crate slog_term;
 extern crate url;
 
 use elba::{
+    index::{Index, Indices},
     package::{
-        resolution::{IndexRes, DirectRes, Resolution},
+        resolution::{DirectRes, IndexRes, Resolution},
         Name, PackageId, Summary,
     },
-    index::{Index, Indices},
-    resolve::{Resolver, solve::Solve},
+    resolve::{solve::Solve, Resolver},
     retrieve::{Cache, Retriever},
     util::lock::DirLock,
 };
@@ -59,7 +59,7 @@ fn new_logger() -> Logger {
 // One reasonable solution would be to change index.toml such that index dependencies are specified
 // in IndexMap form, and indices would be referred to in dependencies by their "short" name. A method
 // dependencies() would turn short names into proper `DirectRes` structs. By doing this, we could
-// do the env! trick within just the index.toml file.  
+// do the env! trick within just the index.toml file.
 fn indices() -> Indices {
     let url = DirectRes::from_str("dir+file://data/index/").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
@@ -80,7 +80,9 @@ fn cache() -> Cache {
     path.push(start);
     path.push("tests/data/cache");
 
-    let def_ix = IndexRes { res: DirectRes::from_str("dir+file://data/index").unwrap() };
+    let def_ix = IndexRes {
+        res: DirectRes::from_str("dir+file://data/index").unwrap(),
+    };
     Cache::from_disk(&LOGGER, path, def_ix)
 }
 

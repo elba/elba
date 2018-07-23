@@ -7,8 +7,8 @@
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
 use directories::BaseDirs;
-use package::resolution::DirectRes;
 use indexmap::{IndexMap, IndexSet};
+use package::resolution::DirectRes;
 use std::path::PathBuf;
 
 /// The requested verbosity of output

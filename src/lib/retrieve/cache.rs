@@ -49,8 +49,8 @@
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
 use failure::{Error, ResultExt};
-use indexmap::IndexMap;
 use index::{Index, Indices};
+use indexmap::IndexMap;
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, IndexRes},
@@ -263,7 +263,12 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) = DirLock::acquire(&self.location.join("indices").join(Self::get_index_dir(index))) {
+            let dir = if let Ok(dir) = DirLock::acquire(
+                &self
+                    .location
+                    .join("indices")
+                    .join(Self::get_index_dir(index)),
+            ) {
                 dir
             } else {
                 continue;
@@ -305,7 +310,7 @@ pub struct Source {
 
 impl Source {
     /// Returns a hash of the Source's "contents."
-    /// 
+    ///
     /// The purpose of this is for builds. The resolution graph only stores Summaries. If we were
     /// to rely solely on hashing the Summaries of a package's dependencies to determine if we need
     /// to rebuild a package, we'd run into a big problem: a package would only get rebuilt iff its
@@ -315,17 +320,17 @@ impl Source {
     /// determines the folder name of a package, it wouldn't be enough. Local dependencies' folder
     /// names never change and don't have a hash, and git repos which pin themselves to a branch
     /// can maintain the same hash while updating their contents.
-    /// 
+    ///
     /// To remedy this, we'd like to have a hash that indicates that the file contents of a Source
-    /// have changed, but having to hash hundreds directories sounds slow. 
-    /// 
+    /// have changed, but having to hash hundreds directories sounds slow.
+    ///
     /// To keep things performant, we don't actually hash every file in a directory. Instead, we
     /// use metadata which could indicate if the directory's contents have changed.
-    /// 
+    ///
     ///   - For tarballs with a checksum, we use that checksum.
     ///   - For git repos, we use the current commit hash.
     ///   - For everything else, we checksum it ourselves.
-    /// 
+    ///
     /// Note that this hash differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.

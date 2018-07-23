@@ -34,23 +34,19 @@ fn cli() -> App<'static, 'static> {
                 .global(true)
                 .conflicts_with("quiet"),
         )
-        .arg(
-            Arg::with_name("quiet")
-                .help("Quiet output")
-                .global(true)
-        )
+        .arg(Arg::with_name("quiet").help("Quiet output").global(true))
         .arg(
             Arg::with_name("color")
                 .long("color")
                 .help("Force-enable color output")
                 .global(true)
-                .conflicts_with("no-color")
+                .conflicts_with("no-color"),
         )
         .arg(
             Arg::with_name("no-color")
                 .long("no-color")
                 .help("Disable color output")
-                .global(true)
+                .global(true),
         )
         .subcommands(cmds::subcommands())
 }

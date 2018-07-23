@@ -23,15 +23,16 @@ impl DirLock {
         // Note! canonicalize will error if the path does not already exist.
         // let path = fs::canonicalize(path).context(ErrorKind::Locked)?;
 
-        let lock_path = {
-            path.with_extension("lock")
-        };
+        let lock_path = { path.with_extension("lock") };
 
         let res = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&lock_path)
-            .map(|_| DirLock { path: path.to_path_buf(), lock_path })
+            .map(|_| DirLock {
+                path: path.to_path_buf(),
+                lock_path,
+            })
             .context(ErrorKind::Locked)?;
 
         Ok(res)

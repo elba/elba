@@ -1,5 +1,13 @@
-use package::{resolution::Resolution, Summary, PackageId, lockfile::{LockfileToml, LockedPkg}};
-use petgraph::{Direction, graph::NodeIndex, visit::{Bfs, IntoNodeReferences, Walker}, Graph};
+use package::{
+    lockfile::{LockedPkg, LockfileToml},
+    resolution::Resolution,
+    PackageId, Summary,
+};
+use petgraph::{
+    graph::NodeIndex,
+    visit::{Bfs, IntoNodeReferences, Walker},
+    Direction, Graph,
+};
 use retrieve::cache::Source;
 use semver::Version;
 
@@ -19,9 +27,11 @@ impl Solve {
     /// Recursively traverse all dependencies of a given root, with breadth first
     pub fn deps<'a>(&'a self, root: &Summary) -> Option<impl Iterator<Item = &Summary> + 'a> {
         let root = self.find_node(root)?;
-        Some(Bfs::new(&self.graph, root)
-            .iter(&self.graph)
-            .map(move |node_id| &self.graph[node_id]))
+        Some(
+            Bfs::new(&self.graph, root)
+                .iter(&self.graph)
+                .map(move |node_id| &self.graph[node_id]),
+        )
     }
 
     pub fn find_node(&self, node: &Summary) -> Option<NodeIndex> {
@@ -44,25 +54,31 @@ impl Into<LockfileToml> for Solve {
         let mut packages = indexset!();
 
         // Just in case the root node ain't at 0
-        let root = self.graph
+        let root = self
+            .graph
             .node_references()
             .find(|(_, sum)| *sum.resolution() == Resolution::Root)
             .map(|(index, _)| index)
             .unwrap_or_else(|| NodeIndex::new(0));
 
-        let deps = Bfs::new(&self.graph, root)
-            .iter(&self.graph);
+        let deps = Bfs::new(&self.graph, root).iter(&self.graph);
 
         for nix in deps {
             let pkg = &self.graph[nix];
-            let mut deps_iter = self.graph.neighbors_directed(nix, Direction::Outgoing).detach();
+            let mut deps_iter = self
+                .graph
+                .neighbors_directed(nix, Direction::Outgoing)
+                .detach();
             let mut this_deps = vec![];
 
             while let Some(dep) = deps_iter.next_node(&self.graph) {
                 this_deps.push(self.graph[dep].clone());
             }
-            
-            packages.insert(LockedPkg { sum: pkg.clone(), dependencies: this_deps });
+
+            packages.insert(LockedPkg {
+                sum: pkg.clone(),
+                dependencies: this_deps,
+            });
         }
 
         LockfileToml { packages }
@@ -105,7 +121,7 @@ impl From<LockfileToml> for Solve {
 impl Default for Solve {
     fn default() -> Self {
         Solve {
-            graph: Graph::new()
+            graph: Graph::new(),
         }
     }
 }

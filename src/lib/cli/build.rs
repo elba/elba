@@ -1,12 +1,16 @@
 use failure::ResultExt;
-use std::{fs, io::prelude::*, path::PathBuf, str::FromStr};
-use util::errors::Res;
+use package::{
+    lockfile::LockfileToml,
+    manifest::Manifest,
+    resolution::{DirectRes, IndexRes},
+};
+use resolve::{solve::Solve, Resolver};
 use retrieve::cache::Cache;
-use package::{lockfile::LockfileToml, manifest::Manifest, resolution::{DirectRes, IndexRes}};
-use slog::Logger;
-use resolve::{Resolver, solve::Solve};
 use retrieve::Retriever;
+use slog::Logger;
+use std::{fs, io::prelude::*, path::PathBuf, str::FromStr};
 use toml;
+use util::errors::Res;
 
 pub struct BuildCtx {
     pub project: PathBuf,
@@ -16,7 +20,8 @@ pub struct BuildCtx {
 }
 
 pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
-    let mut manifest = fs::File::open(ctx.project.join("elba.toml")).context(format_err!("failed to read manifest file."))?;
+    let mut manifest = fs::File::open(ctx.project.join("elba.toml"))
+        .context(format_err!("failed to read manifest file."))?;
     let mut contents = String::new();
     manifest.read_to_string(&mut contents)?;
 
@@ -50,7 +55,11 @@ pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let root = manifest.summary();
     let mut deps = vec![];
 
-    for (n, dep) in manifest.dependencies.iter().chain(manifest.dev_dependencies.iter()) {
+    for (n, dep) in manifest
+        .dependencies
+        .iter()
+        .chain(manifest.dev_dependencies.iter())
+    {
         let dep = dep.clone();
         let (pid, c) = dep.into_dep(def_index.clone(), n.clone());
         deps.push((pid, c));
@@ -62,12 +71,15 @@ pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let mut lockfile = fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .open(&ctx.project.join("elba.lock")).context(format_err!("could not open elba.lock for writing"))?;
+        .open(&ctx.project.join("elba.lock"))
+        .context(format_err!("could not open elba.lock for writing"))?;
 
     let lf_contents: LockfileToml = solve.clone().into();
     let lf_contents = toml::to_string_pretty(&lf_contents)?;
 
-    lockfile.write_all(lf_contents.as_bytes()).context(format_err!("could not write to elba.lock"))?;
+    lockfile
+        .write_all(lf_contents.as_bytes())
+        .context(format_err!("could not write to elba.lock"))?;
 
     Ok((cache, solve))
 }

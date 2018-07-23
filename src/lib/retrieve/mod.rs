@@ -14,7 +14,10 @@ use package::{
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
-use resolve::{incompat::{Incompatibility, IncompatibilityCause}, solve::Solve};
+use resolve::{
+    incompat::{Incompatibility, IncompatibilityCause},
+    solve::Solve,
+};
 use semver::Version;
 use slog::Logger;
 use util::errors::ErrorKind;

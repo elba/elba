@@ -21,7 +21,10 @@ use package::{
     version::{Constraint, Relation},
     PackageId, Summary,
 };
-use petgraph::{Graph, Direction, graphmap::{DiGraphMap, NodeTrait}};
+use petgraph::{
+    graphmap::{DiGraphMap, NodeTrait},
+    Direction, Graph,
+};
 use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
@@ -713,7 +716,9 @@ impl<'cache> Resolver<'cache> {
 }
 
 fn get_two<T: NodeTrait, E>(graph: &DiGraphMap<T, E>, root: T) -> Option<(T, T)> {
-    let xs = graph.neighbors_directed(root, Direction::Outgoing).collect::<Vec<_>>();
+    let xs = graph
+        .neighbors_directed(root, Direction::Outgoing)
+        .collect::<Vec<_>>();
     if xs.len() == 2 {
         Some((xs[0], xs[1]))
     } else if xs.len() == 1 {

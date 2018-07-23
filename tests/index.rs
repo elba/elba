@@ -1,7 +1,11 @@
 extern crate elba;
 extern crate url;
 
-use elba::{index::Index, package::{Name, resolution::DirectRes}, util::lock::DirLock};
+use elba::{
+    index::Index,
+    package::{resolution::DirectRes, Name},
+    util::lock::DirLock,
+};
 use std::{path::PathBuf, str::FromStr};
 
 #[test]

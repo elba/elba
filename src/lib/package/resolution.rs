@@ -237,9 +237,7 @@ impl fmt::Display for DirectRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DirectRes::Git { repo, tag } => write!(f, "dir+{}#{}", repo, tag),
-            DirectRes::Dir { url } => {
-                write!(f, "dir+file://{}", url.display())
-            }
+            DirectRes::Dir { url } => write!(f, "dir+file://{}", url.display()),
             DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
                 write!(
