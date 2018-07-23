@@ -27,7 +27,7 @@ pub fn write(path: &Path, contents: &[u8]) -> Res<()> {
         f.write_all(contents)?;
         Ok(())
     };
-    
+
     f.context(format_err!("failed to write `{}`", path.display()))?;
 
     Ok(())

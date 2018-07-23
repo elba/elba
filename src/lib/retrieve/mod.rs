@@ -7,20 +7,24 @@
 pub mod cache;
 
 pub use self::cache::Cache;
-use failure::Error;
+use failure::{Error, ResultExt};
 use index::Indices;
 use package::{
     resolution::Resolution,
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
+use petgraph::{
+    visit::{Bfs, Walker},
+    Graph,
+};
 use resolve::{
     incompat::{Incompatibility, IncompatibilityCause},
-    solve::Solve,
+    solve::{Solve, SourceSolve},
 };
 use semver::Version;
 use slog::Logger;
-use util::errors::ErrorKind;
+use util::errors::{ErrorKind, Res};
 
 // TODO: Patching
 // TODO: Multiple root packages so we can support workspaces
@@ -56,6 +60,42 @@ impl<'cache> Retriever<'cache> {
             lockfile,
             logger,
         }
+    }
+    
+    /// Loads all of the packages selected in a Solve into the Cache, returning a new graph of all
+    /// the Sources.
+    pub fn retrieve_packages(&mut self, solve: &Solve) -> Res<SourceSolve> {
+        let mut ss: SourceSolve = Graph::new();
+
+        // First, we add all the nodes into our graph.
+        // This downloads all the packages into the cache. If we wanted to parallelize downloads
+        // later, this is where we'd deal with all the Tokio stuff.
+        for node in solve.graph.raw_nodes() {
+            let sum = &node.weight;
+            let loc = if let Resolution::Direct(direct) = sum.resolution() {
+                direct
+            } else {
+                &self.indices.select(sum).unwrap().location
+            };
+
+            let s = self
+                .cache
+                .checkout_source(sum.id(), loc, Some(sum.version()))
+                .context(format_err!("unable to retrieve package {}", sum))?;
+            ss.add_node(s);
+        }
+
+        // Then, we add all the edges.
+        let rix = solve.find_node(&self.root).unwrap();
+        let search = Bfs::new(&solve.graph, rix).iter(&solve.graph);
+
+        for pkg in search {
+            for neighbor in solve.graph.neighbors(pkg) {
+                ss.add_edge(pkg, neighbor, ());
+            }
+        }
+
+        Ok(ss)
     }
 
     /// Chooses the best version of a package given a constraint.
@@ -233,4 +273,5 @@ impl<'cache> Retriever<'cache> {
     pub fn root(&self) -> &Summary {
         &self.root
     }
+
 }

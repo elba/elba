@@ -16,7 +16,7 @@ pub type SourceSolve = Graph<Source, ()>;
 /// Represents a fully resolved package dependency graph.
 #[derive(Debug, Clone)]
 pub struct Solve {
-    graph: Graph<Summary, ()>,
+    pub graph: Graph<Summary, ()>,
 }
 
 impl Solve {
