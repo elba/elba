@@ -10,7 +10,7 @@ use std::{path::PathBuf, str::FromStr};
 
 #[test]
 fn index_success() {
-    let url = DirectRes::from_str("dir+file://data/index").unwrap();
+    let url = DirectRes::from_str("dir+data/index").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::new();
     path.push(start);

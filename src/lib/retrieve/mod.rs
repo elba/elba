@@ -10,7 +10,7 @@ pub use self::cache::Cache;
 use failure::{Error, ResultExt};
 use index::Indices;
 use package::{
-    resolution::Resolution,
+    resolution::{IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
@@ -39,6 +39,7 @@ pub struct Retriever<'cache> {
     indices: Indices,
     lockfile: Solve,
     pub logger: Logger,
+    pub def_index: IndexRes,
 }
 
 impl<'cache> Retriever<'cache> {
@@ -49,6 +50,7 @@ impl<'cache> Retriever<'cache> {
         root_deps: Vec<(PackageId, Constraint)>,
         indices: Indices,
         lockfile: Solve,
+        def_index: IndexRes,
     ) -> Self {
         let logger = plog.new(o!("root" => root.to_string()));
 
@@ -59,9 +61,10 @@ impl<'cache> Retriever<'cache> {
             indices,
             lockfile,
             logger,
+            def_index
         }
     }
-    
+
     /// Loads all of the packages selected in a Solve into the Cache, returning a new graph of all
     /// the Sources.
     pub fn retrieve_packages(&mut self, solve: &Solve) -> Res<SourceSolve> {
@@ -170,7 +173,7 @@ impl<'cache> Retriever<'cache> {
                 .cache
                 .checkout_source(pkg.id(), loc, Some(pkg.version()))?
                 .meta
-                .deps(&self.cache.def_index, false);
+                .deps(&self.def_index, false);
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(
@@ -273,5 +276,4 @@ impl<'cache> Retriever<'cache> {
     pub fn root(&self) -> &Summary {
         &self.root
     }
-
 }

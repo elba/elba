@@ -1,1 +1,1 @@
-{ "name": "conflict_complex/a", "version": "1.0.0", "dependencies": [{ "name": "conflict_complex/b", "index": "index+dir+file://data/index/", "req": "2.0.0" }], "yanked": false, "location": "dir+file://test" }
+{ "name": "conflict_complex/a", "version": "1.0.0", "dependencies": [{ "name": "conflict_complex/b", "index": "index+dir+data/index/", "req": "2.0.0" }], "yanked": false, "location": "dir+test" }

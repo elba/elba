@@ -210,13 +210,7 @@ impl FromStr for DirectRes {
                 Ok(DirectRes::Git { repo: url, tag })
             }
             "dir" => {
-                let url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                if url.scheme() != "file" {
-                    return Err(ErrorKind::InvalidSourceUrl)?;
-                }
-                // We manually do this because to_file_path always gives us an error :v It's dirty,
-                // but it Works(tm)
-                let url = PathBuf::from(&url.as_str()[7..]);
+                let url = PathBuf::from(url);
                 Ok(DirectRes::Dir { url })
             }
             "tar" => {
@@ -236,8 +230,8 @@ impl FromStr for DirectRes {
 impl fmt::Display for DirectRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DirectRes::Git { repo, tag } => write!(f, "dir+{}#{}", repo, tag),
-            DirectRes::Dir { url } => write!(f, "dir+file://{}", url.display()),
+            DirectRes::Git { repo, tag } => write!(f, "git+{}#{}", repo, tag),
+            DirectRes::Dir { url } => write!(f, "dir+{}", url.display()),
             DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
                 write!(

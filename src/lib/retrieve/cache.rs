@@ -52,7 +52,7 @@ use failure::{Error, ResultExt};
 use index::{Index, Indices};
 use package::{
     manifest::Manifest,
-    resolution::{DirectRes, IndexRes},
+    resolution::DirectRes,
     Name, PackageId,
 };
 use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
@@ -62,6 +62,7 @@ use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
 use std::{
+    collections::VecDeque,
     fs,
     io::{prelude::*, BufReader},
     path::PathBuf,
@@ -87,13 +88,12 @@ use util::{
 #[derive(Debug, Clone)]
 pub struct Cache {
     location: PathBuf,
-    pub def_index: IndexRes,
     client: Client,
     pub logger: Logger,
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, location: PathBuf, def_index: IndexRes) -> Self {
+    pub fn from_disk(plog: &Logger, location: PathBuf) -> Self {
         let _ = fs::create_dir_all(location.join("src"));
         let _ = fs::create_dir_all(location.join("build"));
         let _ = fs::create_dir_all(location.join("indices"));
@@ -103,7 +103,6 @@ impl Cache {
 
         Cache {
             location,
-            def_index,
             client,
             logger,
         }
@@ -117,7 +116,7 @@ impl Cache {
         v: Option<&Version>,
     ) -> Result<Source, Error> {
         let p = self.load_source(pkg, loc, v)?;
-        let mf_path = p.path().join("Cargo.toml");
+        let mf_path = p.path().join("elba.toml");
 
         let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
         let mut file = BufReader::new(file);
@@ -126,6 +125,14 @@ impl Cache {
             .context(ErrorKind::InvalidIndex)?;
 
         let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+
+        if manifest.summary().name() != pkg.name() {
+            return Err(format_err!(
+                "names don't match: {} was declared, but {} was found in elba.toml",
+                pkg.name(),
+                manifest.summary().name()
+            ))?;
+        }
 
         Source::from_folder(manifest, loc.clone(), p)
     }
@@ -269,17 +276,22 @@ impl Cache {
     // TODO: We do a lot of silent erroring. Is that good?
     pub fn get_indices(&self, index_reses: &[DirectRes]) -> Indices {
         let mut indices = vec![];
+        let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
 
-        for index in index_reses {
+        while let Some(index) = q.pop_front() {
             // We special-case a local dir index because `dir` won't exist for it.
-            if let DirectRes::Dir { url } = index {
+            if let DirectRes::Dir { url } = &index {
                 let lock = if let Ok(dir) = DirLock::acquire(url) {
                     dir
                 } else {
                     continue;
                 };
+
                 let ix = Index::from_disk(index.clone(), lock);
                 if let Ok(ix) = ix {
+                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                        q.push_back(dependent);
+                    }
                     indices.push(ix);
                 }
                 continue;
@@ -289,7 +301,7 @@ impl Cache {
                 &self
                     .location
                     .join("indices")
-                    .join(Self::get_index_dir(index)),
+                    .join(Self::get_index_dir(&index)),
             ) {
                 dir
             } else {
@@ -299,6 +311,9 @@ impl Cache {
             if dir.path().exists() {
                 let ix = Index::from_disk(index.clone(), dir);
                 if let Ok(ix) = ix {
+                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                        q.push_back(dependent);
+                    }
                     indices.push(ix);
                 }
                 continue;
@@ -307,6 +322,9 @@ impl Cache {
             if index.retrieve(&self.client, &dir).is_ok() {
                 let ix = Index::from_disk(index.clone(), dir);
                 if let Ok(ix) = ix {
+                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                        q.push_back(dependent);
+                    }
                     indices.push(ix);
                 }
             }

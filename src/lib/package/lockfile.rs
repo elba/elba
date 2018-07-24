@@ -43,7 +43,7 @@ id = "terminator/one@index+tar+https://elba.io/pkg"
 version = "0.1.4"
 
 [[packages]]
-id = "good/package@dir+file:///here/there"
+id = "good/package@dir+/here/there"
 version = "1.0.5-alpha.5-zeta.15"
 dependencies = [
     { id = "terminator/one@index+tar+https://elba.io/pkg", version = "0.1.4" }

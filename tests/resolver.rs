@@ -32,7 +32,7 @@ macro_rules! sum {
         let root_name = Name::from_str($a).unwrap();
         let root_pkg = PackageId::new(
             root_name,
-            Resolution::Index(IndexRes::from_str("index+dir+file://data/index/").unwrap()),
+            Resolution::Index(IndexRes::from_str("index+dir+data/index/").unwrap()),
         );
         Summary::new(root_pkg, Version::parse($b).unwrap())
     }};
@@ -61,7 +61,7 @@ fn new_logger() -> Logger {
 // dependencies() would turn short names into proper `DirectRes` structs. By doing this, we could
 // do the env! trick within just the index.toml file.
 fn indices() -> Indices {
-    let url = DirectRes::from_str("dir+file://data/index/").unwrap();
+    let url = DirectRes::from_str("dir+data/index/").unwrap();
     let start = env!("CARGO_MANIFEST_DIR");
     let mut path = PathBuf::new();
     path.push(start);
@@ -80,10 +80,7 @@ fn cache() -> Cache {
     path.push(start);
     path.push("tests/data/cache");
 
-    let def_ix = IndexRes {
-        res: DirectRes::from_str("dir+file://data/index").unwrap(),
-    };
-    Cache::from_disk(&LOGGER, path, def_ix)
+    Cache::from_disk(&LOGGER, path)
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {
@@ -98,6 +95,10 @@ fn retriever(root: Summary) -> Retriever<'static> {
         .map(|d| (PackageId::new(d.name, Resolution::Index(d.index)), d.req))
         .collect::<Vec<_>>();
 
+    let def_ix = IndexRes {
+        res: DirectRes::from_str("dir+data/index/").unwrap(),
+    };
+
     Retriever::new(
         &CACHE.logger.clone(),
         &CACHE,
@@ -105,6 +106,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         root_deps,
         ixs,
         Solve::default(),
+        def_ix,
     )
 }
 

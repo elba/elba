@@ -1,2 +1,2 @@
-{ "name": "conflict_res_partial/target", "version": "1.0.0", "dependencies": [], "yanked": false, "location": "dir+file://test" }
-{ "name": "conflict_res_partial/target", "version": "2.0.0", "dependencies": [], "yanked": false, "location": "dir+file://test" }
+{ "name": "conflict_res_partial/target", "version": "1.0.0", "dependencies": [], "yanked": false, "location": "dir+test" }
+{ "name": "conflict_res_partial/target", "version": "2.0.0", "dependencies": [], "yanked": false, "location": "dir+test" }

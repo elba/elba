@@ -226,7 +226,7 @@ license = 'MIT'
 [dependencies]
 'awesome/a' = '>= 1.0.0 < 2.0.0'
 'cool/b' = { git = 'https://github.com/super/cool', tag = "v1.0.0" }
-'great/c' = { path = 'file://here/right/now' }
+'great/c' = { path = 'here/right/now' }
 
 [dev_dependencies]
 'ayy/x' = '2.0'

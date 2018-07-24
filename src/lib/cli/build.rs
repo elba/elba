@@ -47,13 +47,13 @@ fn solve(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
 
     let def_index = if ctx.indices.is_empty() {
-        IndexRes::from_str("index+dir+file://none").unwrap()
+        IndexRes::from_str("index+dir+none").unwrap()
     } else {
         ctx.indices[0].clone().into()
     };
 
     // TODO: Get indices from config & cache.
-    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), def_index.clone());
+    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone());
     let indices = cache.get_indices(&ctx.indices);
 
     let op = || -> Res<Solve> {
@@ -74,11 +74,11 @@ fn solve(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let root = manifest.summary();
 
     let deps = manifest
-        .deps(&cache.def_index, true)
+        .deps(&def_index, true)
         .into_iter()
         .collect::<Vec<_>>();
 
-    let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock);
+    let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
 
     Ok((cache, solve))

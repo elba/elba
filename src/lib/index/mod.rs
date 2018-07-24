@@ -26,7 +26,7 @@ mod config;
 
 use self::config::IndexConfig;
 use failure::{Error, ResultExt};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::Constraint,
@@ -162,5 +162,9 @@ impl Index {
         }
 
         Ok(res)
+    }
+
+    pub fn depends(&self) -> &IndexSet<IndexRes> {
+        &self.config.index.dependencies
     }
 }
