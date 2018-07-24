@@ -50,11 +50,7 @@
 
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
-use package::{
-    manifest::Manifest,
-    resolution::DirectRes,
-    Name, PackageId,
-};
+use package::{manifest::Manifest, resolution::DirectRes, Name, PackageId};
 use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
 use reqwest::Client;
 use resolve::solve::SourceSolve;
@@ -276,9 +272,13 @@ impl Cache {
     // TODO: We do a lot of silent erroring. Is that good?
     pub fn get_indices(&self, index_reses: &[DirectRes]) -> Indices {
         let mut indices = vec![];
+        let mut seen = vec![];
         let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
 
         while let Some(index) = q.pop_front() {
+            if seen.contains(&index) {
+                continue;
+            }
             // We special-case a local dir index because `dir` won't exist for it.
             if let DirectRes::Dir { url } = &index {
                 let lock = if let Ok(dir) = DirLock::acquire(url) {
@@ -292,6 +292,7 @@ impl Cache {
                     for dependent in ix.depends().iter().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
+                    seen.push(index);
                     indices.push(ix);
                 }
                 continue;
@@ -314,6 +315,7 @@ impl Cache {
                     for dependent in ix.depends().iter().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
+                    seen.push(index);
                     indices.push(ix);
                 }
                 continue;
@@ -325,6 +327,7 @@ impl Cache {
                     for dependent in ix.depends().iter().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
+                    seen.push(index);
                     indices.push(ix);
                 }
             }

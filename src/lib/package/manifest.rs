@@ -81,9 +81,17 @@ impl FromStr for Manifest {
     type Err = Error;
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
-        toml::from_str(raw)
+        let toml: Manifest = toml::from_str(raw)
             .context(ErrorKind::InvalidManifestFile)
-            .map_err(Error::from)
+            .map_err(Error::from)?;
+
+        if toml.targets.lib.is_none() && toml.targets.bin.is_empty() {
+            Err(format_err!(
+                "manifests must define at least either a bin or lib target"
+            ))
+        } else {
+            Ok(toml)
+        }
     }
 }
 

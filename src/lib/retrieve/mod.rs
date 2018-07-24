@@ -61,7 +61,7 @@ impl<'cache> Retriever<'cache> {
             indices,
             lockfile,
             logger,
-            def_index
+            def_index,
         }
     }
 
@@ -108,9 +108,25 @@ impl<'cache> Retriever<'cache> {
         con: &Constraint,
         minimize: bool,
     ) -> Result<Version, Error> {
+        // With stuff from lockfiles, we try to retrieve whatever version was specified in the
+        // lockfile. However, if it fails, we don't want to error out; we want to try to find
+        // the best version we can otherwise.
         if let Some(v) = self.lockfile.get_pkg_version(pkg) {
             if con.satisfies(&v) {
-                return Ok(v);
+                let dir = if let Resolution::Direct(loc) = pkg.resolution() {
+                    Some(loc)
+                } else {
+                    self.indices
+                        .select(&Summary::new(pkg.clone(), v.clone()))
+                        .map(|e| &e.location)
+                        .ok()
+                };
+
+                if let Some(dir) = dir {
+                    if let Ok(src) = self.cache.checkout_source(pkg, dir, Some(&v)) {
+                        return Ok(src.meta.version().clone());
+                    }
+                }
             }
         }
 
