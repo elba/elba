@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod errors;
+pub mod graph;
 pub mod lock;
 pub mod shell;
 
