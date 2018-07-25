@@ -67,7 +67,7 @@ impl<'cache> Retriever<'cache> {
     /// later, this is where we'd deal with all the Tokio stuff.
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
         let sources = solve.map(
-            |sum| {
+            |_, sum| {
                 let wd = DirectRes::Dir {
                     url: env::current_dir()?,
                 };

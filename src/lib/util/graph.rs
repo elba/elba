@@ -56,7 +56,7 @@ impl<T: Eq, E> Graph<T, E> {
     pub fn map<U, V, F, G>(&self, mut f: F, mut g: G) -> Res<Graph<U, V>>
     where
         U: Eq,
-        F: FnMut(&T) -> Res<U>,
+        F: FnMut(NodeIndex, &T) -> Res<U>,
         G: FnMut(&E) -> Res<V>,
     {
         let mut tree = petgraph::Graph::new();
@@ -64,7 +64,7 @@ impl<T: Eq, E> Graph<T, E> {
 
         // First, we add all the nodes into our graph.
         for (idx, weight) in self.inner.node_references() {
-            let new_idx = tree.add_node(f(weight)?);
+            let new_idx = tree.add_node(f(idx, weight)?);
             node_map.insert(idx, new_idx);
         }
 

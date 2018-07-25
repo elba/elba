@@ -1,28 +1,19 @@
 use build::context::BuildContext;
 use failure::Error;
 use petgraph::graph::NodeIndex;
-use retrieve::cache::Binary;
+use retrieve::cache::{Binary, Source};
 use std::collections::VecDeque;
 use util::{errors::Res, graph::Graph};
 
-// TODO: as it is currently, everything gets thrown into the global cache, to keep implementation
-// simple. Fixing this would mean adding a `local: bool` field to Source to let it know that its builds
-// shouldn't be thrown into the global cache (or better yet: adding a `local: bool` parameter to
-// the build family of functions in Cache).
-//
-// Additionally, we have no way of depending on the existence of binaries down the dependency tree.
-// To solve this, we should change Retriever::retrieve_packages so that it returns Res<Graph<Source,
-// bool>> where the bool represents if it should build bins alongside libs. This might mean changing
-// the index format a little as well.
-//
-// If we want "custom tasks" or whatever, those have to be binary dependencies. How do we do that?
-pub fn plan(root_mode: CompileMode, bcx: BuildContext) -> Res<JobQueue> {
+// A task is an elba subcommand that should only be available from the current root project. Tasks
+// is a list of the Sources of all the tasks needed for this build.
+pub fn plan(root_mode: CompileMode, tasks: &[Source], bcx: BuildContext) -> Res<JobQueue> {
     let oldg = &bcx.resolve;
-    let mut graph = oldg.map(
-        |s| {
+    let graph = oldg.map(
+        |ix, s| {
             Ok(Job {
-                source: bcx.cache.checkout_build(s, &oldg)?,
-                compile_mode: CompileMode::Lib,
+                source: bcx.cache.checkout_build(s, &oldg, ix == NodeIndex::new(0) || tasks.contains(s))?,
+                compile_mode: if ix == NodeIndex::new(0) { root_mode } else if tasks.contains(s) { CompileMode::Bin } else { CompileMode::Lib },
             })
         },
         |_| Ok(()),
@@ -30,8 +21,6 @@ pub fn plan(root_mode: CompileMode, bcx: BuildContext) -> Res<JobQueue> {
     // We drop the old context to drop all of the Sources, releasing our lock on them. We
     // don't need them anymore.
     drop(bcx);
-
-    graph.inner[NodeIndex::new(0)].compile_mode = root_mode;
 
     let queue = graph
         .sub_tree(&graph.inner[NodeIndex::new(0)])
