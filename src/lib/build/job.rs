@@ -1,19 +1,29 @@
 use build::context::BuildContext;
 use failure::Error;
 use petgraph::graph::NodeIndex;
-use retrieve::cache::{Binary, Source};
+use retrieve::cache::Binary;
 use std::collections::VecDeque;
 use util::{errors::Res, graph::Graph};
 
 // A task is an elba subcommand that should only be available from the current root project. Tasks
 // is a list of the Sources of all the tasks needed for this build.
-pub fn plan(root_mode: CompileMode, tasks: &[Source], bcx: BuildContext) -> Res<JobQueue> {
+pub fn plan(root_mode: CompileMode, tasks: &[NodeIndex], bcx: BuildContext) -> Res<JobQueue> {
     let oldg = &bcx.resolve;
     let graph = oldg.map(
         |ix, s| {
             Ok(Job {
-                source: bcx.cache.checkout_build(s, &oldg, ix == NodeIndex::new(0) || tasks.contains(s))?,
-                compile_mode: if ix == NodeIndex::new(0) { root_mode } else if tasks.contains(s) { CompileMode::Bin } else { CompileMode::Lib },
+                source: bcx.cache.checkout_build(
+                    s,
+                    &oldg,
+                    ix == NodeIndex::new(0) || tasks.contains(&ix),
+                )?,
+                compile_mode: if ix == NodeIndex::new(0) {
+                    root_mode
+                } else if tasks.contains(&ix) {
+                    CompileMode::Bin
+                } else {
+                    CompileMode::Lib
+                },
             })
         },
         |_| Ok(()),

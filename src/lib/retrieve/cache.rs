@@ -57,8 +57,7 @@ use sha2::{Digest, Sha256};
 use slog::Logger;
 use std::{
     collections::VecDeque,
-    env,
-    fs,
+    env, fs,
     io::{prelude::*, BufReader},
     path::PathBuf,
     str::FromStr,
@@ -194,7 +193,12 @@ impl Cache {
 
     // TODO: local `target/` dir.
     /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
-    pub fn checkout_build(&self, root: &Source, sources: &Graph<Source>, local: bool) -> Result<Binary, Error> {
+    pub fn checkout_build(
+        &self,
+        root: &Source,
+        sources: &Graph<Source>,
+        local: bool,
+    ) -> Result<Binary, Error> {
         if let Some(path) = self.check_build(&root, sources, local) {
             Ok(Binary::Built(DirLock::acquire(&path)?))
         } else {
@@ -222,9 +226,7 @@ impl Cache {
         } else {
             self.location.to_owned()
         };
-        let path = path
-            .join("build")
-            .join(Self::get_build_dir(root, sources));
+        let path = path.join("build").join(Self::get_build_dir(root, sources));
 
         if path.exists() {
             Some(path)
