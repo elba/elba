@@ -6,7 +6,7 @@
 
 pub mod cache;
 
-pub use self::cache::Cache;
+pub use self::cache::{Cache, Source};
 use failure::{Error, ResultExt};
 use index::Indices;
 use package::{
@@ -14,17 +14,11 @@ use package::{
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
-use petgraph::{
-    visit::{Bfs, Walker},
-    Graph,
-};
-use resolve::{
-    incompat::{Incompatibility, IncompatibilityCause},
-    solve::{Solve, SourceSolve},
-};
+use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
 use util::errors::{ErrorKind, Res};
+use util::graph::Graph;
 
 // TODO: Patching
 // TODO: Multiple root packages so we can support workspaces
@@ -37,7 +31,7 @@ pub struct Retriever<'cache> {
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
     indices: Indices,
-    lockfile: Solve,
+    lockfile: Graph<Summary>,
     pub logger: Logger,
     pub def_index: IndexRes,
 }
@@ -49,7 +43,7 @@ impl<'cache> Retriever<'cache> {
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
         indices: Indices,
-        lockfile: Solve,
+        lockfile: Graph<Summary>,
         def_index: IndexRes,
     ) -> Self {
         let logger = plog.new(o!("root" => root.to_string()));
@@ -67,38 +61,26 @@ impl<'cache> Retriever<'cache> {
 
     /// Loads all of the packages selected in a Solve into the Cache, returning a new graph of all
     /// the Sources.
-    pub fn retrieve_packages(&mut self, solve: &Solve) -> Res<SourceSolve> {
-        let mut ss: SourceSolve = Graph::new();
-
-        // First, we add all the nodes into our graph.
-        // This downloads all the packages into the cache. If we wanted to parallelize downloads
-        // later, this is where we'd deal with all the Tokio stuff.
-        for node in solve.graph.raw_nodes() {
-            let sum = &node.weight;
+    ///
+    /// This downloads all the packages into the cache. If we wanted to parallelize downloads
+    /// later, this is where we'd deal with all the Tokio stuff.
+    pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
+        let sources = solve.map(|sum| {
             let loc = if let Resolution::Direct(direct) = sum.resolution() {
                 direct
             } else {
                 &self.indices.select(sum).unwrap().location
             };
 
-            let s = self
+            let source = self
                 .cache
                 .checkout_source(sum.id(), loc, Some(sum.version()))
                 .context(format_err!("unable to retrieve package {}", sum))?;
-            ss.add_node(s);
-        }
 
-        // Then, we add all the edges.
-        let rix = solve.find_node(&self.root).unwrap();
-        let search = Bfs::new(&solve.graph, rix).iter(&solve.graph);
+            Ok(source)
+        })?;
 
-        for pkg in search {
-            for neighbor in solve.graph.neighbors(pkg) {
-                ss.add_edge(pkg, neighbor, ());
-            }
-        }
-
-        Ok(ss)
+        Ok(sources)
     }
 
     /// Chooses the best version of a package given a constraint.
@@ -111,7 +93,11 @@ impl<'cache> Retriever<'cache> {
         // With stuff from lockfiles, we try to retrieve whatever version was specified in the
         // lockfile. However, if it fails, we don't want to error out; we want to try to find
         // the best version we can otherwise.
-        if let Some(v) = self.lockfile.get_pkg_version(pkg) {
+        let pkg_verion = self
+            .lockfile
+            .find_by(|sum| sum.id == *pkg)
+            .map(|meta| &meta.version);
+        if let Some(v) = pkg_verion {
             if con.satisfies(&v) {
                 let dir = if let Resolution::Direct(loc) = pkg.resolution() {
                     Some(loc)

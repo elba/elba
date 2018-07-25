@@ -3,14 +3,16 @@ use package::{
     lockfile::LockfileToml,
     manifest::Manifest,
     resolution::{DirectRes, IndexRes},
+    Summary,
 };
-use resolve::{solve::Solve, Resolver};
+use resolve::Resolver;
 use retrieve::cache::Cache;
 use retrieve::Retriever;
 use slog::Logger;
 use std::{fs, io::prelude::*, path::PathBuf, str::FromStr};
 use toml;
 use util::errors::Res;
+use util::graph::Graph;
 
 pub struct BuildCtx {
     pub project: PathBuf,
@@ -19,7 +21,7 @@ pub struct BuildCtx {
     pub logger: Logger,
 }
 
-pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
+pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Graph<Summary>)> {
     let (cache, solve) = solve(ctx)?;
 
     let mut lockfile = fs::OpenOptions::new()
@@ -38,7 +40,7 @@ pub fn lock(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     Ok((cache, solve))
 }
 
-fn solve(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
+fn solve(ctx: &BuildCtx) -> Res<(Cache, Graph<Summary>)> {
     let mut manifest = fs::File::open(ctx.project.join("elba.toml"))
         .context(format_err!("failed to read manifest file."))?;
     let mut contents = String::new();
@@ -56,7 +58,7 @@ fn solve(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone());
     let indices = cache.get_indices(&ctx.indices);
 
-    let op = || -> Res<Solve> {
+    let op = || -> Res<Graph<Summary>> {
         let mut f = fs::File::open(&ctx.project.join("elba.lock"))?;
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
@@ -68,7 +70,7 @@ fn solve(ctx: &BuildCtx) -> Res<(Cache, Solve)> {
     let lock = if let Ok(solve) = op() {
         solve
     } else {
-        Solve::default()
+        Graph::default()
     };
 
     let root = manifest.summary();
