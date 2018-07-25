@@ -51,9 +51,7 @@
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
 use package::{manifest::Manifest, resolution::DirectRes, Name, PackageId};
-use petgraph::visit::{Bfs, IntoNodeReferences, Walker};
 use reqwest::Client;
-use resolve::solve::SourceSolve;
 use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
@@ -68,6 +66,7 @@ use tar::Builder;
 use util::{
     copy,
     errors::{ErrorKind, Res},
+    graph::Graph,
     hexify_hash,
     lock::DirLock,
 };
@@ -208,20 +207,20 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    pub fn checkout_build(&self, root: &Source, graph: &SourceSolve) -> Result<Binary, Error> {
-        let binary_path = self.load_build(root, graph)?;
+    pub fn checkout_build(&self, root: &Source, sources: &Graph<Source>) -> Result<Binary, Error> {
+        let binary_path = self.load_build(root, sources)?;
         Ok(Binary { binary_path })
     }
 
     /// Acquires a lock on a build directory, copying the files from the source if needed.
-    fn load_build(&self, root: &Source, graph: &SourceSolve) -> Result<DirLock, Error> {
-        if let Some(path) = self.check_build(root, graph) {
+    fn load_build(&self, root: &Source, sources: &Graph<Source>) -> Result<DirLock, Error> {
+        if let Some(path) = self.check_build(root, sources) {
             DirLock::acquire(&path)
         } else {
             let p = self
                 .location
                 .join("build")
-                .join(Self::get_build_dir(root, graph));
+                .join(Self::get_build_dir(root, sources));
 
             let dir = DirLock::acquire(&p)?;
 
@@ -231,11 +230,11 @@ impl Cache {
         }
     }
 
-    fn check_build(&self, root: &Source, graph: &SourceSolve) -> Option<PathBuf> {
+    fn check_build(&self, root: &Source, sources: &Graph<Source>) -> Option<PathBuf> {
         let path = self
             .location
             .join("build")
-            .join(Self::get_build_dir(root, graph));
+            .join(Self::get_build_dir(root, sources));
 
         if path.exists() {
             Some(path)
@@ -244,19 +243,10 @@ impl Cache {
         }
     }
 
-    fn get_build_dir(root: &Source, graph: &SourceSolve) -> String {
+    fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
         let mut hasher = Sha256::default();
 
-        let rix = graph
-            .node_references()
-            .find(|(_, s)| root.hash == s.hash)
-            .map(|(ix, _)| ix)
-            .unwrap();
-
-        let search = Bfs::new(graph, rix).iter(graph);
-
-        for pkg in search {
-            let src = &graph[pkg];
+        for src in sources.sub_tree(root).unwrap() {
             hasher.input(&src.hash.as_bytes());
         }
 
@@ -395,6 +385,14 @@ impl Source {
         })
     }
 }
+
+impl PartialEq for Source {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl Eq for Source {}
 
 /// Information about the build of library that is available somewhere in the file system.
 #[derive(Debug)]

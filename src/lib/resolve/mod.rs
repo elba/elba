@@ -8,12 +8,10 @@
 
 pub mod assignment;
 pub mod incompat;
-pub mod solve;
 
 use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
-    solve::Solve,
 };
 use failure::Error;
 use indexmap::IndexMap;
@@ -22,14 +20,16 @@ use package::{
     PackageId, Summary,
 };
 use petgraph::{
+    self,
     graphmap::{DiGraphMap, NodeTrait},
-    Direction, Graph,
+    Direction,
 };
 use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
 use std::{cmp, collections::VecDeque};
 use util::errors::ErrorKind;
+use util::graph::Graph;
 
 #[derive(Debug)]
 pub struct Resolver<'cache> {
@@ -68,7 +68,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(mut self) -> Result<Solve, Error> {
+    pub fn solve(mut self) -> Result<Graph<Summary>, Error> {
         info!(self.logger, "beginning dependency resolution");
         let r = self.solve_loop();
 
@@ -81,7 +81,7 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Solve, Error> {
+    fn solve_loop(&mut self) -> Result<Graph<Summary>, Error> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -95,7 +95,7 @@ impl<'cache> Resolver<'cache> {
         // To build the tree, we're gonna go through all our dependencies and get their deps,
         // and build our tree with a BFS. It's one last inefficient process before we have our
         // nice resolution... oh well.
-        let mut tree = Graph::new();
+        let mut tree = petgraph::Graph::new();
         let mut set = indexmap!();
         let mut q = VecDeque::new();
         let root = self.retriever.root().clone();
@@ -126,7 +126,7 @@ impl<'cache> Resolver<'cache> {
             }
         }
 
-        Ok(Solve::new(tree))
+        Ok(Graph::new(tree))
     }
 
     // 1: Unit propagation

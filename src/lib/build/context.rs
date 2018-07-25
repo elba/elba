@@ -1,6 +1,6 @@
 use package::Summary;
-use petgraph::Graph;
 use std::{path::PathBuf, process::Command};
+use util::graph::Graph;
 
 /// An unit that elba knows how to build it
 // #[derive(Debug)]
@@ -21,7 +21,7 @@ use std::{path::PathBuf, process::Command};
 // TODO: triple target
 pub struct BuildContext<'a> {
     pub compiler: Compiler,
-    pub resolve: &'a Graph<Summary, ()>,
+    pub resolve: &'a Graph<Summary>,
 }
 
 // TODO: Verbosity, Total checking

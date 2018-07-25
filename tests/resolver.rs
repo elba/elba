@@ -14,9 +14,9 @@ use elba::{
         resolution::{DirectRes, IndexRes, Resolution},
         Name, PackageId, Summary,
     },
-    resolve::{solve::Solve, Resolver},
+    resolve::Resolver,
     retrieve::{Cache, Retriever},
-    util::lock::DirLock,
+    util::{graph::Graph, lock::DirLock},
 };
 use semver::Version;
 use slog::*;
@@ -105,7 +105,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         root,
         root_deps,
         ixs,
-        Solve::default(),
+        Graph::default(),
         def_ix,
     )
 }
