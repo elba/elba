@@ -20,7 +20,7 @@ use failure::Error;
 // Interaction with the main repo would just be implemented as a custom task.
 // Maybe tasks should be allowed to be designated in the manifest too. These would be placed in the
 // local target bin directory, not the global bin directory, but would otherwise be treated like
-// dependencies (or maybe as other root packages).
+// dependencies.
 
 fn cli() -> App<'static, 'static> {
     App::new("elba")

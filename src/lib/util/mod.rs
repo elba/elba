@@ -34,7 +34,7 @@ pub fn write(path: &Path, contents: &[u8]) -> Res<()> {
     Ok(())
 }
 
-pub fn copy(from: &Path, to: &Path) -> Res<()> {
+pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     let walker = WalkDir::new(from)
         .into_iter()
         .filter_entry(|e| valid_file(e));

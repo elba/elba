@@ -1,4 +1,4 @@
-use package::Summary;
+use retrieve::cache::{Cache, Source};
 use std::{path::PathBuf, process::Command};
 use util::graph::Graph;
 
@@ -19,12 +19,15 @@ use util::graph::Graph;
 // }
 
 // TODO: triple target
+#[derive(Debug)]
 pub struct BuildContext<'a> {
     pub compiler: Compiler,
-    pub resolve: &'a Graph<Summary>,
+    pub resolve: Graph<Source>,
+    pub cache: &'a Cache,
+    pub config: BuildConfig,
 }
 
-// TODO: Verbosity, Total checking
+// TODO: Verbosity, totality checking
 #[derive(Debug)]
 pub struct BuildConfig {}
 

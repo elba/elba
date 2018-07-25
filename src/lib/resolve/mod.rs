@@ -74,7 +74,7 @@ impl<'cache> Resolver<'cache> {
 
         if r.is_err() {
             error!(self.logger, "solve failed");
-            Err(format_err!("{}", self.pp_error(self.incompats.len() - 1)))
+            bail!("{}", self.pp_error(self.incompats.len() - 1))
         } else {
             info!(self.logger, "solve successful");
             Ok(r.unwrap())

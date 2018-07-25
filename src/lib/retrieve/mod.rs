@@ -10,13 +10,14 @@ pub use self::cache::{Cache, Source};
 use failure::{Error, ResultExt};
 use index::Indices;
 use package::{
-    resolution::{IndexRes, Resolution},
+    resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
+use std::env;
 use util::errors::{ErrorKind, Res};
 use util::graph::Graph;
 
@@ -65,20 +66,27 @@ impl<'cache> Retriever<'cache> {
     /// This downloads all the packages into the cache. If we wanted to parallelize downloads
     /// later, this is where we'd deal with all the Tokio stuff.
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
-        let sources = solve.map(|sum| {
-            let loc = if let Resolution::Direct(direct) = sum.resolution() {
-                direct
-            } else {
-                &self.indices.select(sum).unwrap().location
-            };
+        let sources = solve.map(
+            |sum| {
+                let wd = DirectRes::Dir {
+                    url: env::current_dir()?,
+                };
 
-            let source = self
-                .cache
-                .checkout_source(sum.id(), loc, Some(sum.version()))
-                .context(format_err!("unable to retrieve package {}", sum))?;
+                let loc = match sum.resolution() {
+                    Resolution::Direct(direct) => direct,
+                    Resolution::Root => &wd,
+                    Resolution::Index(_) => &self.indices.select(sum).unwrap().location,
+                };
 
-            Ok(source)
-        })?;
+                let source = self
+                    .cache
+                    .checkout_source(sum.id(), loc, Some(sum.version()))
+                    .context(format_err!("unable to retrieve package {}", sum))?;
+
+                Ok(source)
+            },
+            |_| Ok(()),
+        )?;
 
         Ok(sources)
     }

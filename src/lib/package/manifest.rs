@@ -35,7 +35,7 @@ use util::errors::*;
 //
 // With this in place, we can safely avoid module namespace conflicts.
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Manifest {
     package: PackageInfo,
     #[serde(default = "IndexMap::new")]
@@ -86,16 +86,14 @@ impl FromStr for Manifest {
             .map_err(Error::from)?;
 
         if toml.targets.lib.is_none() && toml.targets.bin.is_empty() {
-            Err(format_err!(
-                "manifests must define at least either a bin or lib target"
-            ))
+            bail!("manifests must define at least either a bin or lib target")
         } else {
             Ok(toml)
         }
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct PackageInfo {
     name: Name,
     version: Version,
@@ -195,9 +193,9 @@ impl Default for PkgGitSpecifier {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Targets {
-    lib: Option<Target>,
+    lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]
     bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
@@ -206,12 +204,18 @@ struct Targets {
     bench: Vec<Target>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Target {
     path: PathBuf,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
+struct LibTarget {
+    path: PathBuf,
+    mods: Vec<String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 struct BinTarget {
     name: String,
     // For binaries, benches, and tests, this should point to a file with a Main module.
@@ -245,6 +249,11 @@ main = 'src/bin/Here.idr'
 
 [targets.lib]
 path = "src/lib/"
+mods = [
+    "Control.Monad.Wow",
+    "Control.Monad.Yeet",
+    "RingDing.Test"
+]
 "#;
 
         assert!(Manifest::from_str(manifest).is_ok());

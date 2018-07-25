@@ -64,7 +64,7 @@ use std::{
 };
 use tar::Builder;
 use util::{
-    copy,
+    copy_dir,
     errors::{ErrorKind, Res},
     graph::Graph,
     hexify_hash,
@@ -92,6 +92,7 @@ impl Cache {
         let _ = fs::create_dir_all(location.join("src"));
         let _ = fs::create_dir_all(location.join("build"));
         let _ = fs::create_dir_all(location.join("indices"));
+        let _ = fs::create_dir_all(location.join("tmp"));
 
         let client = Client::new();
         let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
@@ -111,25 +112,8 @@ impl Cache {
         v: Option<&Version>,
     ) -> Result<Source, Error> {
         let p = self.load_source(pkg, loc, v)?;
-        let mf_path = p.path().join("elba.toml");
 
-        let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
-        let mut file = BufReader::new(file);
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .context(ErrorKind::InvalidIndex)?;
-
-        let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
-
-        if manifest.summary().name() != pkg.name() {
-            return Err(format_err!(
-                "names don't match: {} was declared, but {} was found in elba.toml",
-                pkg.name(),
-                manifest.summary().name()
-            ))?;
-        }
-
-        Source::from_folder(manifest, loc.clone(), p)
+        Source::from_folder(pkg, p, loc.clone())
     }
 
     // TODO: In the future (heh), return Box<Future<Item = PathBuf, Error = Error>> and use async
@@ -207,26 +191,27 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
+    // TODO: local `target/` dir.
+    /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
     pub fn checkout_build(&self, root: &Source, sources: &Graph<Source>) -> Result<Binary, Error> {
-        let binary_path = self.load_build(root, sources)?;
-        Ok(Binary { binary_path })
-    }
-
-    /// Acquires a lock on a build directory, copying the files from the source if needed.
-    fn load_build(&self, root: &Source, sources: &Graph<Source>) -> Result<DirLock, Error> {
-        if let Some(path) = self.check_build(root, sources) {
-            DirLock::acquire(&path)
+        if let Some(path) = self.check_build(&root, sources) {
+            Ok(Binary::Built(DirLock::acquire(&path)?))
         } else {
-            let p = self
+            let tp = self
+                .location
+                .join("tmp")
+                .join(Self::get_build_dir(&root, sources));
+
+            let bp = self
                 .location
                 .join("build")
-                .join(Self::get_build_dir(root, sources));
+                .join(Self::get_build_dir(&root, sources));
 
-            let dir = DirLock::acquire(&p)?;
+            let td = DirLock::acquire(&tp)?;
+            copy_dir(root.path.path(), td.path())?;
+            let bd = DirLock::acquire(&bp)?;
 
-            copy(root.path.path(), dir.path())?;
-
-            Ok(dir)
+            Ok(Binary::New(root.with_path(td), bd))
         }
     }
 
@@ -246,16 +231,10 @@ impl Cache {
     fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
         let mut hasher = Sha256::default();
 
-        for src in sources.sub_tree(root).unwrap() {
+        for (_, src) in sources.sub_tree(root).unwrap() {
             hasher.input(&src.hash.as_bytes());
         }
 
-        hexify_hash(hasher.result().as_slice())
-    }
-
-    fn get_index_dir(loc: &DirectRes) -> String {
-        let mut hasher = Sha256::default();
-        hasher.input(loc.to_string().as_bytes());
         hexify_hash(hasher.result().as_slice())
     }
 
@@ -325,6 +304,12 @@ impl Cache {
 
         Indices::new(indices)
     }
+
+    fn get_index_dir(loc: &DirectRes) -> String {
+        let mut hasher = Sha256::default();
+        hasher.input(loc.to_string().as_bytes());
+        hexify_hash(hasher.result().as_slice())
+    }
 }
 
 /// Information about the source of package that is available somewhere in the file system.
@@ -360,7 +345,25 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    pub fn from_folder(meta: Manifest, location: DirectRes, path: DirLock) -> Res<Self> {
+    pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
+        let mf_path = path.path().join("elba.toml");
+
+        let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
+        let mut file = BufReader::new(file);
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .context(ErrorKind::InvalidIndex)?;
+
+        let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+
+        if manifest.summary().name() != pkg.name() {
+            bail!(
+                "names don't match: {} was declared, but {} was found in elba.toml",
+                pkg.name(),
+                manifest.summary().name()
+            )
+        }
+
         // Pack into a tar file to hash it quickly
         let f = fs::File::create(path.path().with_extension("tar"))?;
         let mut ar = Builder::new(f);
@@ -378,11 +381,20 @@ impl Source {
         fs::remove_file(p)?;
 
         Ok(Source {
-            meta,
+            meta: manifest,
             location,
             path,
             hash,
         })
+    }
+
+    pub fn with_path(&self, p: DirLock) -> Source {
+        Source {
+            meta: self.meta.clone(),
+            location: self.location.clone(),
+            hash: self.hash.clone(),
+            path: p,
+        }
     }
 }
 
@@ -395,8 +407,8 @@ impl PartialEq for Source {
 impl Eq for Source {}
 
 /// Information about the build of library that is available somewhere in the file system.
-#[derive(Debug)]
-pub struct Binary {
-    /// The path to ibc binary
-    binary_path: DirLock,
+#[derive(Debug, PartialEq, Eq)]
+pub enum Binary {
+    Built(DirLock),
+    New(Source, DirLock),
 }

@@ -12,7 +12,7 @@ use std::{
 
 /// A lock on a directory. This just generates a sibling file to the directory which indicates that
 /// the directory is locked.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DirLock {
     path: PathBuf,
     lock_path: PathBuf,

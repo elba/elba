@@ -43,9 +43,9 @@ impl Into<LockfileToml> for Graph<Summary> {
             .find_by(|sum| *sum.resolution() == Resolution::Root)
             .unwrap();
 
-        let pkg_iter = self.sub_tree(root).unwrap().map(|pkg| LockedPkg {
+        let pkg_iter = self.sub_tree(root).unwrap().map(|(_, pkg)| LockedPkg {
             sum: pkg.clone(),
-            dependencies: self.children(pkg).unwrap().cloned().collect(),
+            dependencies: self.children(pkg).unwrap().map(|x| x.1).cloned().collect(),
         });
 
         let packages = IndexSet::from_iter(pkg_iter);
