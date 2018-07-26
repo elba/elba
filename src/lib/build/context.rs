@@ -1,22 +1,6 @@
-use retrieve::cache::{Cache, Source};
+use retrieve::{Cache, Source};
 use std::{path::PathBuf, process::Command};
 use util::graph::Graph;
-
-/// An unit that elba knows how to build it
-// #[derive(Debug)]
-// pub struct Unit<'a> {
-//     summary: Summary,
-//     resolve: &'a Graph<Summary, ()>,
-// }
-
-// impl<'a> Unit<'a> {
-//     pub fn new(summary: Summary, bcx: BuildContext<'a>) -> Self {
-//         Unit {
-//             summary,
-//             resolve: bcx.resolve
-//         }
-//     }
-// }
 
 // TODO: triple target
 #[derive(Debug)]

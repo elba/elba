@@ -1,120 +1,85 @@
 //! Utilities for interacting with the Idris compiler
 
-use std::fs;
 use std::path::PathBuf;
 
-use failure::{err_msg, Error};
-
 use super::context::BuildContext;
+use super::Layout;
 use package::Name;
-use util::lock::DirLock;
+use retrieve::{Binary, Source};
+use util::{self, errors::Res};
 
 #[derive(Debug)]
 pub struct CompileInvocation {
-    src: PathBuf,
-    dep_builds: Vec<(Name, PathBuf)>,
-    build_dir: BuildDir,
+    pub src: Source,
+    pub deps: Vec<(Name, Binary)>,
+    pub layout: Layout,
+    // A target is a relative path from source root to a source file.
+    // Targets can be modules of lib or main entry of binary. All targets will get compiled.
+    pub targets: Vec<PathBuf>,
 }
 
 impl CompileInvocation {
-    pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
-        // set up file structure of dependencies
-        for (name, dep_build) in &self.dep_builds {
-            if dep_build
-                .extension()
-                .filter(|ext| ext.to_str() == Some("ibc"))
-                .is_none()
-            {
-                bail!("Dependency build '{:?}' is supposed to be .ibc", dep_build);
-            }
+    pub fn execute(&mut self, bcx: &mut BuildContext) -> Res<Vec<PathBuf>> {
+        util::clear_dir(&self.layout.build)?;
 
-            let mut dep_file_dest = self.build_dir.build.join(name.group());
-            dep_file_dest.set_file_name(name.name());
-            dep_file_dest.set_extension("ibc");
-
-            fs::copy(dep_build, dep_file_dest)?;
+        // setup dependencies
+        for (name, binary) in &self.deps {
+            let dep_dir = self.layout.build.join(name.group()).join(name.name());
+            util::copy_dir(binary.target.path(), &dep_dir)?;
         }
 
-        // TODO: Error struct
-        let src_file_name = &self
-            .src
-            .file_name()
-            .ok_or_else(|| err_msg("Src refs to a non-file"))?;
-        let src_dest = self.build_dir.build.join(src_file_name);
-        fs::copy(&self.src, &src_dest)?;
+        // setup source
+        util::copy_dir(self.src.path.path(), &self.layout.build)?;
 
-        let mut target = src_dest.clone();
-        target.set_extension("ibc");
+        let mut target_bins = Vec::new();
 
         // invoke compiler
-        bcx.compiler
-            .process()
-            .current_dir(&self.build_dir.build)
-            .arg("--check")
-            .arg(src_file_name)
-            .spawn()?;
+        for target in &self.targets {
+            let target = self.layout.build.join(target);
 
-        if !target.exists() {
-            bail!(
-                "Compilation of {} does not generate binary",
-                self.src.to_string_lossy()
-            );
+            bcx.compiler
+                .process()
+                .current_dir(&self.layout.build)
+                .arg("--check")
+                .arg(&target)
+                .spawn()?;
+
+            let mut target_bin = target.clone();
+            target_bin.set_extension("ibc");
+
+            if target_bin.exists() {
+                target_bins.push(target_bin);
+            } else {
+                bail!(
+                    "Compiler does not generate binary for {}",
+                    target.to_string_lossy()
+                );
+            }
         }
 
-        fs::copy(
-            &target,
-            self.build_dir.root.join(&target.file_name().unwrap()),
-        )?;
-
-        fs::remove_dir_all(&self.build_dir.build)?;
-
-        Ok(())
+        Ok(target_bins)
     }
 }
 
 #[derive(Debug)]
 pub struct CodegenInvocation {
-    src: PathBuf,
+    build: PathBuf,
     output: String,
     backend: String,
-    build_dir: BuildDir,
+    layout: Layout,
 }
 
 impl CodegenInvocation {
-    pub fn execute(&mut self, bcx: &mut BuildContext) -> Result<(), Error> {
+    pub fn execute(&mut self, bcx: &mut BuildContext) -> Res<()> {
         // invoke compiler
         bcx.compiler
             .process()
-            .current_dir(&self.build_dir.root)
+            .current_dir(&self.layout.bin)
             .args(&["--codegen", &self.backend])
             .args(&["-o", &self.output])
-            .arg(&self.src)
+            .arg(&self.build)
             .spawn()?;
 
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct BuildDir {
-    lock: DirLock,
-    pub root: PathBuf,
-    pub build: PathBuf,
-}
-
-impl BuildDir {
-    pub fn new(lock: DirLock) -> Result<Self, Error> {
-        let root = lock.path().to_path_buf();
-
-        let layout = BuildDir {
-            lock,
-            root: root.clone(),
-            build: root.join("build"),
-        };
-
-        fs::create_dir(&layout.root)?;
-        fs::create_dir(&layout.build)?;
-
-        Ok(layout)
     }
 }

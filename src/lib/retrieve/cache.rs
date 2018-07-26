@@ -197,7 +197,6 @@ impl Cache {
             Ok(Binary::built(DirLock::acquire(&path)?))
         } else {
             let tp = self.layout.tmp.join(Self::get_build_dir(&root, sources));
-
             let bp = self.layout.build.join(Self::get_build_dir(&root, sources));
 
             let tl = DirLock::acquire(&tp)?;
@@ -431,7 +430,7 @@ impl Eq for Source {}
 #[derive(Debug, PartialEq, Eq)]
 pub struct Binary {
     source: Option<Source>,
-    target: DirLock,
+    pub target: DirLock,
 }
 
 impl Binary {

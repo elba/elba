@@ -4,9 +4,9 @@
 //! This module is responsible for smoothing over that process, as well as coordinating the actual
 //! retrieval of packages from various different sources (hopefully in parallel).
 
-pub mod cache;
+mod cache;
 
-pub use self::cache::{Cache, Source};
+pub use self::cache::{Binary, Cache, Source};
 use failure::{Error, ResultExt};
 use index::Indices;
 use package::{

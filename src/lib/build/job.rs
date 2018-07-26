@@ -2,7 +2,7 @@ use build::context::BuildContext;
 use crossbeam::{channel, deque, thread::scope};
 use indexmap::IndexMap;
 use petgraph::{graph::NodeIndex, Direction};
-use retrieve::cache::Binary;
+use retrieve::Binary;
 use std::{thread::sleep, time};
 use util::{errors::Res, graph::Graph};
 
