@@ -8,8 +8,9 @@ use util::{errors::Res, graph::Graph};
 
 // A task is an elba subcommand that should only be available from the current root project. Tasks
 // is a list of the Sources of all the tasks needed for this build.
+// TODO: The root is assumed to be local, even for global installation(by `elba install whatever`),
+//       and it's up to the caller to decide where to place the root package(maybe a tmp folder).
 pub fn plan(
-    local: bool,
     root_mode: CompileMode,
     tasks: &[NodeIndex],
     bcx: BuildContext,
@@ -196,20 +197,6 @@ impl Job {
         println!("From one to ten, this is very unimplemented.");
         Ok(())
     }
-}
-
-/// The general "mode" of what to do
-#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
-pub enum CompileMode {
-    /// Typecheck a target without codegen
-    Lib,
-    /// Compile and codegen executable(s)
-    ///
-    /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
-    /// executables anyway
-    Bin,
-    /// Create documentation
-    Doc,
 }
 
 fn sleep_sec() {

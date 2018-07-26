@@ -64,7 +64,7 @@ use std::{
 };
 use tar::Builder;
 use util::{
-    copy_dir,
+    clear_dir, copy_dir,
     errors::{ErrorKind, Res},
     graph::Graph,
     hexify_hash,
@@ -185,51 +185,39 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    // TODO: local `target/` dir.
-    /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
-    pub fn checkout_build(
-        &self,
-        root: &Source,
-        sources: &Graph<Source>,
-        local: bool,
-    ) -> Result<Binary, Error> {
-        if let Some(path) = self.check_build(&root, sources, local) {
-            Ok(Binary::built(DirLock::acquire(&path)?))
-        } else {
-            let tp = self.layout.tmp.join(Self::get_build_dir(&root, sources));
-            let bp = self.layout.build.join(Self::get_build_dir(&root, sources));
-
-            let tl = DirLock::acquire(&tp)?;
-            copy_dir(root.path.path(), tl.path())?;
-            let bl = DirLock::acquire(&bp)?;
-
-            Ok(Binary::new(root.with_path(tl), bl))
-        }
-    }
-
-    fn check_build(&self, root: &Source, sources: &Graph<Source>, local: bool) -> Option<PathBuf> {
-        let path = if local {
-            env::current_dir().ok()?.join("target")
-        } else {
-            self.layout.root.clone()
-        };
-        let path = path.join("build").join(Self::get_build_dir(root, sources));
+    /// Acquires a lock on a built dependency directory
+    pub fn checkout_build(&self, build_hash: BuildHash) -> Result<Option<Binary>, Error> {
+        let path = self.layout.build.join(build_hash.hash);
 
         if path.exists() {
-            Some(path)
+            let target = DirLock::acquire(&path)?;
+            Ok(Some(Binary { target, build_hash }))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
-        let mut hasher = Sha256::default();
+    pub fn store_build(&self, binary: Binary, build_hash: BuildHash) -> Res<()> {
+        let path = binary.target.path();
 
-        for (_, src) in sources.sub_tree(root).unwrap() {
-            hasher.input(&src.hash.as_bytes());
-        }
+        DirLock::acquire(&path)?;
 
-        hexify_hash(hasher.result().as_slice())
+        clear_dir(&binary.target.path())?;
+        copy_dir(
+            &binary.target.path(),
+            &self.layout.build.join(build_hash.hash),
+        )?;
+
+        Ok(())
+    }
+
+    pub fn acquire_build_tempdir(&self, build_hash: BuildHash) -> Result<DirLock, Error> {
+        let path = self.layout.tmp.join(build_hash.hash);
+
+        let lock = DirLock::acquire(&path)?;
+        clear_dir(&path)?;
+
+        Ok(lock)
     }
 
     // TODO: We do a lot of silent erroring. Is that good?
@@ -426,29 +414,30 @@ impl PartialEq for Source {
 
 impl Eq for Source {}
 
-/// Information about the build of library that is available somewhere in the file system.
+// Formerly `Build`
+// TODO: Name candidates: Build, BuildInfo, BuildMeta
+// TODO: BuildHash allows computing the hash of build by caller,
+//       which helps to avoid duplicate computation.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Binary {
-    source: Option<Source>,
-    pub target: DirLock,
+pub struct BuildHash {
+    pub hash: String,
 }
 
-impl Binary {
-    pub fn is_complete(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn built(lock: DirLock) -> Self {
-        Binary {
-            source: None,
-            target: lock,
+impl BuildHash {
+    pub fn new(root: &Source, sources: &Graph<Source>) -> Self {
+        let mut hasher = Sha256::default();
+        for (_, src) in sources.sub_tree(root).unwrap() {
+            hasher.input(&src.hash.as_bytes());
         }
-    }
+        let hash = hexify_hash(hasher.result().as_slice());
 
-    pub fn new(source: Source, target: DirLock) -> Self {
-        Binary {
-            source: Some(source),
-            target,
-        }
+        BuildHash { hash }
     }
+}
+
+/// Information about the built library that is available somewhere in the file system.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Binary {
+    pub build_hash: BuildHash,
+    pub target: DirLock,
 }
