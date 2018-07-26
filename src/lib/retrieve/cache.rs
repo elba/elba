@@ -82,23 +82,19 @@ use util::{
 // indices and direct deps, and we don't have to discriminate between the two in the Retriever.
 #[derive(Debug, Clone)]
 pub struct Cache {
-    location: PathBuf,
+    layout: Layout,
     client: Client,
     pub logger: Logger,
 }
 
 impl Cache {
     pub fn from_disk(plog: &Logger, location: PathBuf) -> Self {
-        let _ = fs::create_dir_all(location.join("src"));
-        let _ = fs::create_dir_all(location.join("build"));
-        let _ = fs::create_dir_all(location.join("indices"));
-        let _ = fs::create_dir_all(location.join("tmp"));
-
+        let layout = Layout::new(&location).unwrap();
         let client = Client::new();
         let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
 
         Cache {
-            location,
+            layout,
             client,
             logger,
         }
@@ -136,11 +132,11 @@ impl Cache {
         if let Some(path) = self.check_source(pkg.name(), loc, v) {
             DirLock::acquire(&path)
         } else {
-            let mut p = self.location.clone();
-            p.push("src");
-            p.push(Self::get_source_dir(pkg.name(), loc, v));
-
-            let dir = DirLock::acquire(&p)?;
+            let path = self
+                .layout
+                .src
+                .join(Self::get_source_dir(pkg.name(), loc, v));
+            let dir = DirLock::acquire(&path)?;
             loc.retrieve(&self.client, &dir)?;
 
             Ok(dir)
@@ -155,9 +151,7 @@ impl Cache {
             return Some(url.clone());
         }
 
-        let mut path = self.location.clone();
-        path.push("src");
-        path.push(Self::get_source_dir(name, loc, v));
+        let path = self.layout.src.join(Self::get_source_dir(name, loc, v));
         if path.exists() {
             Some(path)
         } else {
@@ -202,21 +196,15 @@ impl Cache {
         if let Some(path) = self.check_build(&root, sources, local) {
             Ok(Binary::built(DirLock::acquire(&path)?))
         } else {
-            let tp = self
-                .location
-                .join("tmp")
-                .join(Self::get_build_dir(&root, sources));
+            let tp = self.layout.tmp.join(Self::get_build_dir(&root, sources));
 
-            let bp = self
-                .location
-                .join("build")
-                .join(Self::get_build_dir(&root, sources));
+            let bp = self.layout.build.join(Self::get_build_dir(&root, sources));
 
-            let td = DirLock::acquire(&tp)?;
-            copy_dir(root.path.path(), td.path())?;
-            let bd = DirLock::acquire(&bp)?;
+            let tl = DirLock::acquire(&tp)?;
+            copy_dir(root.path.path(), tl.path())?;
+            let bl = DirLock::acquire(&bp)?;
 
-            Ok(Binary::new(root.with_path(td), bd))
+            Ok(Binary::new(root.with_path(tl), bl))
         }
     }
 
@@ -224,7 +212,7 @@ impl Cache {
         let path = if local {
             env::current_dir().ok()?.join("target")
         } else {
-            self.location.to_owned()
+            self.layout.root.clone()
         };
         let path = path.join("build").join(Self::get_build_dir(root, sources));
 
@@ -274,12 +262,9 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) = DirLock::acquire(
-                &self
-                    .location
-                    .join("indices")
-                    .join(Self::get_index_dir(&index)),
-            ) {
+            let dir = if let Ok(dir) =
+                DirLock::acquire(&self.layout.indices.join(Self::get_index_dir(&index)))
+            {
                 dir
             } else {
                 continue;
@@ -316,6 +301,35 @@ impl Cache {
         let mut hasher = Sha256::default();
         hasher.input(loc.to_string().as_bytes());
         hexify_hash(hasher.result().as_slice())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Layout {
+    pub root: PathBuf,
+    pub src: PathBuf,
+    pub build: PathBuf,
+    pub indices: PathBuf,
+    pub tmp: PathBuf,
+}
+
+impl Layout {
+    pub fn new(root: &PathBuf) -> Result<Self, Error> {
+        let layout = Layout {
+            root: root.to_path_buf(),
+            src: root.join("src"),
+            build: root.join("build"),
+            indices: root.join("indices"),
+            tmp: root.join("tmp"),
+        };
+
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.src)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.indices)?;
+        fs::create_dir_all(&layout.tmp)?;
+
+        Ok(layout)
     }
 }
 
