@@ -104,7 +104,7 @@ impl JobQueue {
                         match pull.steal() {
                             None => {
                                 sleep_sec();
-                                break;
+                                continue;
                             }
                             Some(Work::Finish) => {
                                 break;
