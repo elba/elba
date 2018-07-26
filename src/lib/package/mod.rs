@@ -9,7 +9,7 @@ use self::resolution::Resolution;
 use failure::Error;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, rc::Rc, str::FromStr};
+use std::{fmt, str::FromStr, sync::Arc};
 use util::errors::ErrorKind;
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
@@ -20,7 +20,7 @@ use util::errors::ErrorKind;
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name {
-    inner: Rc<NameInner>,
+    inner: Arc<NameInner>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -38,7 +38,7 @@ impl Name {
         s.push('/');
         s.push_str(&name);
         Name {
-            inner: Rc::new(NameInner {
+            inner: Arc::new(NameInner {
                 serialization: s,
                 group,
                 name,
@@ -110,7 +110,7 @@ impl AsRef<str> for Name {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PackageId {
-    inner: Rc<PackageIdInner>,
+    inner: Arc<PackageIdInner>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -122,7 +122,7 @@ struct PackageIdInner {
 impl PackageId {
     pub fn new(name: Name, resolution: Resolution) -> Self {
         PackageId {
-            inner: Rc::new(PackageIdInner { name, resolution }),
+            inner: Arc::new(PackageIdInner { name, resolution }),
         }
     }
 

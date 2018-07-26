@@ -200,7 +200,7 @@ impl Cache {
         local: bool,
     ) -> Result<Binary, Error> {
         if let Some(path) = self.check_build(&root, sources, local) {
-            Ok(Binary::Built(DirLock::acquire(&path)?))
+            Ok(Binary::built(DirLock::acquire(&path)?))
         } else {
             let tp = self
                 .location
@@ -216,7 +216,7 @@ impl Cache {
             copy_dir(root.path.path(), td.path())?;
             let bd = DirLock::acquire(&bp)?;
 
-            Ok(Binary::New(root.with_path(td), bd))
+            Ok(Binary::new(root.with_path(td), bd))
         }
     }
 
@@ -415,7 +415,27 @@ impl Eq for Source {}
 
 /// Information about the build of library that is available somewhere in the file system.
 #[derive(Debug, PartialEq, Eq)]
-pub enum Binary {
-    Built(DirLock),
-    New(Source, DirLock),
+pub struct Binary {
+    source: Option<Source>,
+    target: DirLock,
+}
+
+impl Binary {
+    pub fn is_complete(&self) -> bool {
+        self.source.is_some()
+    }
+
+    pub fn built(lock: DirLock) -> Self {
+        Binary {
+            source: None,
+            target: lock,
+        }
+    }
+
+    pub fn new(source: Source, target: DirLock) -> Self {
+        Binary {
+            source: Some(source),
+            target,
+        }
+    }
 }

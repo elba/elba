@@ -115,10 +115,13 @@ pub enum DepReq {
     Git {
         #[serde(with = "url_serde")]
         git: Url,
-        #[serde(default)]
-        #[serde(flatten)]
-        spec: PkgGitSpecifier,
+        #[serde(default = "default_tag")]
+        tag: String,
     },
+}
+
+fn default_tag() -> String {
+    "master".to_owned()
 }
 
 impl DepReq {
@@ -137,59 +140,12 @@ impl DepReq {
                 let pi = PackageId::new(n, res.into());
                 (pi, Constraint::any())
             }
-            DepReq::Git { git, spec } => {
-                let res = DirectRes::Git {
-                    repo: git,
-                    tag: spec,
-                };
+            DepReq::Git { git, tag } => {
+                let res = DirectRes::Git { repo: git, tag };
                 let pi = PackageId::new(n, res.into());
                 (pi, Constraint::any())
             }
         }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
-pub enum PkgGitSpecifier {
-    Branch(String),
-    Commit(String),
-    Tag(String),
-}
-
-impl FromStr for PkgGitSpecifier {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut s = s.splitn(2, '=');
-        let fmt = s.next().unwrap();
-        let spec = s
-            .next()
-            .ok_or_else(|| ErrorKind::InvalidSourceUrl)?
-            .to_string();
-
-        match fmt {
-            "branch" => Ok(PkgGitSpecifier::Branch(spec)),
-            "commit" => Ok(PkgGitSpecifier::Commit(spec)),
-            "tag" => Ok(PkgGitSpecifier::Tag(spec)),
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
-        }
-    }
-}
-
-impl fmt::Display for PkgGitSpecifier {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PkgGitSpecifier::Branch(a) => write!(f, "branch={}", a),
-            PkgGitSpecifier::Commit(a) => write!(f, "branch={}", a),
-            PkgGitSpecifier::Tag(a) => write!(f, "branch={}", a),
-        }
-    }
-}
-
-impl Default for PkgGitSpecifier {
-    fn default() -> Self {
-        PkgGitSpecifier::Branch("master".to_string())
     }
 }
 

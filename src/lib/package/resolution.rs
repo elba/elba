@@ -1,4 +1,4 @@
-use super::{manifest::PkgGitSpecifier, Checksum};
+use super::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::Repository;
@@ -78,10 +78,8 @@ impl<'de> Deserialize<'de> for Resolution {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DirectRes {
-    // TODO: Internally, git doesn't care if you're looking at a branch, tag, or commit. They're
-    // all revparsed the same way. Maybe we shouldn't distinguish between them either.
     /// Git: the package originated from a git repository.
-    Git { repo: Url, tag: PkgGitSpecifier },
+    Git { repo: Url, tag: String },
     /// Dir: the package is on disk in a folder directory.
     Dir { url: PathBuf },
     /// Tar: the package is an archive stored somewhere.
@@ -168,11 +166,7 @@ impl DirectRes {
                         .context(ErrorKind::CannotDownload)?
                 };
 
-                let branch = match tag {
-                    PkgGitSpecifier::Branch(a) => a,
-                    PkgGitSpecifier::Commit(a) => a,
-                    PkgGitSpecifier::Tag(a) => a,
-                };
+                let branch = tag;
 
                 let obj = repo
                     .revparse_single(&branch)
@@ -201,10 +195,7 @@ impl FromStr for DirectRes {
         match utype {
             "git" => {
                 let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
-                let tag = url
-                    .fragment()
-                    .and_then(|s| PkgGitSpecifier::from_str(s).ok())
-                    .unwrap_or_else(PkgGitSpecifier::default);
+                let tag = url.fragment().unwrap_or_else(|| "master").to_owned();
 
                 url.set_fragment(None);
                 Ok(DirectRes::Git { repo: url, tag })

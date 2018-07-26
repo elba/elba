@@ -1,0 +1,11 @@
+[package]
+name = "one/one"
+version = "0.1.0"
+authors = []
+
+[dependencies]
+
+[[targets.bin]]
+name = "one"
+main = "src/Main.idr"
+
