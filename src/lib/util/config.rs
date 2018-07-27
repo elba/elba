@@ -36,19 +36,22 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn configure(&mut self, verbosity: Option<Verbosity>, color: Option<bool>) {
-        if let Some(v) = verbosity {
-            self.term.verbosity = v;
-        }
-        if let Some(c) = color {
-            self.term.color = c;
-        }
-
-        self.merge_env()
+    pub fn merge_files(&mut self) -> &mut Config {
+        self
     }
 
-    fn merge_env(&mut self) {
-        // TODO
+    pub fn merge_env(&mut self) -> &mut Config {
+        self
+    }
+
+    pub fn verbosity(&mut self, v: Verbosity) -> &mut Config {
+        self.term.verbosity = v;
+        self
+    }
+
+    pub fn color(&mut self, c: bool) -> &mut Config {
+        self.term.color = c;
+        self
     }
 }
 
