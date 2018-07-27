@@ -372,20 +372,16 @@ impl Source {
         }
 
         // Pack into a tar file to hash it quickly
-        let f = fs::File::create(path.path().with_extension("tar"))?;
-        let mut ar = Builder::new(f);
+        // We don't need to put this tar file on-disk, we just want a nice single byte vec that we
+        // can hash quickly
+        let mut f = vec![];
+        let mut ar = Builder::new(&mut f);
         ar.append_dir_all("irrelevant", path.path())?;
 
         let _ = ar.into_inner()?;
 
-        let p = path.path().with_extension("tar");
-        let mut file = fs::File::open(&p)?;
-        let result = Sha256::digest_reader(&mut file)?;
+        let result = Sha256::digest(&f);
         let hash = hexify_hash(result.as_slice());
-
-        // The tarball is useless to us now.
-        drop(file);
-        fs::remove_file(p)?;
 
         Ok(Source {
             meta: manifest,

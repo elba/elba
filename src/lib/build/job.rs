@@ -94,7 +94,7 @@ impl JobQueue {
             }
         }
 
-        // TODO: The aternate approach would be sharing memory: we share the status and graph
+        // TODO: The alternate approach would be sharing memory: we share the status and graph
         // structures across threads (with the former being mutably shared). Idk how we'd allow
         // all the threads to push to the deque tho.
         scope(|scope| {
