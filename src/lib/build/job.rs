@@ -130,7 +130,9 @@ impl JobQueue {
                 if let WorkRes::Done(ix) = ix {
                     status[&ix] = Status::Done;
                     for n in graph.inner.neighbors_directed(ix, Direction::Incoming) {
-                        if status[&n] == Status::Waiting {
+                        // `status` might not contain n, since it only contains nodes which weren't
+                        // built before our build process started.
+                        if let Some(Status::Waiting) = status.get(&n) {
                             let ready = graph
                                 .inner
                                 .neighbors_directed(n, Direction::Outgoing)
