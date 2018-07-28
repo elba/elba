@@ -39,7 +39,10 @@ use std::{
     io::{self, prelude::*, BufReader},
     str::FromStr,
 };
-use util::{errors::{ErrorKind, Res}, lock::DirLock};
+use util::{
+    errors::{ErrorKind, Res},
+    lock::DirLock,
+};
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

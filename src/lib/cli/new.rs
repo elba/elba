@@ -54,7 +54,8 @@ mods = [
 ]
 
 "#,
-            name.group(), name.name()
+            name.group(),
+            name.name()
         )
     };
 

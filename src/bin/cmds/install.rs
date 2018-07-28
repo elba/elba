@@ -29,7 +29,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
     };
 
     build::solve_remote(&ctx, name)?;
-    
+
     // TODO
     unimplemented!()
 }
