@@ -30,6 +30,8 @@ The bang trick also works for `>=` constraints as well: while `>= 1.0.0` doesn't
 
 The constraint parser will allow you to add bangs to all types of less-than or greater-than constraints, but some of them won't do anything: `<= 1.0.0` and `<=! 1.0.0` mean the exact same thing, as do `> 1.0.0` and `>! 1.0.0`.
 
+Additionally, if the constraint specifies a pre-release, it will satisfy other pre-releases.
+
 Two inequality constraints can be intersected to produce a new compound constraint. Note that at the moment, this is the only case in which the parser will accept multiple constraints. Additionally, the greater-than bound must be written before the less-than bound.
 
 The new constraint must allow at least one version for it to be valid:

@@ -17,7 +17,7 @@ pub fn new(ctx: NewCtx) -> Res<()> {
     if fs::metadata(path).is_ok() {
         bail!(
             "destination `{}` already exists\n\n\
-             create a new `elba.toml` manifest file in the directory instead.",
+             create a new `elba.toml` manifest file in the directory instead",
             path.display()
         )
     }
@@ -46,10 +46,16 @@ main = "src/Main.idr"
             name.name()
         )
     } else {
-        r#"[targets.lib]
+        format!(
+            r#"[targets.lib]
 path = "src/"
+mods = [
+    "{}.{}"
+]
 
-"#.to_string()
+"#,
+            name.group(), name.name()
+        )
     };
 
     write(

@@ -39,7 +39,7 @@ use std::{
     io::{self, prelude::*, BufReader},
     str::FromStr,
 };
-use util::{errors::ErrorKind, lock::DirLock};
+use util::{errors::{ErrorKind, Res}, lock::DirLock};
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -69,7 +69,21 @@ impl Indices {
         Indices { indices, cache }
     }
 
-    pub fn select(&mut self, pkg: &Summary) -> Result<&IndexEntry, Error> {
+    pub fn select_by_name(&self, name: Name) -> Res<Summary> {
+        // For simplicity's sake, we don't do any caching here. It's not really necessary.
+        for (ir, ix) in &self.indices {
+            if let Ok(es) = ix.entries(&name) {
+                // We don't want to give back yanked packages
+                if let Some(x) = es.into_iter().filter(|x| !x.1.yanked).last() {
+                    return Ok(Summary::new(PackageId::new(name, ir.clone().into()), x.0));
+                }
+            }
+        }
+
+        Err(ErrorKind::PackageNotFound)?
+    }
+
+    pub fn select(&mut self, pkg: &Summary) -> Res<&IndexEntry> {
         let entry = self
             .entries(pkg.id())?
             .get(pkg.version())
@@ -85,7 +99,7 @@ impl Indices {
         }
     }
 
-    pub fn entries(&mut self, pkg: &PackageId) -> Result<&IndexMap<Version, IndexEntry>, Error> {
+    pub fn entries(&mut self, pkg: &PackageId) -> Res<&IndexMap<Version, IndexEntry>> {
         if self.cache.contains_key(pkg) {
             return Ok(&self.cache[pkg]);
         }
@@ -135,7 +149,7 @@ pub struct Index {
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn from_disk(res: DirectRes, path: DirLock) -> Result<Self, Error> {
+    pub fn from_disk(res: DirectRes, path: DirLock) -> Res<Self> {
         let id = IndexRes { res };
         let pn = path.path().join("index.toml");
         let file = fs::File::open(pn).context(ErrorKind::InvalidIndex)?;
@@ -148,7 +162,7 @@ impl Index {
         Ok(Index { id, path, config })
     }
 
-    pub fn entries(&self, name: &Name) -> Result<IndexMap<Version, IndexEntry>, Error> {
+    pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, IndexEntry>> {
         let mut res = indexmap!();
         let path = self.path.path().join(name.as_str());
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;

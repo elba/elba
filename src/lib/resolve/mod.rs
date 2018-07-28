@@ -458,7 +458,7 @@ impl<'cache> Resolver<'cache> {
             }
         }
 
-        s.push_str("version solving has failed:");
+        s.push_str("version solving has failed");
         s.push_str("\n");
         s.push_str("\n");
         self.pp_err_recur(root_icix, &ics, &mut linum, &mut cur_linum, &mut s);

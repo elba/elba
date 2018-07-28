@@ -156,7 +156,6 @@ impl JobQueue {
             }
         });
 
-
         Ok(())
     }
 }

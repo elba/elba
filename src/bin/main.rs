@@ -34,7 +34,12 @@ fn cli() -> App<'static, 'static> {
                 .global(true)
                 .conflicts_with("quiet"),
         )
-        .arg(Arg::with_name("quiet").help("Quiet output").global(true))
+        .arg(
+            Arg::with_name("quiet")
+                .long("quiet")
+                .help("Quiet output")
+                .global(true),
+        )
         .arg(
             Arg::with_name("color")
                 .long("color")
