@@ -1,218 +1,181 @@
-use build::context::BuildContext;
-use crossbeam::{channel, deque, thread::scope};
-use indexmap::IndexMap;
-use petgraph::{graph::NodeIndex, Direction};
-use retrieve::cache::Binary;
-use std::{thread::sleep, time};
+use build::compile_lib;
+use build::context::{BuildContext, Layout};
+use crossbeam::queue::MsQueue;
+use petgraph::graph::NodeIndex;
+use retrieve::{Binary, BuildHash, Source};
+use scoped_threadpool::Pool;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 use util::{errors::Res, graph::Graph};
 
-// A task is an elba subcommand that should only be available from the current root project. Tasks
-// is a list of the Sources of all the tasks needed for this build.
-pub fn plan(
-    local: bool,
-    root_mode: CompileMode,
-    tasks: &[NodeIndex],
-    bcx: BuildContext,
-) -> Res<JobQueue> {
-    let oldg = &bcx.resolve;
-    let graph = oldg.map(
-        |ix, s| {
-            Ok(Job {
-                source: bcx.cache.checkout_build(
-                    s,
-                    &oldg,
-                    ix == NodeIndex::new(0) && local || tasks.contains(&ix),
-                )?,
-                compile_mode: if ix == NodeIndex::new(0) {
-                    root_mode
-                } else if tasks.contains(&ix) {
-                    CompileMode::Bin
-                } else {
-                    CompileMode::Lib
-                },
-            })
-        },
-        |_| Ok(()),
-    )?;
-    // We drop the old context to drop all of the Sources, releasing our lock on them. We
-    // don't need them anymore.
-    drop(bcx);
-
-    let mut queue = graph
-        .sub_tree(&graph.inner[NodeIndex::new(0)])
-        .unwrap()
-        .filter(|(_, x)| x.source.is_complete())
-        .map(|x| x.0)
-        .collect::<Vec<_>>();
-
-    queue.reverse();
-
-    Ok(JobQueue { graph, queue })
-}
-
-// Our parallel building strategy is to share the JobQueue across workers. A worker gets a Job by
-// popping off the end of the queue. When a Job is completed, the Job is mutated so that its source
-// is Binary::Built instead of Binary::New. A worker can only start work when the Job's children
-// are all Binary::Built.
-//
-// Alternate strategy: rely on the Cache and a separate "done" list to indicate if a Job is done
-// and where the output of that Job is.
-#[derive(Default)]
+/// JobQueue is responsible for building direct dependencies for root package.
+///
+/// JobQueue transforms dirty jobs into fresh jobs, starting from the bottom leaves.
+/// A built job is called `Fresh` or else it is `Dirty`. Job of `None` is either root
+/// or a package that is unreachable from root(the intermediate packages were built).
 pub struct JobQueue {
     /// The graph of Jobs which need to be done.
-    pub graph: Graph<Job>,
-    pub queue: Vec<NodeIndex>,
+    graph: Graph<Job>,
 }
 
 impl JobQueue {
-    pub fn exec(self) -> Res<()> {
-        let thread_count = 1;
+    pub fn new(solve: Graph<Source>, bcx: &BuildContext) -> Res<Self> {
+        let mut graph = solve.map(|_, _| Ok(Job::None), |_| Ok(()))?;
 
-        let graph = self.graph;
-        let (push, pull) = deque::fifo();
-        let (send, recv) = channel::unbounded();
+        let mut curr_layer = HashSet::new();
+        let mut next_layer = HashSet::new();
 
-        if self.queue.is_empty() {
-            return Ok(());
-        }
+        let direct_deps = solve.children(NodeIndex::new(0)).map(|(index, _)| index);
 
-        let mut status: IndexMap<NodeIndex, Status> = indexmap!();
-        let mut ready = true;
+        next_layer.extend(direct_deps);
 
-        for i in self.queue {
-            ready = ready
-                && graph
-                    .inner
-                    .neighbors_directed(i, Direction::Outgoing)
-                    .all(|node_id| graph.inner[node_id].is_done());
+        while !next_layer.is_empty() {
+            debug_assert!(curr_layer.is_empty());
 
-            if !ready {
-                status.insert(i, Status::Waiting);
-            } else {
-                status.insert(i, Status::Queued);
-                push.push(Work::More(i, &graph.inner[i]));
+            curr_layer.extend(next_layer.drain());
+
+            for node in curr_layer.drain() {
+                let source = &solve[node];
+                let build_hash = BuildHash::new(source, &solve);
+
+                let job = match bcx.cache.checkout_build(&build_hash)? {
+                    Some(binary) => Job::Fresh(binary),
+                    None => {
+                        next_layer.extend(
+                            graph
+                                .children(node)
+                                .filter(|(_, child)| child.is_none())
+                                .map(|(index, _)| index),
+                        );
+
+                        Job::Dirty(source.clone(), build_hash)
+                    }
+                };
+                graph[node] = job;
             }
         }
 
-        // TODO: The alternate approach would be sharing memory: we share the status and graph
-        // structures across threads (with the former being mutably shared). Idk how we'd allow
-        // all the threads to push to the deque tho.
-        scope(|scope| {
-            for _ in 0..thread_count {
-                scope.spawn(|| {
-                    loop {
-                        match pull.steal() {
-                            None => {
-                                sleep_sec();
-                                continue;
-                            }
-                            Some(Work::Finish) => {
-                                break;
-                            }
-                            Some(Work::More(i, j)) => {
-                                match j.exec() {
-                                    Err(_) => {
-                                        send.send(WorkRes::Error);
-                                        // TODO: Print an error or whatever
-                                    }
-                                    Ok(_) => send.send(WorkRes::Done(i)),
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+        // We drop the all of the Sources, releasing our lock on them. We don't need them anymore.
+        // TODO: We may drop Binary as well when all of it's parents are built?
+        drop(solve);
 
-            // Here we coordinate between our channels and such
-            loop {
-                // It shouldn't close on us... ever.
-                let ix = recv.recv().unwrap();
-                if let WorkRes::Done(ix) = ix {
-                    status[&ix] = Status::Done;
-                    for n in graph.inner.neighbors_directed(ix, Direction::Incoming) {
-                        // `status` might not contain n, since it only contains nodes which weren't
-                        // built before our build process started.
-                        if let Some(Status::Waiting) = status.get(&n) {
-                            let ready = graph
-                                .inner
-                                .neighbors_directed(n, Direction::Outgoing)
-                                .all(|node_id| status[&node_id] == Status::Done);
+        Ok(JobQueue { graph })
+    }
 
-                            if ready {
-                                push.push(Work::More(n, &graph.inner[n]));
-                                status[&n] = Status::Queued;
-                            }
-                        }
-                    }
-                }
+    pub fn exec(mut self, bcx: &BuildContext) -> Res<Vec<Binary>> {
+        let mut thread_pool = Pool::new(1);
 
-                if WorkRes::Error == ix || status.iter().all(|(_, st)| *st == Status::Done) {
-                    for _ in 0..thread_count {
-                        // Tell our threads to finish pls
-                        push.push(Work::Finish);
-                    }
-                    break;
-                }
-            }
+        // bottom job is dirty job that has no deps or has all deps built
+        let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
+            self.graph[index].is_dirty()
+                && self
+                    .graph
+                    .children(index)
+                    .all(|(child, _)| self.graph[child].is_fresh())
         });
 
-        Ok(())
+        // this queue only contains dirty jobs.
+        let mut queue: Vec<NodeIndex> = Vec::from_iter(bottom_jobs);
+        // store job results from threads.
+        let done = &MsQueue::new();
+
+        loop {
+            // break if the job queue is complete
+            if queue.is_empty() {
+                break;
+            }
+
+            // start a group of independent jobs, which can be executed in parallel at current step
+            thread_pool.scoped(|scoped| {
+                for job_index in queue.drain(..) {
+                    if let Job::Dirty(source, build_hash) = &self.graph[job_index] {
+                        let deps = self
+                            .graph
+                            .children(job_index)
+                            .map(|(_, job)| match job {
+                                Job::Fresh(binary) => binary.clone(),
+                                _ => unreachable!(),
+                            })
+                            .collect();
+
+                        scoped.execute(move || {
+                            let op = || -> Res<Binary> {
+                                let dl = bcx.cache.acquire_build_tempdir(&build_hash)?;
+                                let layout = Layout::new(dl)?;
+
+                                compile_lib(&source, &deps, &layout, bcx)?;
+
+                                let binary = bcx.cache.store_build(&layout.lib, &build_hash)?;
+
+                                Ok(binary)
+                            };
+
+                            done.push((job_index, op()));
+                        });
+                    }
+                }
+            });
+
+            // handle the results from job executions
+            while let Some((job_index, job_res)) = done.try_pop() {
+                match job_res {
+                    Ok(binary) => {
+                        self.graph[job_index] = Job::Fresh(binary);
+
+                        // push jobs that can be execute at next step into queue
+                        for (parent, _) in self.graph.parents(job_index) {
+                            let ready = self.graph.children(parent).all(|(_, job)| job.is_fresh());
+
+                            if ready && self.graph[parent].is_dirty() {
+                                queue.push(parent);
+                            }
+                        }
+                    }
+                    // TODO: log error?
+                    Err(err) => return Err(err),
+                }
+            }
+        }
+
+        let deps = self
+            .graph
+            .children(NodeIndex::new(0))
+            .map(|(_, job)| match job {
+                Job::Fresh(binary) => binary.clone(),
+                _ => unreachable!(),
+            })
+            .collect();
+
+        Ok(deps)
     }
 }
 
-#[derive(Debug)]
-enum Work<'a> {
-    More(NodeIndex, &'a Job),
-    Finish,
-}
-
 #[derive(Debug, PartialEq, Eq)]
-enum WorkRes {
-    Done(NodeIndex),
-    Error,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum Status {
-    Done,
-    Queued,
-    Waiting,
-}
-
-/// All the information that defines a compilation task
-// TODO: Include stuff from our BuildContext, because we can never access that thing ever again
-#[derive(Debug, PartialEq, Eq)]
-pub struct Job {
-    pub source: Binary,
-    pub compile_mode: CompileMode,
+enum Job {
+    None,
+    Fresh(Binary),
+    Dirty(Source, BuildHash),
 }
 
 impl Job {
-    pub fn is_done(&self) -> bool {
-        self.source.is_complete()
+    pub fn is_none(&self) -> bool {
+        match self {
+            Job::None => true,
+            _ => false,
+        }
     }
 
-    pub fn exec(&self) -> Res<()> {
-        // TODO
-        println!("From one to ten, this is very unimplemented.");
-        Ok(())
+    pub fn is_dirty(&self) -> bool {
+        match self {
+            Job::Dirty(_, _) => true,
+            _ => false,
+        }
     }
-}
 
-/// The general "mode" of what to do
-#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
-pub enum CompileMode {
-    /// Typecheck a target without codegen
-    Lib,
-    /// Compile and codegen executable(s)
-    ///
-    /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
-    /// executables anyway
-    Bin,
-    /// Create documentation
-    Doc,
-}
-
-fn sleep_sec() {
-    sleep(time::Duration::from_millis(1000));
+    pub fn is_fresh(&self) -> bool {
+        match self {
+            Job::Fresh(_) => true,
+            _ => false,
+        }
+    }
 }

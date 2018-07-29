@@ -15,6 +15,7 @@ extern crate itertools;
 #[macro_use]
 extern crate nom;
 extern crate reqwest;
+extern crate scoped_threadpool;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

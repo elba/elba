@@ -1,35 +1,21 @@
-use retrieve::cache::{Cache, Source};
-use std::{path::PathBuf, process::Command};
-use util::graph::Graph;
-
-/// An unit that elba knows how to build it
-// #[derive(Debug)]
-// pub struct Unit<'a> {
-//     summary: Summary,
-//     resolve: &'a Graph<Summary, ()>,
-// }
-
-// impl<'a> Unit<'a> {
-//     pub fn new(summary: Summary, bcx: BuildContext<'a>) -> Self {
-//         Unit {
-//             summary,
-//             resolve: bcx.resolve
-//         }
-//     }
-// }
+use retrieve::Cache;
+use std::{fs, path::PathBuf, process::Command};
+use util::{errors::Res, lock::DirLock};
 
 // TODO: triple target
 #[derive(Debug)]
 pub struct BuildContext<'a> {
     pub compiler: Compiler,
-    pub resolve: Graph<Source>,
     pub cache: &'a Cache,
-    pub config: BuildConfig,
+    // pub config: BuildConfig,
 }
 
 // TODO: Verbosity, totality checking
 #[derive(Debug)]
-pub struct BuildConfig {}
+pub struct BuildConfig {
+    /// In what mode we are compiling
+    pub compile_mode: CompileMode,
+}
 
 /// Information on the compiler executable
 // TODO: Support args and envs
@@ -57,5 +43,52 @@ impl Default for Compiler {
         Compiler {
             path: PathBuf::from("idris"),
         }
+    }
+}
+
+/// The general "mode" of what to do
+#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
+pub enum CompileMode {
+    /// Typecheck a target without codegen
+    Lib,
+    /// Compile and codegen executable(s)
+    ///
+    /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
+    /// executables anyway
+    Bin,
+    /// Create documentation
+    Doc,
+}
+
+#[derive(Debug)]
+pub struct Layout {
+    lock: DirLock,
+    pub root: PathBuf,
+    pub bin: PathBuf,
+    pub lib: PathBuf,
+    pub build: PathBuf,
+    pub deps: PathBuf,
+}
+
+impl Layout {
+    pub fn new(lock: DirLock) -> Res<Self> {
+        let root = lock.path().to_path_buf();
+
+        let layout = Layout {
+            lock,
+            root: root.clone(),
+            bin: root.join("bin"),
+            lib: root.join("lib"),
+            build: root.join("build"),
+            deps: root.join("deps"),
+        };
+
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.lib)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.deps)?;
+
+        Ok(layout)
     }
 }

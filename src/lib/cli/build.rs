@@ -6,7 +6,7 @@ use package::{
     Name, PackageId, Summary,
 };
 use resolve::Resolver;
-use retrieve::cache::Cache;
+use retrieve::Cache;
 use retrieve::Retriever;
 use slog::Logger;
 use std::{fs, io::prelude::*, path::PathBuf, str::FromStr};

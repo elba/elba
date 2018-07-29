@@ -4,9 +4,9 @@
 //! This module is responsible for smoothing over that process, as well as coordinating the actual
 //! retrieval of packages from various different sources (hopefully in parallel).
 
-pub mod cache;
+mod cache;
 
-pub use self::cache::{Cache, Source};
+pub use self::cache::{Binary, BuildHash, Cache, Source};
 use failure::{Error, ResultExt};
 use index::Indices;
 use package::{
@@ -118,7 +118,7 @@ impl<'cache> Retriever<'cache> {
 
                 if let Some(dir) = dir {
                     if let Ok(src) = self.cache.checkout_source(pkg, dir, Some(&v)) {
-                        return Ok(src.meta.version().clone());
+                        return Ok(src.meta().version().clone());
                     }
                 }
             }
@@ -128,7 +128,7 @@ impl<'cache> Retriever<'cache> {
             return Ok(self
                 .cache
                 .checkout_source(pkg, loc, None)?
-                .meta
+                .meta()
                 .version()
                 .clone());
         }
@@ -182,7 +182,7 @@ impl<'cache> Retriever<'cache> {
             let deps = self
                 .cache
                 .checkout_source(pkg.id(), loc, Some(pkg.version()))?
-                .meta
+                .meta()
                 .deps(&self.def_index, false);
             let mut res = vec![];
             for dep in deps {

@@ -59,12 +59,13 @@ use std::{
     collections::VecDeque,
     env, fs,
     io::{prelude::*, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 use tar::Builder;
 use util::{
-    copy_dir,
+    clear_dir, copy_dir,
     errors::{ErrorKind, Res},
     graph::Graph,
     hexify_hash,
@@ -82,23 +83,19 @@ use util::{
 // indices and direct deps, and we don't have to discriminate between the two in the Retriever.
 #[derive(Debug, Clone)]
 pub struct Cache {
-    location: PathBuf,
+    layout: Layout,
     client: Client,
     pub logger: Logger,
 }
 
 impl Cache {
     pub fn from_disk(plog: &Logger, location: PathBuf) -> Self {
-        let _ = fs::create_dir_all(location.join("src"));
-        let _ = fs::create_dir_all(location.join("build"));
-        let _ = fs::create_dir_all(location.join("indices"));
-        let _ = fs::create_dir_all(location.join("tmp"));
-
+        let layout = Layout::new(&location).unwrap();
         let client = Client::new();
         let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
 
         Cache {
-            location,
+            layout,
             client,
             logger,
         }
@@ -136,11 +133,11 @@ impl Cache {
         if let Some(path) = self.check_source(pkg.name(), loc, v) {
             DirLock::acquire(&path)
         } else {
-            let mut p = self.location.clone();
-            p.push("src");
-            p.push(Self::get_source_dir(pkg.name(), loc, v));
-
-            let dir = DirLock::acquire(&p)?;
+            let path = self
+                .layout
+                .src
+                .join(Self::get_source_dir(pkg.name(), loc, v));
+            let dir = DirLock::acquire(&path)?;
             loc.retrieve(&self.client, &dir)?;
 
             Ok(dir)
@@ -155,9 +152,7 @@ impl Cache {
             return Some(url.clone());
         }
 
-        let mut path = self.location.clone();
-        path.push("src");
-        path.push(Self::get_source_dir(name, loc, v));
+        let path = self.layout.src.join(Self::get_source_dir(name, loc, v));
         if path.exists() {
             Some(path)
         } else {
@@ -191,58 +186,45 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    // TODO: local `target/` dir.
-    /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
-    pub fn checkout_build(
-        &self,
-        root: &Source,
-        sources: &Graph<Source>,
-        local: bool,
-    ) -> Result<Binary, Error> {
-        if let Some(path) = self.check_build(&root, sources, local) {
-            Ok(Binary::built(DirLock::acquire(&path)?))
-        } else {
-            let tp = self
-                .location
-                .join("tmp")
-                .join(Self::get_build_dir(&root, sources));
-
-            let bp = self
-                .location
-                .join("build")
-                .join(Self::get_build_dir(&root, sources));
-
-            let td = DirLock::acquire(&tp)?;
-            copy_dir(root.path.path(), td.path())?;
-            let bd = DirLock::acquire(&bp)?;
-
-            Ok(Binary::new(root.with_path(td), bd))
-        }
-    }
-
-    fn check_build(&self, root: &Source, sources: &Graph<Source>, local: bool) -> Option<PathBuf> {
-        let path = if local {
-            env::current_dir().ok()?.join("target")
-        } else {
-            self.location.to_owned()
-        };
-        let path = path.join("build").join(Self::get_build_dir(root, sources));
+    /// Acquires a lock on a built dependency directory
+    pub fn checkout_build(&self, build_hash: &BuildHash) -> Result<Option<Binary>, Error> {
+        let path = self.layout.build.join(build_hash.hash.clone());
 
         if path.exists() {
-            Some(path)
+            let target = DirLock::acquire(&path)?;
+            Ok(Some(Binary {
+                inner: Arc::new(BinaryInner { target }),
+            }))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
-        let mut hasher = Sha256::default();
+    pub fn store_build(&self, target: &Path, build_hash: &BuildHash) -> Res<Binary> {
+        let dest = self.layout.build.join(&build_hash.hash);
 
-        for (_, src) in sources.sub_tree(root).unwrap() {
-            hasher.input(&src.hash.as_bytes());
+        if !dest.exists() {
+            fs::create_dir_all(&dest)?;
         }
 
-        hexify_hash(hasher.result().as_slice())
+        let dest = DirLock::acquire(&dest)?;
+
+        clear_dir(dest.path())?;
+        copy_dir(target, dest.path())?;
+
+        Ok(Binary {
+            inner: Arc::new(BinaryInner { target: dest }),
+        })
+    }
+
+    // TODO: Return a newtype struct TempDir which will remove the folder when dropped.
+    pub fn acquire_build_tempdir(&self, build_hash: &BuildHash) -> Result<DirLock, Error> {
+        let path = self.layout.tmp.join(&build_hash.hash);
+
+        let lock = DirLock::acquire(&path)?;
+        clear_dir(&path)?;
+
+        Ok(lock)
     }
 
     // TODO: We do a lot of silent erroring. Is that good?
@@ -274,12 +256,9 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) = DirLock::acquire(
-                &self
-                    .location
-                    .join("indices")
-                    .join(Self::get_index_dir(&index)),
-            ) {
+            let dir = if let Ok(dir) =
+                DirLock::acquire(&self.layout.indices.join(Self::get_index_dir(&index)))
+            {
                 dir
             } else {
                 continue;
@@ -319,17 +298,54 @@ impl Cache {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Layout {
+    pub root: PathBuf,
+    pub bin: PathBuf,
+    pub src: PathBuf,
+    pub build: PathBuf,
+    pub indices: PathBuf,
+    pub tmp: PathBuf,
+}
+
+impl Layout {
+    pub fn new(root: &PathBuf) -> Result<Self, Error> {
+        let layout = Layout {
+            root: root.to_path_buf(),
+            bin: root.join("bin"),
+            src: root.join("src"),
+            build: root.join("build"),
+            indices: root.join("indices"),
+            tmp: root.join("tmp"),
+        };
+
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.src)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.indices)?;
+        fs::create_dir_all(&layout.tmp)?;
+
+        Ok(layout)
+    }
+}
+
 /// Information about the source of package that is available somewhere in the file system.
 /// Packages are stored as directories on disk (not archives because it would just be a bunch of
 /// pointless unpacking-repacking).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Source {
+    inner: Arc<SourceInner>,
+}
+
+#[derive(Debug)]
+pub struct SourceInner {
     /// The package's manifest
-    pub meta: Manifest,
-    pub location: DirectRes,
+    meta: Manifest,
+    location: DirectRes,
+    hash: String,
     /// The path to the package.
-    pub path: DirLock,
-    pub hash: String,
+    path: DirLock,
 }
 
 impl Source {
@@ -352,6 +368,7 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
+    // TODO: ignore target/ folder
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 
@@ -384,54 +401,83 @@ impl Source {
         let hash = hexify_hash(result.as_slice());
 
         Ok(Source {
-            meta: manifest,
-            location,
-            path,
-            hash,
+            inner: Arc::new(SourceInner {
+                meta: manifest,
+                location,
+                path,
+                hash,
+            }),
         })
     }
 
-    pub fn with_path(&self, p: DirLock) -> Source {
-        Source {
-            meta: self.meta.clone(),
-            location: self.location.clone(),
-            hash: self.hash.clone(),
-            path: p,
-        }
+    pub fn meta(&self) -> &Manifest {
+        &self.inner.meta
     }
+
+    pub fn location(&self) -> &DirectRes {
+        &self.inner.location
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.inner.hash
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.inner.path.path()
+    }
+
+    // pub fn with_path(&self, p: DirLock) -> Source {
+    //     Source {
+    //         meta: self.meta.clone(),
+    //         location: self.location.clone(),
+    //         hash: self.hash.clone(),
+    //         path: p,
+    //     }
+    // }
 }
 
 impl PartialEq for Source {
     fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash
+        self.hash() == other.hash()
     }
 }
 
 impl Eq for Source {}
 
-/// Information about the build of library that is available somewhere in the file system.
-#[derive(Debug, PartialEq, Eq)]
+// Formerly `Build`
+// TODO: Name candidates: Build, BuildInfo, BuildMeta
+// TODO: BuildHash allows computing the hash of build by caller,
+//       which helps to avoid duplicate computation.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct BuildHash {
+    pub hash: String,
+}
+
+impl BuildHash {
+    pub fn new(root: &Source, sources: &Graph<Source>) -> Self {
+        let mut hasher = Sha256::default();
+        for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
+            hasher.input(&src.hash().as_bytes());
+        }
+        let hash = hexify_hash(hasher.result().as_slice());
+
+        BuildHash { hash }
+    }
+}
+
+/// Information about the built library that is available somewhere in the file system.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binary {
-    source: Option<Source>,
+    inner: Arc<BinaryInner>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct BinaryInner {
     target: DirLock,
 }
 
 impl Binary {
-    pub fn is_complete(&self) -> bool {
-        self.source.is_some()
-    }
-
-    pub fn built(lock: DirLock) -> Self {
-        Binary {
-            source: None,
-            target: lock,
-        }
-    }
-
-    pub fn new(source: Source, target: DirLock) -> Self {
-        Binary {
-            source: Some(source),
-            target,
-        }
+    pub fn target(&self) -> &Path {
+        self.inner.target.path()
     }
 }
