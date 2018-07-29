@@ -5,6 +5,7 @@ use petgraph::{
     Direction,
 };
 use std::collections::HashMap;
+use std::ops::{Index, IndexMut};
 use util::errors::Res;
 
 /// A wrapper for `petgraph::Graph`.
@@ -23,6 +24,13 @@ impl<T: Eq, E> Graph<T, E> {
         Graph { inner: graph }
     }
 
+    pub fn find_id(&self, node: &T) -> Option<NodeIndex> {
+        self.inner
+            .node_references()
+            .find(|(_, weight)| *weight == node)
+            .map(|(index, _)| index)
+    }
+
     pub fn find_by<F>(&self, f: F) -> Option<&T>
     where
         F: Fn(&T) -> bool,
@@ -32,25 +40,33 @@ impl<T: Eq, E> Graph<T, E> {
     }
 
     /// Recursively traverse the entire sub tree of the given root, including the root itself
-    pub fn sub_tree<'a>(&'a self, root: &T) -> Option<impl Iterator<Item = (NodeIndex, &T)> + 'a> {
-        let root_id = self.find_id(root)?;
-        let iter = Bfs::new(&self.inner, root_id)
+    pub fn sub_tree<'a>(
+        &'a self,
+        root_id: NodeIndex,
+    ) -> impl Iterator<Item = (NodeIndex, &T)> + 'a {
+        Bfs::new(&self.inner, root_id)
             .iter(&self.inner)
-            .map(move |node_id| (node_id, &self.inner[node_id]));
-        Some(iter)
+            .map(move |node_id| (node_id, &self.inner[node_id]))
     }
 
     /// Traverse all direct children of the given node
     pub fn children<'a>(
         &'a self,
-        parent: &T,
-    ) -> Option<impl Iterator<Item = (NodeIndex, &T)> + 'a> {
-        let parent_id = self.find_id(parent)?;
-        let iter = self
-            .inner
+        parent_id: NodeIndex,
+    ) -> impl Iterator<Item = (NodeIndex, &T)> + 'a {
+        self.inner
             .neighbors_directed(parent_id, Direction::Outgoing)
-            .map(move |node_id| (node_id, &self.inner[node_id]));
-        Some(iter)
+            .map(move |node_id| (node_id, &self.inner[node_id]))
+    }
+
+    /// Traverse all direct parents of the given node
+    pub fn parents<'a>(
+        &'a self,
+        child_id: NodeIndex,
+    ) -> impl Iterator<Item = (NodeIndex, &T)> + 'a {
+        self.inner
+            .neighbors_directed(child_id, Direction::Incoming)
+            .map(move |node_id| (node_id, &self.inner[node_id]))
     }
 
     pub fn map<U, V, F, G>(&self, mut f: F, mut g: G) -> Res<Graph<U, V>>
@@ -90,12 +106,25 @@ impl<T: Eq, E> Graph<T, E> {
             inner: self.inner.filter_map(|_, i| f(i), |_, j| g(j)),
         }
     }
+}
 
-    fn find_id(&self, node: &T) -> Option<NodeIndex> {
-        self.inner
-            .node_references()
-            .find(|(_, weight)| *weight == node)
-            .map(|(index, _)| index)
+impl<T, E> Index<NodeIndex> for Graph<T, E>
+where
+    T: Eq,
+{
+    type Output = T;
+
+    fn index(&self, index: NodeIndex) -> &T {
+        &self.inner[index]
+    }
+}
+
+impl<T, E> IndexMut<NodeIndex> for Graph<T, E>
+where
+    T: Eq,
+{
+    fn index_mut(&mut self, index: NodeIndex) -> &mut T {
+        &mut self.inner[index]
     }
 }
 

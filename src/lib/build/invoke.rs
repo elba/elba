@@ -1,55 +1,49 @@
 //! Utilities for interacting with the Idris compiler
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use super::context::BuildContext;
-use super::Layout;
-use package::Name;
-use retrieve::{Binary, Source};
-use util::{self, errors::Res};
+use build::{context::BuildContext, Layout};
+use retrieve::Binary;
+use util::{clear_dir, copy_dir, errors::Res};
 
 #[derive(Debug)]
-pub struct CompileInvocation {
-    pub src: Source,
-    pub deps: Vec<(Name, Binary)>,
-    pub layout: Layout,
+pub struct CompileInvocation<'a> {
+    pub src: &'a Path,
+    pub deps: &'a Vec<Binary>,
     // A target is a relative path from source root to a source file.
     // Targets can be modules of lib or main entry of binary. All targets will get compiled.
-    pub targets: Vec<PathBuf>,
+    pub targets: &'a Vec<PathBuf>,
+    pub layout: &'a Layout,
 }
 
-impl CompileInvocation {
-    pub fn execute(&mut self, bcx: &mut BuildContext) -> Res<Vec<PathBuf>> {
-        util::clear_dir(&self.layout.build)?;
-
-        // setup dependencies
-        for (name, binary) in &self.deps {
-            let dep_dir = self.layout.build.join(name.group()).join(name.name());
-            util::copy_dir(binary.target.path(), &dep_dir)?;
-        }
+impl<'a> CompileInvocation<'a> {
+    pub fn execute(self, bcx: &BuildContext) -> Res<()> {
+        clear_dir(&self.layout.build)?;
 
         // setup source
-        util::copy_dir(self.src.path.path(), &self.layout.build)?;
-
-        let mut target_bins = Vec::new();
+        copy_dir(self.src, &self.layout.build)?;
 
         // invoke compiler
-        for target in &self.targets {
+        for target in self.targets {
             let target = self.layout.build.join(target);
 
-            bcx.compiler
-                .process()
-                .current_dir(&self.layout.build)
-                .arg("--check")
-                .arg(&target)
-                .spawn()?;
+            let mut process = bcx.compiler.process();
+            process.current_dir(&self.layout.build).arg("--check");
 
-            let mut target_bin = target.clone();
-            target_bin.set_extension("ibc");
+            // include dependencies
+            for binary in self.deps {
+                process.arg("-i").arg(binary.target());
+            }
 
-            if target_bin.exists() {
-                target_bins.push(target_bin);
-            } else {
+            // compile units
+            for target in self.targets {
+                process.arg(self.layout.build.join(target));
+            }
+
+            process.spawn()?;
+
+            let target_bin = target.with_extension("ibc");
+            if !target_bin.exists() {
                 bail!(
                     "Compiler does not generate binary for {}",
                     target.to_string_lossy()
@@ -57,7 +51,7 @@ impl CompileInvocation {
             }
         }
 
-        Ok(target_bins)
+        Ok(())
     }
 }
 
@@ -70,7 +64,7 @@ pub struct CodegenInvocation {
 }
 
 impl CodegenInvocation {
-    pub fn execute(&mut self, bcx: &mut BuildContext) -> Res<()> {
+    pub fn execute(self, bcx: &BuildContext) -> Res<()> {
         // invoke compiler
         bcx.compiler
             .process()

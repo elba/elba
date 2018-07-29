@@ -7,7 +7,7 @@
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
 use directories::BaseDirs;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use package::resolution::DirectRes;
 use std::path::PathBuf;
 
@@ -32,7 +32,7 @@ pub struct Config {
     // First index = default.
     // In future, default for "indices" should be only official index..
     #[serde(default)]
-    pub indices: IndexSet<DirectRes>,
+    pub indices: Vec<DirectRes>,
 }
 
 impl Config {
@@ -59,7 +59,7 @@ impl Default for Config {
             term: Term::default(),
             alias: default_aliases(),
             directories: Directories::default(),
-            indices: IndexSet::default(),
+            indices: Vec::new(),
         }
     }
 }

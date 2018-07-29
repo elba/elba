@@ -13,57 +13,160 @@
 //!     In this stage, Elba builds lib target, binary, docs, benchmarks and tests, only for local package.
 //!
 
-pub mod invoke;
 pub mod context;
-pub mod prepare;
+pub mod invoke;
+pub mod job;
 
-use std::fs;
-use std::path::PathBuf;
-use util::{errors::Res, lock::DirLock};
+use build::context::{BuildConfig, BuildContext, CompileMode, Compiler, Layout};
+use build::invoke::CompileInvocation;
+use build::job::JobQueue;
+use failure::ResultExt;
+use package::{lockfile::LockfileToml, manifest::Manifest, resolution::IndexRes, Summary};
+use petgraph::graph::NodeIndex;
+use resolve::Resolver;
+use retrieve::{Binary, Cache, Retriever, Source};
+use slog::Logger;
+use std::{
+    fs,
+    io::prelude::*,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+use toml;
+use util::{config::Config, errors::Res, graph::Graph, lock::DirLock};
 
-/// The general "mode" of what to do
-#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
-pub enum CompileMode {
-    /// Typecheck a target without codegen
-    Lib,
-    /// Compile and codegen executable(s)
-    ///
-    /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
-    /// executables anyway
-    Bin,
-    /// Create documentation
-    Doc,
-}
+pub fn compile(
+    package: PathBuf,
+    layout: &Layout,
+    config: Config,
+    bc: BuildConfig,
+    logger: &Logger,
+) -> Res<()> {
+    let mut manifest = fs::File::open(package.join("elba.toml"))
+        .context(format_err!("failed to read manifest file."))?;
+    let mut contents = String::new();
+    manifest.read_to_string(&mut contents)?;
+    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
 
-#[derive(Debug)]
-pub struct Layout {
-    lock: DirLock,
-    pub root: PathBuf,
-    pub bin: PathBuf,
-    pub lib: PathBuf,
-    pub build: PathBuf,
-    pub deps: PathBuf,
-}
+    // TODO: Get indices from config & cache.
+    let cache = Cache::from_disk(&logger, config.directories.cache.clone());
+    let compiler = Compiler::new();
+    let bcx = BuildContext {
+        cache: &cache,
+        compiler,
+    };
 
-impl Layout {
-    pub fn new(lock: DirLock) -> Res<Self> {
-        let root = lock.path().to_path_buf();
+    let solve = solve(&package, &manifest, &config, &cache, logger)?;
 
-        let layout = Layout {
-            lock,
-            root: root.clone(),
-            bin: root.join("bin"),
-            lib: root.join("lib"),
-            build: root.join("build"),
-            deps: root.join("deps"),
-        };
+    let root = solve[NodeIndex::new(0)].clone();
 
-        fs::create_dir(&layout.root)?;
-        fs::create_dir(&layout.bin)?;
-        fs::create_dir(&layout.lib)?;
-        fs::create_dir(&layout.build)?;
-        fs::create_dir(&layout.deps)?;
+    let job_queue = JobQueue::new(solve, &bcx)?;
+    let deps = job_queue.exec(&bcx)?;
 
-        Ok(layout)
+    match bc.compile_mode {
+        CompileMode::Lib => compile_lib(&root, &deps, &layout, &bcx)?,
+        CompileMode::Bin => unimplemented!(),
+        CompileMode::Doc => unimplemented!(),
     }
+
+    Ok(())
+}
+
+fn solve(
+    package: &Path,
+    manifest: &Manifest,
+    config: &Config,
+    cache: &Cache,
+    logger: &Logger,
+) -> Res<Graph<Source>> {
+    let def_index = config
+        .indices
+        .get(0)
+        .map(|index| index.clone().into())
+        .unwrap_or_else(|| IndexRes::from_str("index+dir+none").unwrap());
+
+    let op = || -> Res<Graph<Summary>> {
+        let mut f = fs::File::open(&package.join("elba.lock"))?;
+        let mut contents = String::new();
+        f.read_to_string(&mut contents)?;
+        let toml = LockfileToml::from_str(&contents)?;
+
+        Ok(toml.into())
+    };
+
+    let lock = if let Ok(solve) = op() {
+        solve
+    } else {
+        Graph::default()
+    };
+
+    let root = manifest.summary();
+
+    let deps = manifest
+        .deps(&def_index, true)
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    let indices = cache.get_indices(&config.indices);
+
+    let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
+    let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
+
+    let mut lockfile = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(&package.join("elba.lock"))
+        .context(format_err!("could not open elba.lock for writing"))?;
+
+    let lf_contents: LockfileToml = solve.clone().into();
+    let lf_contents = toml::to_string_pretty(&lf_contents)?;
+
+    lockfile
+        .write_all(lf_contents.as_bytes())
+        .context(format_err!("could not write to elba.lock"))?;
+
+    // TODO: (important) borrowcheck keeps complaining the code beneath
+    // let sources = retriever.retrieve_packages(&solve)?;
+    let sources = unimplemented!();
+
+    Ok(sources)
+}
+
+fn compile_lib(
+    source: &Source,
+    deps: &Vec<Binary>,
+    layout: &Layout,
+    bcx: &BuildContext,
+) -> Res<()> {
+    let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
+        format_err!(
+            "package {} does not contain lib target",
+            source.meta().package.name
+        )
+    })?;
+
+    let targets = lib_target
+        .mods
+        .iter()
+        .map(|mod_name| lib_target.path.join(mod_name.replace(".", "/")))
+        .collect();
+
+    let invocation = CompileInvocation {
+        src: &source.path().join("src"),
+        deps,
+        targets: &targets,
+        layout: &layout,
+    };
+
+    invocation.execute(bcx)?;
+
+    for target in targets {
+        let target_bin = target.with_extension("ibc");
+        let from = layout.build.join(&target_bin);
+        let to = layout.lib.join(&target_bin);
+        fs::create_dir_all(to.parent().unwrap())?;
+        fs::rename(from, to)?;
+    }
+
+    Ok(())
 }

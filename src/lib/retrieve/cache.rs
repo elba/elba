@@ -59,8 +59,9 @@ use std::{
     collections::VecDeque,
     env, fs,
     io::{prelude::*, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 use tar::Builder;
 use util::{
@@ -186,33 +187,34 @@ impl Cache {
     }
 
     /// Acquires a lock on a built dependency directory
-    pub fn checkout_build(&self, build_hash: BuildHash) -> Result<Option<Binary>, Error> {
-        let path = self.layout.build.join(build_hash.hash);
+    pub fn checkout_build(&self, build_hash: &BuildHash) -> Result<Option<Binary>, Error> {
+        let path = self.layout.build.join(build_hash.hash.clone());
 
         if path.exists() {
             let target = DirLock::acquire(&path)?;
-            Ok(Some(Binary { target, build_hash }))
+            Ok(Some(Binary {
+                inner: Arc::new(BinaryInner { target }),
+            }))
         } else {
             Ok(None)
         }
     }
 
-    pub fn store_build(&self, binary: Binary, build_hash: BuildHash) -> Res<()> {
-        let path = binary.target.path();
+    pub fn store_build(&self, target: &Path, build_hash: &BuildHash) -> Res<Binary> {
+        let dest = self.layout.build.join(&build_hash.hash);
 
-        DirLock::acquire(&path)?;
+        clear_dir(&dest)?;
+        copy_dir(target, &dest)?;
 
-        clear_dir(&binary.target.path())?;
-        copy_dir(
-            &binary.target.path(),
-            &self.layout.build.join(build_hash.hash),
-        )?;
-
-        Ok(())
+        let target = DirLock::acquire(&dest)?;
+        Ok(Binary {
+            inner: Arc::new(BinaryInner { target }),
+        })
     }
 
-    pub fn acquire_build_tempdir(&self, build_hash: BuildHash) -> Result<DirLock, Error> {
-        let path = self.layout.tmp.join(build_hash.hash);
+    // TODO: Return a newtype struct TempDir which will remove the folder when dropped.
+    pub fn acquire_build_tempdir(&self, build_hash: &BuildHash) -> Result<DirLock, Error> {
+        let path = self.layout.tmp.join(&build_hash.hash);
 
         let lock = DirLock::acquire(&path)?;
         clear_dir(&path)?;
@@ -294,6 +296,7 @@ impl Cache {
 #[derive(Debug, Clone)]
 struct Layout {
     pub root: PathBuf,
+    pub bin: PathBuf,
     pub src: PathBuf,
     pub build: PathBuf,
     pub indices: PathBuf,
@@ -304,6 +307,7 @@ impl Layout {
     pub fn new(root: &PathBuf) -> Result<Self, Error> {
         let layout = Layout {
             root: root.to_path_buf(),
+            bin: root.join("bin"),
             src: root.join("src"),
             build: root.join("build"),
             indices: root.join("indices"),
@@ -311,6 +315,7 @@ impl Layout {
         };
 
         fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.bin)?;
         fs::create_dir_all(&layout.src)?;
         fs::create_dir_all(&layout.build)?;
         fs::create_dir_all(&layout.indices)?;
@@ -323,14 +328,19 @@ impl Layout {
 /// Information about the source of package that is available somewhere in the file system.
 /// Packages are stored as directories on disk (not archives because it would just be a bunch of
 /// pointless unpacking-repacking).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Source {
+    inner: Arc<SourceInner>,
+}
+
+#[derive(Debug)]
+pub struct SourceInner {
     /// The package's manifest
-    pub meta: Manifest,
-    pub location: DirectRes,
+    meta: Manifest,
+    location: DirectRes,
+    hash: String,
     /// The path to the package.
-    pub path: DirLock,
-    pub hash: String,
+    path: DirLock,
 }
 
 impl Source {
@@ -353,6 +363,7 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
+    // TODO: ignore target/ folder
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 
@@ -373,42 +384,56 @@ impl Source {
         }
 
         // Pack into a tar file to hash it quickly
-        let f = fs::File::create(path.path().with_extension("tar"))?;
-        let mut ar = Builder::new(f);
+        // We don't need to put this tar file on-disk, we just want a nice single byte vec that we
+        // can hash quickly
+        let mut f = vec![];
+        let mut ar = Builder::new(&mut f);
         ar.append_dir_all("irrelevant", path.path())?;
 
         let _ = ar.into_inner()?;
 
-        let p = path.path().with_extension("tar");
-        let mut file = fs::File::open(&p)?;
-        let result = Sha256::digest_reader(&mut file)?;
+        let result = Sha256::digest(&f);
         let hash = hexify_hash(result.as_slice());
 
-        // The tarball is useless to us now.
-        drop(file);
-        fs::remove_file(p)?;
-
         Ok(Source {
-            meta: manifest,
-            location,
-            path,
-            hash,
+            inner: Arc::new(SourceInner {
+                meta: manifest,
+                location,
+                path,
+                hash,
+            }),
         })
     }
 
-    pub fn with_path(&self, p: DirLock) -> Source {
-        Source {
-            meta: self.meta.clone(),
-            location: self.location.clone(),
-            hash: self.hash.clone(),
-            path: p,
-        }
+    pub fn meta(&self) -> &Manifest {
+        &self.inner.meta
     }
+
+    pub fn location(&self) -> &DirectRes {
+        &self.inner.location
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.inner.hash
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.inner.path.path()
+    }
+
+    // pub fn with_path(&self, p: DirLock) -> Source {
+    //     Source {
+    //         meta: self.meta.clone(),
+    //         location: self.location.clone(),
+    //         hash: self.hash.clone(),
+    //         path: p,
+    //     }
+    // }
 }
 
 impl PartialEq for Source {
     fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash
+        self.hash() == other.hash()
     }
 }
 
@@ -418,7 +443,7 @@ impl Eq for Source {}
 // TODO: Name candidates: Build, BuildInfo, BuildMeta
 // TODO: BuildHash allows computing the hash of build by caller,
 //       which helps to avoid duplicate computation.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BuildHash {
     pub hash: String,
 }
@@ -426,8 +451,8 @@ pub struct BuildHash {
 impl BuildHash {
     pub fn new(root: &Source, sources: &Graph<Source>) -> Self {
         let mut hasher = Sha256::default();
-        for (_, src) in sources.sub_tree(root).unwrap() {
-            hasher.input(&src.hash.as_bytes());
+        for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
+            hasher.input(&src.hash().as_bytes());
         }
         let hash = hexify_hash(hasher.result().as_slice());
 
@@ -436,8 +461,18 @@ impl BuildHash {
 }
 
 /// Information about the built library that is available somewhere in the file system.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binary {
-    pub build_hash: BuildHash,
-    pub target: DirLock,
+    inner: Arc<BinaryInner>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct BinaryInner {
+    target: DirLock,
+}
+
+impl Binary {
+    pub fn target(&self) -> &Path {
+        self.inner.target.path()
+    }
 }

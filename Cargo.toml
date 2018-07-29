@@ -18,6 +18,7 @@ itertools = "0.7"
 nom = "4.0"
 petgraph = "0.4"
 reqwest = "0.8"
+scoped_threadpool = "0.1"
 semver = { version = "0.9", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"

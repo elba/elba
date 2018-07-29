@@ -37,12 +37,12 @@ use util::errors::*;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Manifest {
-    package: PackageInfo,
+    pub package: PackageInfo,
     #[serde(default = "IndexMap::new")]
     pub dependencies: IndexMap<Name, DepReq>,
     #[serde(default = "IndexMap::new")]
     pub dev_dependencies: IndexMap<Name, DepReq>,
-    targets: Targets,
+    pub targets: Targets,
     #[serde(default)]
     workspace: IndexMap<Name, String>,
 }
@@ -94,11 +94,11 @@ impl FromStr for Manifest {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct PackageInfo {
-    name: Name,
-    version: Version,
-    authors: Vec<String>,
-    license: Option<String>,
+pub struct PackageInfo {
+    pub name: Name,
+    pub version: Version,
+    pub authors: Vec<String>,
+    pub license: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -150,8 +150,8 @@ impl DepReq {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct Targets {
-    lib: Option<LibTarget>,
+pub struct Targets {
+    pub lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]
     bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
@@ -161,18 +161,18 @@ struct Targets {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct Target {
+pub struct Target {
     path: PathBuf,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct LibTarget {
-    path: PathBuf,
-    mods: Vec<String>,
+pub struct LibTarget {
+    pub path: PathBuf,
+    pub mods: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct BinTarget {
+pub struct BinTarget {
     name: String,
     // For binaries, benches, and tests, this should point to a file with a Main module.
     main: PathBuf,
