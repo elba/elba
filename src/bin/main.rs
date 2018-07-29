@@ -34,7 +34,12 @@ fn cli() -> App<'static, 'static> {
                 .global(true)
                 .conflicts_with("quiet"),
         )
-        .arg(Arg::with_name("quiet").help("Quiet output").global(true))
+        .arg(
+            Arg::with_name("quiet")
+                .long("quiet")
+                .help("Quiet output")
+                .global(true),
+        )
         .arg(
             Arg::with_name("color")
                 .long("color")
@@ -85,27 +90,22 @@ fn expand_aliases(
 
 fn go() -> Result<(), Error> {
     let args = cli().get_matches();
-    // TODO: Actually get correct config
     let mut config = Config::default();
     let args = expand_aliases(&mut config, args)?;
 
-    let verbosity = if args.is_present("verbose") {
-        Some(Verbosity::Verbose)
+    config.merge_files().merge_env();
+
+    if args.is_present("verbose") {
+        config.verbosity(Verbosity::Verbose);
     } else if args.is_present("quiet") {
-        Some(Verbosity::Quiet)
-    } else {
-        None
-    };
+        config.verbosity(Verbosity::Quiet);
+    }
 
-    let color = if args.is_present("color") {
-        Some(true)
+    if args.is_present("color") {
+        config.color(true);
     } else if args.is_present("no-color") {
-        Some(false)
-    } else {
-        None
-    };
-
-    config.configure(verbosity, color);
+        config.color(false);
+    }
 
     let (cmd, subcommand_args) = match args.subcommand() {
         (cmd, Some(args)) => (cmd, args),

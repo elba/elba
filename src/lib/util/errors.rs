@@ -9,31 +9,31 @@ pub type Res<T> = Result<T, Error>;
 // implement Fail for each type of error: Index failures, Parsing failures, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(display = "Invalid lockfile.")]
+    #[fail(display = "invalid lockfile")]
     InvalidLockfile,
-    #[fail(display = "Invalid manifest file.")]
+    #[fail(display = "invalid manifest file")]
     InvalidManifestFile,
-    #[fail(display = "Invalid source url.")]
+    #[fail(display = "invalid source url")]
     InvalidSourceUrl,
-    #[fail(display = "Invalid package id.")]
+    #[fail(display = "invalid package id")]
     InvalidPackageId,
-    #[fail(display = "Invalid constraint.")]
+    #[fail(display = "invalid constraint")]
     InvalidConstraint,
-    #[fail(display = "Invalid index structure.")]
+    #[fail(display = "invalid index structure")]
     InvalidIndex,
-    #[fail(display = "Package doesn't exist in index.")]
+    #[fail(display = "package doesn't exist in index")]
     PackageNotFound,
-    #[fail(display = "Conflict resolution failure.")]
+    #[fail(display = "conflict resolution failure")]
     NoConflictRes,
-    #[fail(display = "Package is missing manifest.")]
+    #[fail(display = "package is missing manifest")]
     MissingManifest,
-    #[fail(display = "Could not download package.")]
+    #[fail(display = "could not download package")]
     CannotDownload,
-    #[fail(display = "Checksum error.")]
+    #[fail(display = "checksum error")]
     Checksum,
-    #[fail(display = "Resource is locked.")]
+    #[fail(display = "resource is locked")]
     Locked,
     #[doc(hidden)]
-    #[fail(display = "This should be impossible")]
+    #[fail(display = "if you see this error, everything is wrong")]
     __Nonexhaustive,
 }

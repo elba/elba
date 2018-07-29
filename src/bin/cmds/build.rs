@@ -8,7 +8,7 @@ use failure::ResultExt;
 use std::env::current_dir;
 
 pub fn cli() -> App<'static, 'static> {
-    SubCommand::with_name("lock").about("Generates an elba.lock according to the manifest")
+    SubCommand::with_name("build").about("Builds the root package")
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
@@ -18,7 +18,6 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
     let indices = c.indices.iter().cloned().collect::<Vec<_>>();
     let global_cache = c.directories.cache.clone();
 
-    // TODO: Proper log output etc.
     let logger = logger(c);
 
     let ctx = build::BuildCtx {
@@ -29,5 +28,6 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
 
     build::solve_local(&ctx, project)?;
 
-    Ok(())
+    // TODO: Do more stuff
+    unimplemented!()
 }
