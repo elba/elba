@@ -1,52 +1,60 @@
 extern crate elba;
-extern crate petgraph;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate slog;
 
 use elba::{
-    build::job::{CompileMode, Job, JobQueue},
-    package::{
-        resolution::{DirectRes, Resolution},
-        Name, PackageId,
-    },
-    retrieve::cache::{Binary, Source},
-    util::{graph::Graph, lock::DirLock},
+    build::compile,
+    build::context::{BuildConfig, CompileMode, Layout},
+    util::{config::Config, config::Directories, lock::DirLock},
 };
-use petgraph::graph::NodeIndex;
-use std::{path::PathBuf, str::FromStr};
+use slog::Logger;
+use std::path::PathBuf;
 
-macro_rules! pkg {
-    ($a:tt) => {{
-        let root_name = Name::from_str($a).unwrap();
-        PackageId::new(root_name, Resolution::Root)
-    }};
+lazy_static! {
+    static ref LOGGER: Logger = new_logger();
+    static ref CONFIG: Config = config();
+}
+
+fn new_logger() -> Logger {
+    /*
+    let decorator = slog_term::TermDecorator::new().build();
+    let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+    */
+
+    // Suppress logging output during tests - we don't need to see it
+    Logger::root(slog::Discard, o!())
+}
+
+fn config() -> Config {
+    let start = env!("CARGO_MANIFEST_DIR");
+    let mut cache_path = PathBuf::new();
+    cache_path.push(start);
+    cache_path.push("tests/data/cache");
+
+    Config {
+        directories: Directories {
+            cache: cache_path.clone(),
+            rest: cache_path.clone(),
+        },
+        ..Config::default()
+    }
 }
 
 #[test]
-fn job_queue_empty() {
-    JobQueue::default().exec().unwrap();
-}
-
-#[test]
-fn job_queue_single() {
-    let start = env!("CARGO_MANIFEST_DIR").to_owned();
+fn compile_single() {
+    let start = env!("CARGO_MANIFEST_DIR");
     let p = PathBuf::from(start.clone()).join("tests/data/pkgs/one");
-    let q = DirLock::acquire(&PathBuf::from(start).join("tests/data/whatever")).unwrap();
-    let dir = DirLock::acquire(&p).unwrap();
-    let res = DirectRes::Dir {
-        url: p.to_path_buf(),
+    let lp = DirLock::acquire(&p).unwrap();
+    let t = p.join("target");
+    let lt = DirLock::acquire(&t).unwrap();
+    let layout = Layout::new(lt).unwrap();
+    // TODO: build Bin target as well
+    let bc = BuildConfig {
+        compile_mode: CompileMode::Lib,
     };
 
-    let j = Job {
-        source: Binary::new(Source::from_folder(&pkg!("one/one"), dir, res).unwrap(), q),
-        compile_mode: CompileMode::Bin,
-    };
-
-    let mut graph = Graph::default();
-    graph.inner.add_node(j);
-
-    let jq = JobQueue {
-        graph,
-        queue: vec![NodeIndex::new(0)],
-    };
-
-    jq.exec().unwrap();
+    compile(&lp, &layout, &CONFIG, &bc, &LOGGER).unwrap()
 }

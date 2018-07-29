@@ -9,7 +9,7 @@
 //!     Dependency preparation does not necessarily be executed along with target generating and it
 //!     could also be used by editors (like rls).
 //!
-//! - Target generating:
+//! - Target generation:
 //!     In this stage, Elba builds lib target, binary, docs, benchmarks and tests, only for local package.
 //!
 
@@ -26,23 +26,18 @@ use petgraph::graph::NodeIndex;
 use resolve::Resolver;
 use retrieve::{Binary, Cache, Retriever, Source};
 use slog::Logger;
-use std::{
-    fs,
-    io::prelude::*,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{fs, io::prelude::*, path::Path, str::FromStr};
 use toml;
 use util::{config::Config, errors::Res, graph::Graph, lock::DirLock};
 
 pub fn compile(
-    package: PathBuf,
+    package: &DirLock,
     layout: &Layout,
-    config: Config,
-    bc: BuildConfig,
+    config: &Config,
+    bc: &BuildConfig,
     logger: &Logger,
 ) -> Res<()> {
-    let mut manifest = fs::File::open(package.join("elba.toml"))
+    let mut manifest = fs::File::open(package.path().join("elba.toml"))
         .context(format_err!("failed to read manifest file."))?;
     let mut contents = String::new();
     manifest.read_to_string(&mut contents)?;
@@ -56,13 +51,14 @@ pub fn compile(
         compiler,
     };
 
-    let solve = solve(&package, &manifest, &config, &cache, logger)?;
+    let solve = solve(&package.path(), &manifest, &config, &cache, logger)?;
 
     let root = solve[NodeIndex::new(0)].clone();
 
     let job_queue = JobQueue::new(solve, &bcx)?;
     let deps = job_queue.exec(&bcx)?;
 
+    // TODO: seperate the following into second stage(?)
     match bc.compile_mode {
         CompileMode::Lib => compile_lib(&root, &deps, &layout, &bcx)?,
         CompileMode::Bin => unimplemented!(),

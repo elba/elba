@@ -203,12 +203,17 @@ impl Cache {
     pub fn store_build(&self, target: &Path, build_hash: &BuildHash) -> Res<Binary> {
         let dest = self.layout.build.join(&build_hash.hash);
 
-        clear_dir(&dest)?;
-        copy_dir(target, &dest)?;
+        if !dest.exists() {
+            fs::create_dir_all(&dest)?;
+        }
 
-        let target = DirLock::acquire(&dest)?;
+        let dest = DirLock::acquire(&dest)?;
+
+        clear_dir(dest.path())?;
+        copy_dir(target, dest.path())?;
+
         Ok(Binary {
-            inner: Arc::new(BinaryInner { target }),
+            inner: Arc::new(BinaryInner { target: dest }),
         })
     }
 

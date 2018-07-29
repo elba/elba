@@ -83,11 +83,11 @@ impl Layout {
             deps: root.join("deps"),
         };
 
-        fs::create_dir(&layout.root)?;
-        fs::create_dir(&layout.bin)?;
-        fs::create_dir(&layout.lib)?;
-        fs::create_dir(&layout.build)?;
-        fs::create_dir(&layout.deps)?;
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.lib)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.deps)?;
 
         Ok(layout)
     }

@@ -6,14 +6,13 @@ use retrieve::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-// use threadpool::Pool;
 use util::{errors::Res, graph::Graph};
 
-/// JobQueue is responsible for building the direct dependencies for root package.
+/// JobQueue is responsible for building direct dependencies for root package.
 ///
 /// JobQueue transforms dirty jobs into fresh jobs, starting from the bottom leaves.
 /// A built job is called `Fresh` or else it is `Dirty`. Job of `None` is either root
-/// or a package that is unreachable from root(the intermediate packages are built).
+/// or a package that is unreachable from root(the intermediate packages were built).
 pub struct JobQueue {
     /// The graph of Jobs which need to be done.
     graph: Graph<Job>,
@@ -41,16 +40,18 @@ impl JobQueue {
 
                 let job = match bcx.cache.checkout_build(&build_hash)? {
                     Some(binary) => Job::Fresh(binary),
-                    None => Job::Dirty(source.clone(), build_hash),
+                    None => {
+                        next_layer.extend(
+                            graph
+                                .children(node)
+                                .filter(|(_, child)| child.is_none())
+                                .map(|(index, _)| index),
+                        );
+
+                        Job::Dirty(source.clone(), build_hash)
+                    }
                 };
                 graph[node] = job;
-
-                next_layer.extend(
-                    graph
-                        .children(node)
-                        .filter(|(_, child)| child.is_none())
-                        .map(|(index, _)| index),
-                );
             }
         }
 
