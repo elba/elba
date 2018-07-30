@@ -21,6 +21,10 @@ pub struct BuildCtx {
 }
 
 // TODO: Maybe each one of these should return a closure that we can pass into solve_*
+pub fn bench(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| unimplemented!())
+}
+
 pub fn build(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
@@ -38,6 +42,10 @@ pub fn lock(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
 }
 
 pub fn repl(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| unimplemented!())
+}
+
+pub fn test(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
