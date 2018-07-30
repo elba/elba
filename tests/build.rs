@@ -2,7 +2,10 @@ extern crate elba;
 extern crate petgraph;
 
 use elba::{
-    build::{CompileMode, job::{Job, JobQueue}},
+    build::{
+        job::{Job, JobQueue},
+        CompileMode,
+    },
     package::{
         resolution::{DirectRes, Resolution},
         Name, PackageId,
@@ -36,15 +39,14 @@ fn job_queue_single() {
 
     let j = Job {
         source: Binary::new(Source::from_folder(&pkg!("one/one"), dir, res).unwrap(), q),
-        compile_mode: CompileMode::Bin,
+        compile_mode: CompileMode::Lib,
+        bin_paths: vec![],
     };
 
     let mut graph = Graph::default();
     graph.inner.add_node(j);
 
-    let jq = JobQueue {
-        graph,
-    };
+    let jq = JobQueue { graph };
 
     jq.exec().unwrap();
 }

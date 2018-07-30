@@ -85,7 +85,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, location: PathBuf) -> Self {
+    pub fn from_disk(plog: &Logger, location: &Path) -> Self {
         let layout = Layout::new(&location);
 
         let client = Client::new();

@@ -19,7 +19,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
     let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
 
     let logger = logger(c);
-    let indices = c.indices.iter().cloned().collect::<Vec<_>>();
+    let indices = c.indices.to_vec();
     let global_cache = c.directories.cache.clone();
 
     let ctx = build::BuildCtx {
@@ -28,8 +28,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::solve_remote(&ctx, name)?;
-
-    // TODO
-    unimplemented!()
+    build::install(&ctx, name)
 }

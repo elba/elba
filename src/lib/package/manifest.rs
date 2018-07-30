@@ -8,7 +8,10 @@ use super::{
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
-use std::{path::{Component, PathBuf}, str::FromStr};
+use std::{
+    path::{Component, Path, PathBuf},
+    str::FromStr,
+};
 use toml;
 use url::Url;
 use url_serde;
@@ -90,13 +93,39 @@ impl FromStr for Manifest {
         }
 
         if let Some(lib) = &toml.targets.lib {
-            if lib.path.is_absolute() || !lib.path.components().all(|x| x != Component::ParentDir) {
+            if !is_relative_subdir(&lib.path) {
                 bail!("lib path can only reference a directory inside package")
+            }
+
+            if lib.mods.is_empty() {
+                bail!("libraries have to export at least one module")
+            }
+        }
+
+        for bin in &toml.targets.bin {
+            if !is_relative_subdir(&bin.main) {
+                bail!("bin path can only reference a directory inside package")
+            }
+        }
+
+        for test in &toml.targets.test {
+            if !is_relative_subdir(&test.path) {
+                bail!("test path can only reference a directory inside package")
+            }
+        }
+
+        for bench in &toml.targets.bench {
+            if !is_relative_subdir(&bench.path) {
+                bail!("bench path can only reference a directory inside package")
             }
         }
 
         Ok(toml)
     }
+}
+
+fn is_relative_subdir(path: &Path) -> bool {
+    path.is_relative() && path.components().all(|x| x != Component::ParentDir)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -159,7 +188,7 @@ impl DepReq {
 pub struct Targets {
     pub lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]
-    bin: Vec<BinTarget>,
+    pub bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
     test: Vec<Target>,
     #[serde(default = "Vec::new")]
@@ -178,7 +207,7 @@ pub struct LibTarget {
     pub mods: Vec<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct BinTarget {
     pub name: String,
     // For binaries, benches, and tests, this should point to a file with a Main module.
@@ -190,7 +219,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn valid_manifest() {
+    fn manifest_valid() {
         let manifest = r#"
 [package]
 name = 'ring_ding/test'
@@ -220,5 +249,53 @@ mods = [
 "#;
 
         assert!(Manifest::from_str(manifest).is_ok());
+    }
+
+    #[test]
+    fn manifest_no_targets() {
+        let manifest = r#"
+[package]
+name = 'ring_ding/test'
+version = '1.0.0'
+authors = ['Me <y@boi.me>']
+license = 'MIT'
+
+[dependencies]
+'awesome/a' = '>= 1.0.0 < 2.0.0'
+'cool/b' = { git = 'https://github.com/super/cool', branch = "v1.0.0" }
+'great/c' = { path = 'here/right/now' }
+
+[dev_dependencies]
+'ayy/x' = '2.0'
+"#;
+
+        assert!(Manifest::from_str(manifest).is_err());
+    }
+
+    #[test]
+    fn manifest_invalid_target_path() {
+        let manifest = r#"
+[package]
+name = 'ring_ding/test'
+version = '1.0.0'
+authors = ['me']
+license = 'MIT'
+
+[dependencies]
+'awesome/a' = '>= 1.0.0 < 2.0.0'
+'cool/b' = { git = 'https://github.com/super/cool', tag = "v1.0.0" }
+'great/c' = { path = 'here/right/now' }
+
+[dev_dependencies]
+'ayy/x' = '2.0'
+
+[targets.lib]
+path = "../oops"
+mods = [
+    "Right.Here"
+]
+"#;
+
+        assert!(Manifest::from_str(manifest).is_err());
     }
 }

@@ -15,7 +15,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
-    let indices = c.indices.iter().cloned().collect::<Vec<_>>();
+    let indices = c.indices.to_vec();
     let global_cache = c.directories.cache.clone();
 
     // TODO: Proper log output etc.
@@ -27,7 +27,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::solve_local(&ctx, project)?;
-
-    Ok(())
+    build::lock(&ctx, project)
 }

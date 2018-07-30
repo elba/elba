@@ -13,6 +13,8 @@ pub enum CompileMode {
     ///
     /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
     /// executables anyway
+    ///
+    /// The argument is the path(s) to the binar(y/ies).
     Bin,
     /// Create documentation
     Doc,

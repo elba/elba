@@ -27,7 +27,8 @@ impl<'a> CompileInvocation<'a> {
 
             // Because we check if the path is inside the package in Manifest::from_str, this is ok.
             let src_path = s.path.path().join(lib_target.path);
-            let targets = self.targets
+            let targets = self
+                .targets
                 .iter()
                 .map(|mod_name| {
                     src_path
@@ -39,7 +40,8 @@ impl<'a> CompileInvocation<'a> {
             self.compile(bcx)?;
 
             for from in targets {
-                let to = self.pkg
+                let to = self
+                    .pkg
                     .target
                     .path()
                     .join(from.strip_prefix(&src_path).unwrap());

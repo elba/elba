@@ -2,6 +2,7 @@ use super::CompileMode;
 use build::context::BuildContext;
 use crossbeam::{channel, deque, thread::scope};
 use indexmap::IndexMap;
+use package::manifest::BinTarget;
 use petgraph::{graph::NodeIndex, Direction};
 use retrieve::cache::{Binary, Cache, Source};
 use std::{thread::sleep, time};
@@ -29,6 +30,7 @@ impl JobQueue {
     pub fn new(
         local: &Cache,
         root_mode: CompileMode,
+        root_bins: &[BinTarget],
         tasks: &[NodeIndex],
         bcx: BuildContext,
         graph: Graph<Source>,
@@ -36,12 +38,13 @@ impl JobQueue {
         let oldg = graph;
         let graph = oldg.map(
             |ix, s| {
+                let src = if ix == NodeIndex::new(0) || tasks.contains(&ix) {
+                    local.checkout_build(s, &oldg)?
+                } else {
+                    bcx.cache.checkout_build(s, &oldg)?
+                };
+
                 Ok(Job {
-                    source: if ix == NodeIndex::new(0) || tasks.contains(&ix) {
-                        local.checkout_build(s, &oldg)?
-                    } else {
-                        bcx.cache.checkout_build(s, &oldg)?
-                    },
                     compile_mode: if ix == NodeIndex::new(0) {
                         root_mode
                     } else if tasks.contains(&ix) {
@@ -49,6 +52,16 @@ impl JobQueue {
                     } else {
                         CompileMode::Lib
                     },
+                    bin_paths: if ix == NodeIndex::new(0) {
+                        root_bins.to_vec()
+                    } else if tasks.contains(&ix) {
+                        src.source()
+                            .map(|s| s.meta.targets.bin.clone())
+                            .unwrap_or_else(|| vec![])
+                    } else {
+                        vec![]
+                    },
+                    source: src,
                 })
             },
             |_| Ok(()),
@@ -204,6 +217,7 @@ enum Status {
 pub struct Job {
     pub source: Binary,
     pub compile_mode: CompileMode,
+    pub bin_paths: Vec<BinTarget>,
 }
 
 impl Job {

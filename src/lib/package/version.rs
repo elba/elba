@@ -333,7 +333,8 @@ impl FromStr for Range {
         // We throw away the original error because of 'static lifetime bs...
         let p = parse::range(CompleteStr(s))
             .map(|o| o.1)
-            .map_err(|_| ErrorKind::InvalidConstraint)?;
+            .map_err(|_| ErrorKind::InvalidConstraint)?
+            .ok_or_else(|| ErrorKind::InvalidConstraint)?;
 
         Ok(p)
     }
@@ -706,7 +707,8 @@ impl FromStr for Constraint {
         // We throw away the original error because of 'static lifetime bs...
         let p = parse::constraint(CompleteStr(s))
             .map(|o| o.1)
-            .map_err(|_| ErrorKind::InvalidConstraint)?;
+            .map_err(|_| ErrorKind::InvalidConstraint)?
+            .ok_or_else(|| ErrorKind::InvalidConstraint)?;
 
         Ok(p)
     }
@@ -835,21 +837,20 @@ mod parse {
         alt!(bare_version_from_str | bare_version_minor | bare_version_major)
     );
 
-    // TODO: Unwrapping is Bad
-    named!(range_caret<CompleteStr, Range>, ws!(do_parse!(
+    named!(range_caret<CompleteStr, Option<Range>>, ws!(do_parse!(
         opt!(tag_s!("^")) >>
         version: bare_version >>
-        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_caret(version.0, version.1, version.2), false)).unwrap())
+        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_caret(version.0, version.1, version.2), false)))
     )));
 
-    named!(range_tilde<CompleteStr, Range>, ws!(do_parse!(
+    named!(range_tilde<CompleteStr, Option<Range>>, ws!(do_parse!(
         tag_s!("~") >>
         version: bare_version >>
-        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_tilde(version.0, version.1, version.2), false)).unwrap())
+        (Range::new(Interval::Closed(version.0.clone(), false), Interval::Open(increment_tilde(version.0, version.1, version.2), false)))
     )));
 
     // Note! We allow bangs where they don't change anything (>=! and <!)
-    named!(range_interval<CompleteStr, Range>, ws!(do_parse!(
+    named!(range_interval<CompleteStr, Option<Range>>, ws!(do_parse!(
         lower: opt!(ws!(do_parse!(
             tag_s!(">") >>
             a: opt!(tag_s!("=")) >>
@@ -864,20 +865,20 @@ mod parse {
             version: bare_version >>
             (a.is_some(), version.0.clone(), inf.is_some() && !version.0.is_prerelease())
         ))) >>
-        (build_range(lower, upper).unwrap())
+        (build_range(lower, upper))
     )));
 
-    named!(range_any<CompleteStr, Range>, do_parse!(
+    named!(range_any<CompleteStr, Option<Range>>, do_parse!(
         tag_s!("any") >>
-        (Range::new(Interval::Unbounded, Interval::Unbounded).unwrap())
+        (Range::new(Interval::Unbounded, Interval::Unbounded))
     ));
 
-    named!(pub range<CompleteStr, Range>,
+    named!(pub range<CompleteStr, Option<Range>>,
         alt_complete!(range_caret | range_tilde | range_any | range_interval)
     );
 
-    named!(pub constraint<CompleteStr, Constraint>,
-        alt!(map!(separated_list!(tag!(","), range), |v| { Constraint::new(v.into_iter().collect()) }) | value!(Constraint::default()))
+    named!(pub constraint<CompleteStr, Option<Constraint>>,
+        map!(separated_list!(tag!(","), range), |v| if v.contains(&None) { None } else { Some(Constraint::new(v.into_iter().map(|x| x.unwrap()).collect())) })
     );
 }
 
@@ -885,7 +886,6 @@ mod parse {
 mod tests {
     use super::parse::*;
     use super::*;
-    use nom::types::CompleteStr;
     use semver::Version;
 
     macro_rules! new_range {
@@ -916,7 +916,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_bare() {
+    fn version_parse() {
         let vs = vec![
             "1",
             "1.0",
@@ -934,10 +934,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_range_caret() {
+    fn range_parse_caret() {
         let vs = vec!["1", "1.4", "1.4.3", "0", "0.2", "0.2.3", "0.0.2"]
             .into_iter()
-            .map(|s| range(CompleteStr(s)).unwrap().1)
+            .map(|s| Range::from_str(s).unwrap())
             .collect::<Vec<_>>();
 
         let ns = vec![
@@ -954,10 +954,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_range_tilde() {
+    fn range_parse_tilde() {
         let vs = vec!["~1", "~1.4", "~1.4.3", "~0", "~0.2", "~0.2.3", "~0.0.2"]
             .into_iter()
-            .map(|s| range(CompleteStr(s)).unwrap().1)
+            .map(|s| Range::from_str(s).unwrap())
             .collect::<Vec<_>>();
 
         let ns = vec![
@@ -974,10 +974,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_range_manual() {
+    fn range_parse_manual() {
         let vs = vec![">= 1.0.0 < 2.0.0", ">= 1.0.0", "< 2.0.0"]
             .into_iter()
-            .map(|s| range(CompleteStr(s)).unwrap().1)
+            .map(|s| Range::from_str(s).unwrap())
             .collect::<Vec<_>>();
 
         let ns = vec![
@@ -996,7 +996,7 @@ mod tests {
     }
 
     #[test]
-    fn test_range_pre_ok() {
+    fn range_pre_ok() {
         let r = Range::from_str(">=! 1.0.0 <! 2.0.0").unwrap();
         let vs = vec!["1.0.0-alpha.1", "1.0.0", "1.4.2", "1.6.3", "2.0.0-alpha.1"];
         for v in vs {
@@ -1006,7 +1006,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_relation() {
+    fn constraint_relation() {
         let rs = indexset!(Range::from_str("1").unwrap(),);
         let c = Constraint::new(rs);
 
@@ -1016,7 +1016,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_relation_single() {
+    fn constraint_relation_single() {
         let rs = indexset!(
             Range::from_str("<! 1.0.0").unwrap(), // pre-releases of 1.0.0 ok
             Range::from_str(">! 1.0.0").unwrap(), // same as > 1.0.0
@@ -1030,7 +1030,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_relation_opposite() {
+    fn constraint_relation_opposite() {
         let c1 = Constraint::from_str(">! 2.0.0 < 3.0.0").unwrap();
         let c2 = Constraint::from_str("<! 2.0.0, >=! 3.0.0").unwrap();
 
@@ -1038,7 +1038,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_complement() {
+    fn constraint_complement() {
         let rs = indexset!(
             new_range!("1.0.0" ~.. "2.0.0"),
             new_range!("2.5.3-beta.1" ~.~ "2.7.8")
@@ -1064,7 +1064,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_complement_symmetry() {
+    fn constraint_complement_symmetry() {
         let rs = indexset!(
             new_range!("1.0.0" ~.. "2.0.0"),
             new_range!("1.5.0" ~.~ "2.6.1")
@@ -1075,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_complement_correct() {
+    fn constraint_complement_correct() {
         let c1 = Constraint::from_str("<! 2.0.0, >=! 3.0.0").unwrap();
         let c2 = Constraint::from_str(">= 2.0.0 < 3.0.0").unwrap();
 
@@ -1083,7 +1083,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_complement_single() {
+    fn constraint_complement_single() {
         let rs = indexset!(
             Range::from_str("<! 1.0.0").unwrap(), // pre-releases of 1.0.0 ok
             Range::from_str(">! 1.0.0").unwrap(), // same as > 1.0.0
@@ -1097,7 +1097,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_subset() {
+    fn constraint_subset() {
         let a = Constraint::new(indexset!(
             new_range!("1.0.0" ..~ "1.3.2"),
             new_range!("5.5.7" ~.~ "5.6.2-alpha.2")
@@ -1112,7 +1112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_version_single() {
+    fn version_single() {
         let v = Version::new(1, 4, 2);
         let v2 = Version::new(1, 4, 3);
         let v3 = Version::new(1, 4, 1);
@@ -1124,7 +1124,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_difference() {
+    fn constraint_difference() {
         let c1 = Constraint::from_str("<! 2.0.0").unwrap();
         let c2 = Constraint::from_str(">! 2.0.0 < 3.0.0").unwrap();
 
@@ -1134,7 +1134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_difference_any() {
+    fn constraint_difference_any() {
         let c1 = Constraint::from_str(">= 2.0.0 < 3.0.0").unwrap();
         let c2 = Constraint::from_str("any").unwrap();
         let ce = Constraint::empty();
@@ -1143,7 +1143,7 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_difference_any_union() {
+    fn constraint_difference_any_union() {
         let c1 = Constraint::from_str("<! 1.1.0, >= 2.0.0").unwrap();
         let c2 = Constraint::from_str("any").unwrap();
         let ce = Constraint::empty();

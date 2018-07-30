@@ -80,7 +80,7 @@ fn cache() -> Cache {
     path.push(start);
     path.push("tests/data/cache");
 
-    Cache::from_disk(&LOGGER, path)
+    Cache::from_disk(&LOGGER, &path)
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {
@@ -110,7 +110,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
     )
 }
 
-fn resolver<'a>(retriever: &'a mut Retriever<'a>) -> Resolver<'a> {
+fn resolver<'a>(retriever: &'a mut Retriever<'static>) -> Resolver<'a, 'static> {
     Resolver::new(&retriever.logger.clone(), retriever)
 }
 

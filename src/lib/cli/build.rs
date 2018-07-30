@@ -9,7 +9,7 @@ use resolve::Resolver;
 use retrieve::cache::Cache;
 use retrieve::Retriever;
 use slog::Logger;
-use std::{fs, io::prelude::*, path::PathBuf, str::FromStr};
+use std::{fs, io::prelude::*, path::{Path, PathBuf}, str::FromStr};
 use toml;
 use util::errors::Res;
 use util::graph::Graph;
@@ -20,7 +20,32 @@ pub struct BuildCtx {
     pub logger: Logger,
 }
 
-pub fn solve_local(ctx: &BuildCtx, project: PathBuf) -> Res<(Cache, Graph<Summary>)> {
+// TODO: Maybe each one of these should return a closure that we can pass into solve_*
+pub fn build(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| unimplemented!())
+}
+
+pub fn check(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| unimplemented!())
+}
+
+pub fn install(ctx: &BuildCtx, name: Name) -> Res<()> {
+    solve_remote(ctx, name, |_, _, _| unimplemented!())
+}
+
+pub fn lock(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| Ok(()))
+}
+
+pub fn repl(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+    solve_local(ctx, &project, |_, _, _| unimplemented!())
+}
+
+pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
+    ctx: &BuildCtx,
+    project: &Path,
+    mut f: F,
+) -> Res<()> {
     let mut manifest = fs::File::open(project.join("elba.toml"))
         .context(format_err!("failed to read manifest file"))?;
     let mut contents = String::new();
@@ -52,11 +77,12 @@ pub fn solve_local(ctx: &BuildCtx, project: PathBuf) -> Res<(Cache, Graph<Summar
         .into_iter()
         .collect::<Vec<_>>();
 
-    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone());
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache);
     let indices = cache.get_indices(&ctx.indices);
 
     let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
-    let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
+    let solver = Resolver::new(&retriever.logger.clone(), &mut retriever);
+    let solve = solver.solve()?;
 
     let mut lockfile = fs::OpenOptions::new()
         .write(true)
@@ -71,12 +97,16 @@ pub fn solve_local(ctx: &BuildCtx, project: PathBuf) -> Res<(Cache, Graph<Summar
         .write_all(lf_contents.as_bytes())
         .context(format_err!("could not write to elba.lock"))?;
 
-    Ok((cache, solve))
+    f(&cache, retriever, solve)
 }
 
-pub fn solve_remote(ctx: &BuildCtx, name: Name) -> Res<(Cache, Graph<Summary>)> {
+pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
+    ctx: &BuildCtx,
+    name: Name,
+    mut f: F,
+) -> Res<()> {
     let def_index = def_index(ctx);
-    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone());
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache);
     let mut indices = cache.get_indices(&ctx.indices);
     let root = indices.select_by_name(name)?;
 
@@ -94,7 +124,7 @@ pub fn solve_remote(ctx: &BuildCtx, name: Name) -> Res<(Cache, Graph<Summary>)> 
     let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
 
-    Ok((cache, solve))
+    f(&cache, retriever, solve)
 }
 
 fn def_index(ctx: &BuildCtx) -> IndexRes {

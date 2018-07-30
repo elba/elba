@@ -32,7 +32,7 @@ use util::errors::ErrorKind;
 use util::graph::Graph;
 
 #[derive(Debug)]
-pub struct Resolver<'cache> {
+pub struct Resolver<'ret, 'cache: 'ret> {
     /// The current step.
     step: u16,
     level: u16,
@@ -41,12 +41,12 @@ pub struct Resolver<'cache> {
     derivations: IndexMap<PackageId, (bool, Constraint)>,
     incompats: Vec<Incompatibility>,
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
-    retriever: &'cache mut Retriever<'cache>,
+    retriever: &'ret mut Retriever<'cache>,
     pub logger: Logger,
 }
 
-impl<'cache> Resolver<'cache> {
-    pub fn new(plog: &Logger, retriever: &'cache mut Retriever<'cache>) -> Self {
+impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
+    pub fn new(plog: &Logger, retriever: &'ret mut Retriever<'cache>) -> Self {
         let step = 1;
         let level = 0;
         let assignments = vec![];
@@ -68,15 +68,17 @@ impl<'cache> Resolver<'cache> {
         }
     }
 
-    pub fn solve(mut self) -> Result<Graph<Summary>, Error> {
-        info!(self.logger, "beginning dependency resolution");
-        let r = self.solve_loop();
+    pub fn solve(self) -> Result<Graph<Summary>, Error> {
+        let mut s = self;
+
+        info!(s.logger, "beginning dependency resolution");
+        let r = s.solve_loop();
 
         if r.is_err() {
-            error!(self.logger, "solve failed");
-            bail!("{}", self.pp_error(self.incompats.len() - 1))
+            error!(s.logger, "solve failed");
+            bail!("{}", s.pp_error(s.incompats.len() - 1))
         } else {
-            info!(self.logger, "solve successful");
+            info!(s.logger, "solve successful");
             Ok(r.unwrap())
         }
     }
