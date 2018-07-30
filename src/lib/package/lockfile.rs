@@ -35,7 +35,6 @@ impl FromStr for LockfileToml {
 }
 
 // TODO: Is here a good place for these?
-// Should the package module unaware of resolve module?
 impl Into<LockfileToml> for Graph<Summary> {
     fn into(self) -> LockfileToml {
         // TODO: Is the unwrap safe here?
@@ -43,10 +42,16 @@ impl Into<LockfileToml> for Graph<Summary> {
             .find_by(|sum| *sum.resolution() == Resolution::Root)
             .unwrap();
 
-        let pkg_iter = self.sub_tree(root).unwrap().map(|(_, pkg)| LockedPkg {
-            sum: pkg.clone(),
-            dependencies: self.children(pkg).unwrap().map(|x| x.1).cloned().collect(),
-        });
+        let pkg_iter = self
+            .sub_tree(self.find_id(root).unwrap())
+            .map(|(_, pkg)| LockedPkg {
+                sum: pkg.clone(),
+                dependencies: self
+                    .children(self.find_id(pkg).unwrap())
+                    .map(|x| x.1)
+                    .cloned()
+                    .collect(),
+            });
 
         let packages = IndexSet::from_iter(pkg_iter);
         LockfileToml { packages }

@@ -1,70 +1,66 @@
+use super::CompileMode;
 use build::context::BuildContext;
 use crossbeam::{channel, deque, thread::scope};
 use indexmap::IndexMap;
 use petgraph::{graph::NodeIndex, Direction};
-use retrieve::cache::Binary;
+use retrieve::cache::{Binary, Cache, Source};
 use std::{thread::sleep, time};
 use util::{errors::Res, graph::Graph};
 
-// A task is an elba subcommand that should only be available from the current root project. Tasks
-// is a list of the Sources of all the tasks needed for this build.
-pub fn plan(
-    local: bool,
-    root_mode: CompileMode,
-    tasks: &[NodeIndex],
-    bcx: BuildContext,
-) -> Res<JobQueue> {
-    let oldg = &bcx.resolve;
-    let graph = oldg.map(
-        |ix, s| {
-            Ok(Job {
-                source: bcx.cache.checkout_build(
-                    s,
-                    &oldg,
-                    ix == NodeIndex::new(0) && local || tasks.contains(&ix),
-                )?,
-                compile_mode: if ix == NodeIndex::new(0) {
-                    root_mode
-                } else if tasks.contains(&ix) {
-                    CompileMode::Bin
-                } else {
-                    CompileMode::Lib
-                },
-            })
-        },
-        |_| Ok(()),
-    )?;
-    // We drop the old context to drop all of the Sources, releasing our lock on them. We
-    // don't need them anymore.
-    drop(bcx);
-
-    let mut queue = graph
-        .sub_tree(&graph.inner[NodeIndex::new(0)])
-        .unwrap()
-        .filter(|(_, x)| x.source.is_complete())
-        .map(|x| x.0)
-        .collect::<Vec<_>>();
-
-    queue.reverse();
-
-    Ok(JobQueue { graph, queue })
-}
-
-// Our parallel building strategy is to share the JobQueue across workers. A worker gets a Job by
-// popping off the end of the queue. When a Job is completed, the Job is mutated so that its source
-// is Binary::Built instead of Binary::New. A worker can only start work when the Job's children
-// are all Binary::Built.
+// Our parallel building strategy uses a shared work deque and message passing between the main
+// thread and the child threads. The main thread pushes work to the deque when it's available.
+// If an error occurs on any of the threads, the main thread will tell all the children to die,
+// and return an error overall.
 //
-// Alternate strategy: rely on the Cache and a separate "done" list to indicate if a Job is done
-// and where the output of that Job is.
+// Once all of the dependencies of a package have been built, that package is immediately pushed
+// onto the work queue; in other words, we don't spend any time waiting for a whole "layer" of
+// packages to be finished, since that can block packages from being built for no reason.
 #[derive(Default)]
 pub struct JobQueue {
     /// The graph of Jobs which need to be done.
     pub graph: Graph<Job>,
-    pub queue: Vec<NodeIndex>,
 }
 
 impl JobQueue {
+    // A task is an elba subcommand that should only be available from the current root project. Tasks
+    // is a list of the Sources of all the tasks needed for this build.
+    // This function takes another Cache as an argument because that Cache corresponds to the Cache
+    // where the root package should be built.
+    pub fn new(
+        local: &Cache,
+        root_mode: CompileMode,
+        tasks: &[NodeIndex],
+        bcx: BuildContext,
+        graph: Graph<Source>,
+    ) -> Res<JobQueue> {
+        let oldg = graph;
+        let graph = oldg.map(
+            |ix, s| {
+                Ok(Job {
+                    source: if ix == NodeIndex::new(0) || tasks.contains(&ix) {
+                        local.checkout_build(s, &oldg)?
+                    } else {
+                        bcx.cache.checkout_build(s, &oldg)?
+                    },
+                    compile_mode: if ix == NodeIndex::new(0) {
+                        root_mode
+                    } else if tasks.contains(&ix) {
+                        CompileMode::Bin
+                    } else {
+                        CompileMode::Lib
+                    },
+                })
+            },
+            |_| Ok(()),
+        )?;
+
+        // We drop the old context to drop all of the old Sources, releasing our lock on them. We
+        // don't need them anymore.
+        drop(bcx);
+
+        Ok(JobQueue { graph })
+    }
+
     pub fn exec(self) -> Res<()> {
         let thread_count = 1;
 
@@ -72,14 +68,26 @@ impl JobQueue {
         let (push, pull) = deque::fifo();
         let (send, recv) = channel::unbounded();
 
-        if self.queue.is_empty() {
+        if graph.inner.raw_nodes().is_empty() {
+            return Ok(());
+        }
+
+        let mut queue = graph
+            .sub_tree(NodeIndex::new(0))
+            .filter(|(_, x)| x.source.is_complete())
+            .map(|x| x.0)
+            .collect::<Vec<_>>();
+
+        queue.reverse();
+
+        if queue.is_empty() {
             return Ok(());
         }
 
         let mut status: IndexMap<NodeIndex, Status> = indexmap!();
         let mut ready = true;
 
-        for i in self.queue {
+        for i in queue {
             ready = ready
                 && graph
                     .inner
@@ -94,12 +102,10 @@ impl JobQueue {
             }
         }
 
-        // TODO: The alternate approach would be sharing memory: we share the status and graph
-        // structures across threads (with the former being mutably shared). Idk how we'd allow
-        // all the threads to push to the deque tho.
-        scope(|scope| {
+        scope(|scope| -> Res<()> {
+            let mut threads = vec![];
             for _ in 0..thread_count {
-                scope.spawn(|| {
+                threads.push(scope.spawn(|| -> Res<()> {
                     loop {
                         match pull.steal() {
                             None => {
@@ -109,18 +115,18 @@ impl JobQueue {
                             Some(Work::Finish) => {
                                 break;
                             }
-                            Some(Work::More(i, j)) => {
-                                match j.exec() {
-                                    Err(_) => {
-                                        send.send(WorkRes::Error);
-                                        // TODO: Print an error or whatever
-                                    }
-                                    Ok(_) => send.send(WorkRes::Done(i)),
+                            Some(Work::More(i, j)) => match j.exec() {
+                                Err(e) => {
+                                    send.send(WorkRes::Error);
+                                    return Err(e);
                                 }
-                            }
+                                Ok(_) => send.send(WorkRes::Done(i)),
+                            },
                         }
                     }
-                });
+
+                    Ok(())
+                }));
             }
 
             // Here we coordinate between our channels and such
@@ -146,7 +152,20 @@ impl JobQueue {
                     }
                 }
 
-                if WorkRes::Error == ix || status.iter().all(|(_, st)| *st == Status::Done) {
+                if WorkRes::Error == ix {
+                    for _ in 0..thread_count {
+                        // Tell our threads to finish pls
+                        push.push(Work::Finish);
+                    }
+                    for t in threads {
+                        t.join().unwrap()?;
+                    }
+
+                    // At least one of our threads has to have errored at this point
+                    unreachable!()
+                }
+
+                if status.iter().all(|(_, st)| *st == Status::Done) {
                     for _ in 0..thread_count {
                         // Tell our threads to finish pls
                         push.push(Work::Finish);
@@ -154,9 +173,9 @@ impl JobQueue {
                     break;
                 }
             }
-        });
 
-        Ok(())
+            Ok(())
+        })
     }
 }
 
@@ -180,7 +199,7 @@ enum Status {
 }
 
 /// All the information that defines a compilation task
-// TODO: Include stuff from our BuildContext, because we can never access that thing ever again
+// TODO: How do we pass the correct Layout to this Job
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub source: Binary,
@@ -197,20 +216,6 @@ impl Job {
         println!("From one to ten, this is very unimplemented.");
         Ok(())
     }
-}
-
-/// The general "mode" of what to do
-#[derive(Clone, Copy, PartialEq, Debug, Eq, Hash)]
-pub enum CompileMode {
-    /// Typecheck a target without codegen
-    Lib,
-    /// Compile and codegen executable(s)
-    ///
-    /// This subsumes the "Bench" and "Test" modes since those are just compiling and running
-    /// executables anyway
-    Bin,
-    /// Create documentation
-    Doc,
 }
 
 fn sleep_sec() {

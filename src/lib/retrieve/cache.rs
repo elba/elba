@@ -57,9 +57,9 @@ use sha2::{Digest, Sha256};
 use slog::Logger;
 use std::{
     collections::VecDeque,
-    env, fs,
+    fs,
     io::{prelude::*, BufReader},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 use tar::Builder;
@@ -71,34 +71,28 @@ use util::{
     lock::DirLock,
 };
 
-/// A Cache of downloaded packages and packages with no other Index.
+/// The Cache encapsulates all of the global state required for `elba` to function.
 ///
-/// A Cache is located in a directory, and it has two directories of its own:
-/// - `src/`: the cache of downloaded packages, in full source form.
-/// - `build/`: the cache of built packages.
+/// This global state includes stuff like temporary places to download and build packages, places
+/// to store indices of packages, etc.
 ///
-/// The src and build folders contain one folder for every package on disk.
-// TODO: Maybe the Cache is in charge of the Indices. This way, metadata takes into account both
-// indices and direct deps, and we don't have to discriminate between the two in the Retriever.
+/// Note that a Cache can be located anywhere, including in the current directory!
 #[derive(Debug, Clone)]
 pub struct Cache {
-    location: PathBuf,
+    layout: Layout,
     client: Client,
     pub logger: Logger,
 }
 
 impl Cache {
     pub fn from_disk(plog: &Logger, location: PathBuf) -> Self {
-        let _ = fs::create_dir_all(location.join("src"));
-        let _ = fs::create_dir_all(location.join("build"));
-        let _ = fs::create_dir_all(location.join("indices"));
-        let _ = fs::create_dir_all(location.join("tmp"));
+        let layout = Layout::new(&location);
 
         let client = Client::new();
         let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
 
         Cache {
-            location,
+            layout,
             client,
             logger,
         }
@@ -136,9 +130,10 @@ impl Cache {
         if let Some(path) = self.check_source(pkg.name(), loc, v) {
             DirLock::acquire(&path)
         } else {
-            let mut p = self.location.clone();
-            p.push("src");
-            p.push(Self::get_source_dir(pkg.name(), loc, v));
+            let p = self
+                .layout
+                .src
+                .join(Self::get_source_dir(pkg.name(), loc, v));
 
             let dir = DirLock::acquire(&p)?;
             loc.retrieve(&self.client, &dir)?;
@@ -155,9 +150,7 @@ impl Cache {
             return Some(url.clone());
         }
 
-        let mut path = self.location.clone();
-        path.push("src");
-        path.push(Self::get_source_dir(name, loc, v));
+        let path = self.layout.src.join(Self::get_source_dir(name, loc, v));
         if path.exists() {
             Some(path)
         } else {
@@ -191,24 +184,16 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    // TODO: local `target/` dir.
     /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
-    pub fn checkout_build(
-        &self,
-        root: &Source,
-        sources: &Graph<Source>,
-        local: bool,
-    ) -> Result<Binary, Error> {
-        if let Some(path) = self.check_build(&root, sources, local) {
+    pub fn checkout_build(&self, root: &Source, sources: &Graph<Source>) -> Res<Binary> {
+        if let Some(path) = self.check_build(&root, sources) {
             Ok(Binary::built(DirLock::acquire(&path)?))
         } else {
-            let tp = self
-                .location
-                .join("tmp")
-                .join(Self::get_build_dir(&root, sources));
+            let tp = self.layout.tmp.join(Self::get_build_dir(&root, sources));
 
             let bp = self
-                .location
+                .layout
+                .build
                 .join("build")
                 .join(Self::get_build_dir(&root, sources));
 
@@ -220,12 +205,8 @@ impl Cache {
         }
     }
 
-    fn check_build(&self, root: &Source, sources: &Graph<Source>, local: bool) -> Option<PathBuf> {
-        let path = if local {
-            env::current_dir().ok()?.join("target")
-        } else {
-            self.location.to_owned()
-        };
+    fn check_build(&self, root: &Source, sources: &Graph<Source>) -> Option<PathBuf> {
+        let path = self.layout.root.to_owned();
         let path = path.join("build").join(Self::get_build_dir(root, sources));
 
         if path.exists() {
@@ -238,7 +219,7 @@ impl Cache {
     fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
         let mut hasher = Sha256::default();
 
-        for (_, src) in sources.sub_tree(root).unwrap() {
+        for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
             hasher.input(&src.hash.as_bytes());
         }
 
@@ -274,12 +255,9 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) = DirLock::acquire(
-                &self
-                    .location
-                    .join("indices")
-                    .join(Self::get_index_dir(&index)),
-            ) {
+            let dir = if let Ok(dir) =
+                DirLock::acquire(&self.layout.indices.join(Self::get_index_dir(&index)))
+            {
                 dir
             } else {
                 continue;
@@ -319,6 +297,51 @@ impl Cache {
     }
 }
 
+/// Layouts encapsulate the logic behind our directory structure.
+#[derive(Debug, Clone)]
+pub struct Layout {
+    /// Root directory of the Layout
+    pub root: PathBuf,
+    /// Build location of codegen'd libraries
+    pub artifacts: PathBuf,
+    /// Location to dump binaries
+    pub bin: PathBuf,
+    /// Source download directory
+    pub src: PathBuf,
+    /// Built library (ibc output) directory
+    pub build: PathBuf,
+    /// Temporary build directory
+    pub tmp: PathBuf,
+    /// Directory of all the indices
+    pub indices: PathBuf,
+}
+
+impl Layout {
+    pub fn new(root: &Path) -> Self {
+        let layout = Layout {
+            root: root.to_path_buf(),
+            bin: root.join("bin"),
+            artifacts: root.join("artifacts"),
+            src: root.join("src"),
+            build: root.join("build"),
+            indices: root.join("indices"),
+            tmp: root.join("tmp"),
+        };
+
+        // We purposely ignore all errors here because we don't care if the directory already
+        // exists
+        let _ = fs::create_dir_all(&layout.root);
+        let _ = fs::create_dir_all(&layout.artifacts);
+        let _ = fs::create_dir_all(&layout.bin);
+        let _ = fs::create_dir_all(&layout.src);
+        let _ = fs::create_dir_all(&layout.build);
+        let _ = fs::create_dir_all(&layout.indices);
+        let _ = fs::create_dir_all(&layout.tmp);
+
+        layout
+    }
+}
+
 /// Information about the source of package that is available somewhere in the file system.
 /// Packages are stored as directories on disk (not archives because it would just be a bunch of
 /// pointless unpacking-repacking).
@@ -352,6 +375,7 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
+    // TODO: Ignore `target/` folder
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 
@@ -412,8 +436,9 @@ impl Eq for Source {}
 /// Information about the build of library that is available somewhere in the file system.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Binary {
-    source: Option<Source>,
-    target: DirLock,
+    pub source: Option<Source>,
+    // TODO: Should this be a layout?
+    pub target: DirLock,
 }
 
 impl Binary {
@@ -432,6 +457,13 @@ impl Binary {
         Binary {
             source: Some(source),
             target,
+        }
+    }
+    pub fn source(&self) -> Option<&Source> {
+        if let Some(d) = &self.source {
+            Some(d)
+        } else {
+            None
         }
     }
 }

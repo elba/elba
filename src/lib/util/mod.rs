@@ -51,6 +51,12 @@ pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     Ok(())
 }
 
+pub fn clear_dir(dir: &Path) -> Res<()> {
+    fs::remove_dir_all(dir)?;
+    fs::create_dir(dir)?;
+    Ok(())
+}
+
 fn valid_file(entry: &DirEntry) -> bool {
     entry
         .file_name()

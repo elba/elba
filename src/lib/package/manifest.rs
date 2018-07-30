@@ -8,7 +8,7 @@ use super::{
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
-use std::{path::PathBuf, str::FromStr};
+use std::{path::{Component, PathBuf}, str::FromStr};
 use toml;
 use url::Url;
 use url_serde;
@@ -37,12 +37,12 @@ use util::errors::*;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Manifest {
-    package: PackageInfo,
+    pub package: PackageInfo,
     #[serde(default = "IndexMap::new")]
     pub dependencies: IndexMap<Name, DepReq>,
     #[serde(default = "IndexMap::new")]
     pub dev_dependencies: IndexMap<Name, DepReq>,
-    targets: Targets,
+    pub targets: Targets,
     #[serde(default)]
     workspace: IndexMap<Name, String>,
 }
@@ -87,18 +87,24 @@ impl FromStr for Manifest {
 
         if toml.targets.lib.is_none() && toml.targets.bin.is_empty() {
             bail!("manifests must define at least either a bin or lib target")
-        } else {
-            Ok(toml)
         }
+
+        if let Some(lib) = &toml.targets.lib {
+            if lib.path.is_absolute() || !lib.path.components().all(|x| x != Component::ParentDir) {
+                bail!("lib path can only reference a directory inside package")
+            }
+        }
+
+        Ok(toml)
     }
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct PackageInfo {
-    name: Name,
-    version: Version,
-    authors: Vec<String>,
-    license: Option<String>,
+pub struct PackageInfo {
+    pub name: Name,
+    pub version: Version,
+    pub authors: Vec<String>,
+    pub license: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -150,8 +156,8 @@ impl DepReq {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct Targets {
-    lib: Option<LibTarget>,
+pub struct Targets {
+    pub lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]
     bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
@@ -161,21 +167,22 @@ struct Targets {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct Target {
-    path: PathBuf,
+pub struct Target {
+    pub path: PathBuf,
+}
+
+// TODO: Prevent non-relative paths
+#[derive(Deserialize, Debug, Clone)]
+pub struct LibTarget {
+    pub path: PathBuf,
+    pub mods: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct LibTarget {
-    path: PathBuf,
-    mods: Vec<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct BinTarget {
-    name: String,
+pub struct BinTarget {
+    pub name: String,
     // For binaries, benches, and tests, this should point to a file with a Main module.
-    main: PathBuf,
+    pub main: PathBuf,
 }
 
 #[cfg(test)]

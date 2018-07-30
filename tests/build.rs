@@ -2,7 +2,7 @@ extern crate elba;
 extern crate petgraph;
 
 use elba::{
-    build::job::{CompileMode, Job, JobQueue},
+    build::{CompileMode, job::{Job, JobQueue}},
     package::{
         resolution::{DirectRes, Resolution},
         Name, PackageId,
@@ -10,7 +10,6 @@ use elba::{
     retrieve::cache::{Binary, Source},
     util::{graph::Graph, lock::DirLock},
 };
-use petgraph::graph::NodeIndex;
 use std::{path::PathBuf, str::FromStr};
 
 macro_rules! pkg {
@@ -45,7 +44,6 @@ fn job_queue_single() {
 
     let jq = JobQueue {
         graph,
-        queue: vec![NodeIndex::new(0)],
     };
 
     jq.exec().unwrap();
