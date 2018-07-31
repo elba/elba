@@ -86,17 +86,17 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, location: &Path) -> Self {
-        let layout = Layout::new(&location);
+    pub fn from_disk(plog: &Logger, location: &Path) -> Res<Self> {
+        let layout = Layout::new(&location)?;
 
         let client = Client::new();
         let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
 
-        Cache {
+        Ok(Cache {
             layout,
             client,
             logger,
-        }
+        })
     }
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary.
@@ -202,7 +202,7 @@ impl Cache {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
         clear_dir(&path)?;
-        Ok(OutputLayout::new(lock))
+        OutputLayout::new(lock)
     }
 
     pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Res<Binary> {
@@ -322,7 +322,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn new(root: &Path) -> Self {
+    pub fn new(root: &Path) -> Res<Self> {
         let layout = Layout {
             root: root.to_path_buf(),
             bin: root.join("bin"),
@@ -333,17 +333,16 @@ impl Layout {
             tmp: root.join("tmp"),
         };
 
-        // We purposely ignore all errors here because we don't care if the directory already
-        // exists
-        let _ = fs::create_dir_all(&layout.root);
-        let _ = fs::create_dir_all(&layout.artifacts);
-        let _ = fs::create_dir_all(&layout.bin);
-        let _ = fs::create_dir_all(&layout.src);
-        let _ = fs::create_dir_all(&layout.build);
-        let _ = fs::create_dir_all(&layout.indices);
-        let _ = fs::create_dir_all(&layout.tmp);
+        // create_dir_all ignores pre-existing folders
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.artifacts)?;
+        fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.src)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.indices)?;
+        fs::create_dir_all(&layout.tmp)?;
 
-        layout
+        Ok(layout)
     }
 }
 
@@ -361,7 +360,7 @@ pub struct OutputLayout {
 }
 
 impl OutputLayout {
-    pub fn new(lock: DirLock) -> Self {
+    pub fn new(lock: DirLock) -> Res<Self> {
         let root = lock.path().to_path_buf();
         let layout = OutputLayout {
             lock,
@@ -373,14 +372,14 @@ impl OutputLayout {
             deps: root.join("deps"),
         };
 
-        // We ignore all the errors because we don't care if the folders exist
-        let _ = fs::create_dir_all(&layout.root);
-        let _ = fs::create_dir_all(&layout.bin);
-        let _ = fs::create_dir_all(&layout.lib);
-        let _ = fs::create_dir_all(&layout.build);
-        let _ = fs::create_dir_all(&layout.deps);
+        // create_dir_all ignores pre-existing folders
+        fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.lib)?;
+        fs::create_dir_all(&layout.build)?;
+        fs::create_dir_all(&layout.deps)?;
 
-        layout
+        Ok(layout)
     }
 }
 

@@ -90,7 +90,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache);
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache)?;
     let indices = cache.get_indices(&ctx.indices);
 
     let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
@@ -119,7 +119,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
     mut f: F,
 ) -> Res<()> {
     let def_index = def_index(ctx);
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache);
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache)?;
     let mut indices = cache.get_indices(&ctx.indices);
     let root = indices.select_by_name(name)?;
 

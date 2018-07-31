@@ -38,6 +38,7 @@ pub fn compile_lib(
         )
     })?;
 
+    // We know that source.path() will be relative to the package root
     let src_path = source.path().join(&lib_target.path);
     let targets = lib_target
         .mods
@@ -50,7 +51,7 @@ pub fn compile_lib(
         .collect::<Vec<_>>();
 
     let invocation = CompileInvocation {
-        src: &source.path().join(&lib_target.path),
+        src: &src_path,
         deps,
         targets: &targets,
         layout: &layout,
@@ -58,8 +59,13 @@ pub fn compile_lib(
 
     invocation.exec(bcx)?;
 
-    for from in targets {
-        let to = layout.build.join(from.strip_prefix(&src_path).unwrap());
+    for target in targets {
+        let target_bin = target.with_extension("ibc");
+        let from = layout.build.join(&target_bin);
+        // We strip the library prefix before copying
+        // target_bin is something like src/Test.ibc
+        // we want to move build/src/Test.ibc to lib/Test.ibc
+        let to = layout.lib.join(&target_bin.strip_prefix(source.path()).unwrap());
 
         fs::create_dir_all(to.parent().unwrap())?;
         fs::rename(from, to)?;

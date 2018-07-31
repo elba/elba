@@ -18,7 +18,7 @@ impl JobQueue {
     // Executing the JobQueue creates all of the binaries and stuff. Another function will be
     // responsible for any moving around that has to take place.
     pub fn new(solve: Graph<Source>, bcx: &BuildContext) -> Res<Self> {
-        let mut graph = solve.map(|_, _| Ok(Job::default()), |_| Ok(()))?;
+        let mut graph = Graph::new(solve.inner.map(|_, _| Job::default(), |_, _| ()));
 
         let mut curr_layer = HashSet::new();
         let mut next_layer = HashSet::new();
