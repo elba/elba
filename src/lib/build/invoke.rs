@@ -1,60 +1,24 @@
 //! Utilities for interacting with the Idris compiler
 
-use std::{fs, path::Path};
-
 use build::context::BuildContext;
-use retrieve::cache::{Binary, Layout};
-use util::errors::Res;
+use retrieve::cache::{Binary, OutputLayout};
+use std::path::{Path, PathBuf};
+use util::{clear_dir, copy_dir, errors::Res};
 
-// CompileInvocation is responsible for dealing with building libraries (ibc stuff)
+// CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
 pub struct CompileInvocation<'a> {
-    pub pkg: &'a Binary,
-    pub deps: &'a [Binary],
-    pub targets: &'a [String],
-    pub layout: &'a Layout,
+    pub src: &'a Path,
+    pub deps: &'a [&'a Binary],
+    pub targets: &'a [PathBuf],
+    pub layout: &'a OutputLayout,
 }
 
 impl<'a> CompileInvocation<'a> {
-    pub fn exec(self, bcx: &BuildContext) -> Res<()> {
-        if let Some(s) = self.pkg.source() {
-            let lib_target = s.meta.targets.lib.clone().ok_or_else(|| {
-                format_err!(
-                    "internal: package {} does not contain lib target",
-                    s.meta.package.name
-                )
-            })?;
+    pub fn exec(&self, bcx: &BuildContext) -> Res<()> {
+        clear_dir(&self.layout.build)?;
+        copy_dir(&self.src, &self.layout.build)?;
 
-            // Because we check if the path is inside the package in Manifest::from_str, this is ok.
-            let src_path = s.path.path().join(lib_target.path);
-            let targets = self
-                .targets
-                .iter()
-                .map(|mod_name| {
-                    src_path
-                        .join(mod_name.replace(".", "/"))
-                        .with_extension("idr")
-                })
-                .collect::<Vec<_>>();
-
-            self.compile(bcx)?;
-
-            for from in targets {
-                let to = self
-                    .pkg
-                    .target
-                    .path()
-                    .join(from.strip_prefix(&src_path).unwrap());
-
-                fs::create_dir_all(to.parent().unwrap())?;
-                fs::rename(from, to)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn compile(&self, bcx: &BuildContext) -> Res<()> {
         // invoke compiler
         let mut process = bcx.compiler.process();
         process.current_dir(&self.layout.build).arg("--check");
@@ -67,7 +31,7 @@ impl<'a> CompileInvocation<'a> {
 
         // Add compile units: the individual files that we want to "export" and make available
         for target in self.targets {
-            process.arg(self.layout.build.join(target));
+            process.arg(target);
         }
 
         // The moment of truth:
@@ -82,10 +46,9 @@ impl<'a> CompileInvocation<'a> {
 #[derive(Debug)]
 pub struct CodegenInvocation<'a> {
     pub build: &'a Path,
-    pub deps: &'a [Binary],
     pub output: String,
     pub backend: String,
-    pub layout: &'a Layout,
+    pub layout: &'a OutputLayout,
     /// Whether the output should be treated as a binary (true) or artifact files (false)
     pub binary: bool,
 }
@@ -105,11 +68,6 @@ impl<'a> CodegenInvocation<'a> {
             .args(&["--codegen", &self.backend])
             .args(&["-o", &self.output])
             .arg(&self.build);
-
-        for binary in self.deps {
-            // We assume that the binary has already been compiled
-            process.arg("-i").arg(binary.target.path());
-        }
 
         process.spawn()?;
 

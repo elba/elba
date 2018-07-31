@@ -9,7 +9,12 @@ use resolve::Resolver;
 use retrieve::cache::Cache;
 use retrieve::Retriever;
 use slog::Logger;
-use std::{fs, io::prelude::*, path::{Path, PathBuf}, str::FromStr};
+use std::{
+    fs,
+    io::prelude::*,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use toml;
 use util::errors::Res;
 use util::graph::Graph;

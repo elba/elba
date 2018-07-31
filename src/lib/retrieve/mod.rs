@@ -118,7 +118,7 @@ impl<'cache> Retriever<'cache> {
 
                 if let Some(dir) = dir {
                     if let Ok(src) = self.cache.checkout_source(pkg, dir, Some(&v)) {
-                        return Ok(src.meta.version().clone());
+                        return Ok(src.meta().version().clone());
                     }
                 }
             }
@@ -128,7 +128,7 @@ impl<'cache> Retriever<'cache> {
             return Ok(self
                 .cache
                 .checkout_source(pkg, loc, None)?
-                .meta
+                .meta()
                 .version()
                 .clone());
         }
@@ -182,7 +182,7 @@ impl<'cache> Retriever<'cache> {
             let deps = self
                 .cache
                 .checkout_source(pkg.id(), loc, Some(pkg.version()))?
-                .meta
+                .meta()
                 .deps(&self.def_index, false);
             let mut res = vec![];
             for dep in deps {

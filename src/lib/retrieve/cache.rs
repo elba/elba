@@ -61,10 +61,11 @@ use std::{
     io::{prelude::*, BufReader},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 use tar::Builder;
 use util::{
-    copy_dir,
+    clear_dir, copy_dir,
     errors::{ErrorKind, Res},
     graph::Graph,
     hexify_hash,
@@ -184,46 +185,50 @@ impl Cache {
         format!("{}_{}-{}", name.group(), name.name(), hash)
     }
 
-    /// Acquires a lock on a build directory - either the directory of the actual or a tmp dir
-    pub fn checkout_build(&self, root: &Source, sources: &Graph<Source>) -> Res<Binary> {
-        if let Some(path) = self.check_build(&root, sources) {
-            Ok(Binary::built(DirLock::acquire(&path)?))
+    /// If the build directory exists, returns it. Otherwise, give up and return None
+    pub fn checkout_build(&self, hash: &BuildHash) -> Res<Option<Binary>> {
+        if let Some(path) = self.check_build(&hash) {
+            Ok(Some(Binary {
+                target: DirLock::acquire(&path)?,
+            }))
         } else {
-            let tp = self.layout.tmp.join(Self::get_build_dir(&root, sources));
-
-            let bp = self
-                .layout
-                .build
-                .join("build")
-                .join(Self::get_build_dir(&root, sources));
-
-            let td = DirLock::acquire(&tp)?;
-            copy_dir(root.path.path(), td.path())?;
-            let bd = DirLock::acquire(&bp)?;
-
-            Ok(Binary::new(root.with_path(td), bd))
+            Ok(None)
         }
     }
 
-    fn check_build(&self, root: &Source, sources: &Graph<Source>) -> Option<PathBuf> {
+    /// Returns a lock on a temporary build directory.
+    /// Note that the format of this directory should be an OutputLayout.
+    pub fn checkout_tmp(&self, hash: &BuildHash) -> Res<OutputLayout> {
+        let path = self.layout.tmp.join(&hash.0);
+        let lock = DirLock::acquire(&path)?;
+        clear_dir(&path)?;
+        Ok(OutputLayout::new(lock))
+    }
+
+    pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Res<Binary> {
+        let dest = self.layout.build.join(&hash.0);
+
+        if !dest.exists() {
+            fs::create_dir_all(&dest)?;
+        }
+
+        let dest = DirLock::acquire(&dest)?;
+
+        clear_dir(dest.path())?;
+        copy_dir(from, dest.path())?;
+
+        Ok(Binary { target: dest })
+    }
+
+    fn check_build(&self, hash: &BuildHash) -> Option<PathBuf> {
         let path = self.layout.root.to_owned();
-        let path = path.join("build").join(Self::get_build_dir(root, sources));
+        let path = path.join("build").join(&hash.0);
 
         if path.exists() {
             Some(path)
         } else {
             None
         }
-    }
-
-    fn get_build_dir(root: &Source, sources: &Graph<Source>) -> String {
-        let mut hasher = Sha256::default();
-
-        for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
-            hasher.input(&src.hash.as_bytes());
-        }
-
-        hexify_hash(hasher.result().as_slice())
     }
 
     // TODO: We do a lot of silent erroring. Is that good?
@@ -342,17 +347,62 @@ impl Layout {
     }
 }
 
+/// The Layout of an output directory. This is used either as the `target` directory or one of the
+/// folders in a temporary build directory in the global cache.
+#[derive(Debug)]
+pub struct OutputLayout {
+    lock: DirLock,
+    pub root: PathBuf,
+    pub artifacts: PathBuf,
+    pub bin: PathBuf,
+    pub lib: PathBuf,
+    pub build: PathBuf,
+    pub deps: PathBuf,
+}
+
+impl OutputLayout {
+    pub fn new(lock: DirLock) -> Self {
+        let root = lock.path().to_path_buf();
+        let layout = OutputLayout {
+            lock,
+            root: root.clone(),
+            artifacts: root.join("artifacts"),
+            bin: root.join("bin"),
+            lib: root.join("lib"),
+            build: root.join("build"),
+            deps: root.join("deps"),
+        };
+
+        // We ignore all the errors because we don't care if the folders exist
+        let _ = fs::create_dir_all(&layout.root);
+        let _ = fs::create_dir_all(&layout.bin);
+        let _ = fs::create_dir_all(&layout.lib);
+        let _ = fs::create_dir_all(&layout.build);
+        let _ = fs::create_dir_all(&layout.deps);
+
+        layout
+    }
+}
+
 /// Information about the source of package that is available somewhere in the file system.
 /// Packages are stored as directories on disk (not archives because it would just be a bunch of
 /// pointless unpacking-repacking).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Source {
+    // Note: the reason we have to deal with this Arc is because in the JobQueue, there's no way of
+    // moving Sources out of the queue, hence the need to clone the references to the Source.
+    // TODO: Get rid of this Arc somehow
+    inner: Arc<SourceInner>
+}
+
+#[derive(Debug)]
+struct SourceInner {
     /// The package's manifest
-    pub meta: Manifest,
-    pub location: DirectRes,
+    meta: Manifest,
+    location: DirectRes,
     /// The path to the package.
-    pub path: DirLock,
-    pub hash: String,
+    path: DirLock,
+    hash: String,
 }
 
 impl Source {
@@ -408,62 +458,56 @@ impl Source {
         let hash = hexify_hash(result.as_slice());
 
         Ok(Source {
-            meta: manifest,
-            location,
-            path,
-            hash,
+            inner: Arc::new(SourceInner {
+                meta: manifest,
+                location,
+                path,
+                hash,
+            })
         })
     }
 
-    pub fn with_path(&self, p: DirLock) -> Source {
-        Source {
-            meta: self.meta.clone(),
-            location: self.location.clone(),
-            hash: self.hash.clone(),
-            path: p,
-        }
+    pub fn meta(&self) -> &Manifest {
+        &self.inner.meta
+    }
+
+    pub fn location(&self) -> &DirectRes {
+        &self.inner.location
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.inner.hash
+    }
+
+    pub fn path(&self) -> &Path {
+        self.inner.path.path()
     }
 }
 
 impl PartialEq for Source {
     fn eq(&self, other: &Self) -> bool {
-        self.hash == other.hash
+        self.hash() == other.hash()
     }
 }
 
 impl Eq for Source {}
 
-/// Information about the build of library that is available somewhere in the file system.
+/// Information about a built library that is available somewhere in the file system.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Binary {
-    pub source: Option<Source>,
-    // TODO: Should this be a layout?
     pub target: DirLock,
 }
 
-impl Binary {
-    pub fn is_complete(&self) -> bool {
-        self.source.is_some()
-    }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct BuildHash(String);
 
-    pub fn built(lock: DirLock) -> Self {
-        Binary {
-            source: None,
-            target: lock,
+impl BuildHash {
+    pub fn new(root: &Source, sources: &Graph<Source>) -> Self {
+        let mut hasher = Sha256::default();
+        for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
+            hasher.input(&src.hash().as_bytes());
         }
-    }
-
-    pub fn new(source: Source, target: DirLock) -> Self {
-        Binary {
-            source: Some(source),
-            target,
-        }
-    }
-    pub fn source(&self) -> Option<&Source> {
-        if let Some(d) = &self.source {
-            Some(d)
-        } else {
-            None
-        }
+        let hash = hexify_hash(hasher.result().as_slice());
+        BuildHash(hash)
     }
 }
