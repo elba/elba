@@ -80,7 +80,7 @@ fn cache() -> Cache {
     path.push(start);
     path.push("tests/data/cache");
 
-    Cache::from_disk(&LOGGER, &path)
+    Cache::from_disk(&LOGGER, &path).unwrap()
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {
