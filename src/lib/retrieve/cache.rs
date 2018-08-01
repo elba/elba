@@ -411,6 +411,8 @@ impl Source {
 
         if let Some(p) = manifest.workspace.get(pkg.name()) {
             let lock = DirLock::acquire(&path.path().join(&p.0))?;
+            // We immediately release our lock on the parent folder
+            drop(path);
             return Source::from_folder(pkg, lock, location);
         }
 

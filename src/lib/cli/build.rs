@@ -1,7 +1,7 @@
 use build::{
     context::{BuildConfig, BuildContext, Compiler},
     job::JobQueue,
-    CompileMode,
+    Target, Targets
 };
 use failure::ResultExt;
 use package::{
@@ -72,17 +72,23 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
 
-        let root = if manifest.targets.lib.is_some() {
-            (CompileMode::Lib, vec![])
-        } else {
-            // In the manifest we check for library/binary targets. This has to be (a) binar(y/ies)
-            (CompileMode::Bin, manifest.targets.bin.clone())
-        };
-
         // We drop the Retriever because we want to release our lock on the Indices as soon as we
         // can to avoid stopping other instances of elba from downloading and resolving (even
         // though we don't even need the Retriever anymore).
         drop(retriever);
+
+        // TODO: Specifying targets to build
+        // By default, we build all lib and bin targets.
+        let mut root = vec![];
+        if manifest.targets.lib.is_some() {
+            root.push(Target::Lib);
+        }
+        
+        for (ix, _) in manifest.targets.bin.iter().enumerate() {
+            root.push(Target::Bin(ix));
+        }
+        
+        let root = Targets::new(root);
 
         let ctx = BuildContext {
             // TODO: pick a better compiler pls
@@ -95,7 +101,7 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, &root, &ctx)?;
+        let q = JobQueue::new(sources, root, &ctx)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
         q.exec(&ctx, &Some(layout))

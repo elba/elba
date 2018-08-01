@@ -26,7 +26,7 @@ pub fn hexify_hash(hash: &[u8]) -> String {
     s
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SubPath(pub PathBuf);
 
 impl SubPath {
