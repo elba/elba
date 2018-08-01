@@ -1,12 +1,12 @@
 mod bench;
 mod build;
-mod check;
 mod init;
 mod install;
 mod lock;
 mod new;
 mod repl;
 mod test;
+mod uninstall;
 
 use clap::{App, ArgMatches};
 use elba::util::{config::Config, errors::Res};
@@ -19,13 +19,13 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
         bench::cli(),
         build::cli(),
-        check::cli(),
         init::cli(),
         install::cli(),
         new::cli(),
         lock::cli(),
         repl::cli(),
         test::cli(),
+        uninstall::cli(),
     ]
 }
 
@@ -33,13 +33,13 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
         "bench" => Some(bench::exec),
         "build" => Some(build::exec),
-        "check" => Some(check::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
         "new" => Some(new::exec),
         "lock" => Some(lock::exec),
         "repl" => Some(repl::exec),
         "test" => Some(test::exec),
+        "uninstall" => Some(uninstall::exec),
         _ => None,
     }
 }

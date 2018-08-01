@@ -50,9 +50,8 @@
 
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
-use package::{manifest::Manifest, resolution::DirectRes, Name, PackageId};
+use package::{manifest::Manifest, resolution::DirectRes, PackageId};
 use reqwest::Client;
-use semver::Version;
 use sha2::{Digest, Sha256};
 use slog::Logger;
 use std::{
@@ -100,13 +99,8 @@ impl Cache {
     }
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary.
-    pub fn checkout_source(
-        &self,
-        pkg: &PackageId,
-        loc: &DirectRes,
-        v: Option<&Version>,
-    ) -> Result<Source, Error> {
-        let p = self.load_source(pkg, loc, v)?;
+    pub fn checkout_source(&self, pkg: &PackageId, loc: &DirectRes) -> Result<Source, Error> {
+        let p = self.load_source(loc)?;
 
         Source::from_folder(pkg, p, loc.clone())
     }
@@ -122,19 +116,11 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    fn load_source(
-        &self,
-        pkg: &PackageId,
-        loc: &DirectRes,
-        v: Option<&Version>,
-    ) -> Result<DirLock, Error> {
-        if let Some(path) = self.check_source(pkg.name(), loc, v) {
+    fn load_source(&self, loc: &DirectRes) -> Result<DirLock, Error> {
+        if let Some(path) = self.check_source(loc) {
             DirLock::acquire(&path)
         } else {
-            let p = self
-                .layout
-                .src
-                .join(Self::get_source_dir(pkg.name(), loc, v));
+            let p = self.layout.src.join(Self::get_source_dir(loc));
 
             let dir = DirLock::acquire(&p)?;
             loc.retrieve(&self.client, &dir)?;
@@ -143,15 +129,14 @@ impl Cache {
         }
     }
 
-    // TODO: Workspaces for git repos.
     /// Check if package is downloaded and in the cache. If so, returns the path of source of the cached
     /// package.
-    fn check_source(&self, name: &Name, loc: &DirectRes, v: Option<&Version>) -> Option<PathBuf> {
+    fn check_source(&self, loc: &DirectRes) -> Option<PathBuf> {
         if let DirectRes::Dir { url } = loc {
             return Some(url.clone());
         }
 
-        let path = self.layout.src.join(Self::get_source_dir(name, loc, v));
+        let path = self.layout.src.join(Self::get_source_dir(loc));
         if path.exists() {
             Some(path)
         } else {
@@ -165,24 +150,10 @@ impl Cache {
     ///
     /// Note: with regard to git repos, we treat the same repo with different checked out commits/
     /// tags as completely different repos.
-    fn get_source_dir(name: &Name, loc: &DirectRes, v: Option<&Version>) -> String {
+    fn get_source_dir(loc: &DirectRes) -> String {
         let mut hasher = Sha256::default();
-        hasher.input(name.as_bytes());
         hasher.input(loc.to_string().as_bytes());
-        if let Some(v) = v {
-            // We only care about the version of the package at this source directory if it came
-            // from a tarball
-            if let DirectRes::Tar {
-                url: _url,
-                cksum: _cksum,
-            } = loc
-            {
-                hasher.input(v.to_string().as_bytes());
-            }
-        }
-        let hash = hexify_hash(hasher.result().as_slice());
-
-        format!("{}_{}-{}", name.group(), name.name(), hash)
+        hexify_hash(hasher.result().as_slice())
     }
 
     /// If the build directory exists, returns it. Otherwise, give up and return None
@@ -201,7 +172,6 @@ impl Cache {
     pub fn checkout_tmp(&self, hash: &BuildHash) -> Res<OutputLayout> {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
-        clear_dir(&path)?;
         OutputLayout::new(lock)
     }
 
@@ -361,6 +331,9 @@ pub struct OutputLayout {
 
 impl OutputLayout {
     pub fn new(lock: DirLock) -> Res<Self> {
+        if lock.path().exists() {
+            clear_dir(&lock.path()).context(format_err!("couldn't remove existing output path"))?;
+        }
         let root = lock.path().to_path_buf();
         let layout = OutputLayout {
             lock,
@@ -391,7 +364,7 @@ pub struct Source {
     // Note: the reason we have to deal with this Arc is because in the JobQueue, there's no way of
     // moving Sources out of the queue, hence the need to clone the references to the Source.
     // TODO: Get rid of this Arc somehow
-    inner: Arc<SourceInner>
+    inner: Arc<SourceInner>,
 }
 
 #[derive(Debug)]
@@ -424,7 +397,7 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    // TODO: Ignore `target/` folder
+    // TODO: Ignore `target/` folder!!!
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 
@@ -435,6 +408,11 @@ impl Source {
             .context(ErrorKind::InvalidIndex)?;
 
         let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+
+        if let Some(p) = manifest.workspace.get(pkg.name()) {
+            let lock = DirLock::acquire(&path.path().join(&p.0))?;
+            return Source::from_folder(pkg, lock, location);
+        }
 
         if manifest.summary().name() != pkg.name() {
             bail!(
@@ -462,7 +440,7 @@ impl Source {
                 location,
                 path,
                 hash,
-            })
+            }),
         })
     }
 

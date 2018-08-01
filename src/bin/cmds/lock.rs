@@ -27,5 +27,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::lock(&ctx, project)
+    build::lock(&ctx, &project)
 }

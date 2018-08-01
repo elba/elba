@@ -1,7 +1,8 @@
-use super::{CompileMode, compile_lib, context::BuildContext};
+use super::{compile_lib, context::BuildContext, CompileMode};
 use crossbeam::queue::MsQueue;
 use package::manifest::BinTarget;
 use petgraph::graph::NodeIndex;
+use retrieve::cache::OutputLayout;
 use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::collections::HashSet;
@@ -17,15 +18,18 @@ impl JobQueue {
     // We're using Graph<Job> to move dependency preparation and target generation closer.
     // Executing the JobQueue creates all of the binaries and stuff. Another function will be
     // responsible for any moving around that has to take place.
-    pub fn new(solve: Graph<Source>, bcx: &BuildContext) -> Res<Self> {
+    pub fn new(
+        solve: Graph<Source>,
+        root: &(CompileMode, Vec<BinTarget>),
+        bcx: &BuildContext,
+    ) -> Res<Self> {
         let mut graph = Graph::new(solve.inner.map(|_, _| Job::default(), |_, _| ()));
 
         let mut curr_layer = HashSet::new();
         let mut next_layer = HashSet::new();
 
-        let direct_deps = solve.children(NodeIndex::new(0)).map(|(index, _)| index);
-
-        next_layer.extend(direct_deps);
+        // We start with the root node.
+        next_layer.insert(NodeIndex::new(0));
 
         while !next_layer.is_empty() {
             debug_assert!(curr_layer.is_empty());
@@ -36,17 +40,39 @@ impl JobQueue {
                 let source = &solve[node];
                 let build_hash = BuildHash::new(source, &solve);
 
+                // We assume all the Jobs down the line are libraries.
+                let compile_mode = if node == NodeIndex::new(0) {
+                    root.0
+                } else {
+                    CompileMode::Lib
+                };
+
+                let bin_paths = if node == NodeIndex::new(0) {
+                    root.1.clone()
+                } else {
+                    vec![]
+                };
+
                 let job = match bcx.cache.checkout_build(&build_hash)? {
-                    Some(binary) => Job { work: Work::Fresh(binary), compile_mode: CompileMode::Lib, bin_paths: vec![] },
+                    Some(binary) => Job {
+                        work: Work::Fresh(binary),
+                        compile_mode,
+                        bin_paths,
+                    },
                     None => {
                         next_layer.extend(
                             graph
                                 .children(node)
+                                // If the Job is none, that means that it hasn't been visited yet.
                                 .filter(|(_, child)| child.is_none())
                                 .map(|(index, _)| index),
                         );
 
-                        Job { work: Work::Dirty(source.clone(), build_hash), compile_mode: CompileMode::Lib, bin_paths: vec![] }
+                        Job {
+                            work: Work::Dirty(source.clone(), build_hash),
+                            compile_mode,
+                            bin_paths,
+                        }
                     }
                 };
                 graph[node] = job;
@@ -60,7 +86,7 @@ impl JobQueue {
         Ok(JobQueue { graph })
     }
 
-    pub fn exec(mut self, bcx: &BuildContext) -> Res<()> {
+    pub fn exec(mut self, bcx: &BuildContext, root_ol: &Option<OutputLayout>) -> Res<()> {
         // TODO: How many threads do we want?
         let threads = 1;
         let mut thread_pool = Pool::new(threads);
@@ -101,7 +127,17 @@ impl JobQueue {
                         scoped.execute(move || {
                             let op = || -> Res<Binary> {
                                 let layout = bcx.cache.checkout_tmp(&build_hash)?;
+                                let layout = if job_index == NodeIndex::new(0) {
+                                    if let Some(x) = &root_ol {
+                                        x
+                                    } else {
+                                        &layout
+                                    }
+                                } else {
+                                    &layout
+                                };
 
+                                // TODO: Don't always compile a lib
                                 compile_lib(&source, &deps, &layout, bcx)?;
 
                                 let binary = bcx.cache.store_build(&layout.lib, &build_hash)?;
@@ -115,7 +151,8 @@ impl JobQueue {
                 }
             });
 
-            // handle the results from job executions
+            // Handle the results of job execution
+            // TODO: Work::Fresh -> Work::None when it's no longer needed.
             while let Some((job_index, job_res)) = done.try_pop() {
                 match job_res {
                     Ok(binary) => {

@@ -6,17 +6,26 @@ use elba::{
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
-use std::str::FromStr;
+use std::{env::current_dir, str::FromStr};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("install")
         .about("Installs a package's artifacts")
-        .arg(Arg::with_name("name").required(true))
+        .arg(Arg::with_name("name"))
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
-    let name = &*args.value_of_lossy("name").unwrap();
-    let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
+    let current = current_dir();
+
+    let proj = if let Some(name) = args.value_of_lossy("name") {
+        let name = &*name;
+        let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
+        Ok(name)
+    } else if let Ok(d) = current {
+        Err(d)
+    } else {
+        bail!("no package was specified to be installed and the current directory is inaccessible")
+    };
 
     let logger = logger(c);
     let indices = c.indices.to_vec();
@@ -28,5 +37,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::install(&ctx, name)
+    build::install(&ctx, proj)
 }

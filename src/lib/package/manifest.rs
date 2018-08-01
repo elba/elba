@@ -8,14 +8,12 @@ use super::{
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
-use std::{
-    path::{Component, Path, PathBuf},
-    str::FromStr,
-};
+use std::{path::PathBuf, str::FromStr};
 use toml;
 use url::Url;
 use url_serde;
 use util::errors::*;
+use util::SubPath;
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
 //
@@ -47,7 +45,7 @@ pub struct Manifest {
     pub dev_dependencies: IndexMap<Name, DepReq>,
     pub targets: Targets,
     #[serde(default)]
-    workspace: IndexMap<Name, String>,
+    pub workspace: IndexMap<Name, SubPath>,
 }
 
 impl Manifest {
@@ -92,40 +90,8 @@ impl FromStr for Manifest {
             bail!("manifests must define at least either a bin or lib target")
         }
 
-        if let Some(lib) = &toml.targets.lib {
-            if !is_relative_subdir(&lib.path) {
-                bail!("lib path can only reference a directory inside package")
-            }
-
-            if lib.mods.is_empty() {
-                bail!("libraries have to export at least one module")
-            }
-        }
-
-        for bin in &toml.targets.bin {
-            if !is_relative_subdir(&bin.main) {
-                bail!("bin path can only reference a directory inside package")
-            }
-        }
-
-        for test in &toml.targets.test {
-            if !is_relative_subdir(&test.path) {
-                bail!("test path can only reference a directory inside package")
-            }
-        }
-
-        for bench in &toml.targets.bench {
-            if !is_relative_subdir(&bench.path) {
-                bail!("bench path can only reference a directory inside package")
-            }
-        }
-
         Ok(toml)
     }
-}
-
-fn is_relative_subdir(path: &Path) -> bool {
-    path.is_relative() && path.components().all(|x| x != Component::ParentDir)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -197,13 +163,13 @@ pub struct Targets {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Target {
-    pub path: PathBuf,
+    pub path: SubPath,
 }
 
 // TODO: Prevent non-relative paths
 #[derive(Deserialize, Debug, Clone)]
 pub struct LibTarget {
-    pub path: PathBuf,
+    pub path: SubPath,
     pub mods: Vec<String>,
 }
 
@@ -211,7 +177,7 @@ pub struct LibTarget {
 pub struct BinTarget {
     pub name: String,
     // For binaries, benches, and tests, this should point to a file with a Main module.
-    pub main: PathBuf,
+    pub main: SubPath,
 }
 
 #[cfg(test)]

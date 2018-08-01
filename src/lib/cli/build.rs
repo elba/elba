@@ -1,3 +1,8 @@
+use build::{
+    context::{BuildConfig, BuildContext, Compiler},
+    job::JobQueue,
+    CompileMode,
+};
 use failure::ResultExt;
 use package::{
     lockfile::LockfileToml,
@@ -7,6 +12,7 @@ use package::{
 };
 use resolve::Resolver;
 use retrieve::cache::Cache;
+use retrieve::cache::OutputLayout;
 use retrieve::Retriever;
 use slog::Logger;
 use std::{
@@ -16,8 +22,7 @@ use std::{
     str::FromStr,
 };
 use toml;
-use util::errors::Res;
-use util::graph::Graph;
+use util::{errors::Res, graph::Graph, lock::DirLock};
 
 pub struct BuildCtx {
     pub indices: Vec<DirectRes>,
@@ -25,33 +30,80 @@ pub struct BuildCtx {
     pub logger: Logger,
 }
 
-// TODO: Maybe each one of these should return a closure that we can pass into solve_*
-pub fn bench(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+// TODO: Each of these functions returns a closure that can be passed into solve_local or solve_remote
+// bench and test are just building executables and running them
+pub fn bench(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
-pub fn build(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+pub fn test(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
-pub fn check(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+// The name argument is a Result because we want a generic Either type, but that's not in std
+// and I don't feel like making a new enum just for this
+// Also the Err variant is a PathBuf because I couldn't get it to take &Path without ownership
+// problems in the bin code.
+pub fn install(ctx: &BuildCtx, name: Result<Name, PathBuf>) -> Res<()> {
+    match name {
+        Ok(name) => solve_remote(ctx, name, |_, _, _| unimplemented!()),
+        Err(path) => solve_local(ctx, &path, |_, _, _| unimplemented!()),
+    }
+}
+
+pub fn uninstall(ctx: &BuildCtx, name: Name) -> Res<()> {
+    unimplemented!()
+}
+
+pub fn repl(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
-pub fn install(ctx: &BuildCtx, name: Name) -> Res<()> {
-    solve_remote(ctx, name, |_, _, _| unimplemented!())
+pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
+    solve_local(ctx, &project, |cache, mut retriever, solve| {
+        let mut contents = String::new();
+        let mut manifest = fs::File::open(project.join("elba.toml"))
+            .context(format_err!("failed to read manifest file"))?;
+        manifest.read_to_string(&mut contents)?;
+        let manifest =
+            Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+
+        let sources = retriever
+            .retrieve_packages(&solve)
+            .context(format_err!("package retrieval failed"))?;
+
+        let root = if manifest.targets.lib.is_some() {
+            (CompileMode::Lib, vec![])
+        } else {
+            // In the manifest we check for library/binary targets. This has to be (a) binar(y/ies)
+            (CompileMode::Bin, manifest.targets.bin.clone())
+        };
+
+        // We drop the Retriever because we want to release our lock on the Indices as soon as we
+        // can to avoid stopping other instances of elba from downloading and resolving (even
+        // though we don't even need the Retriever anymore).
+        drop(retriever);
+
+        let ctx = BuildContext {
+            // TODO: pick a better compiler pls
+            compiler: Compiler::default(),
+            config: BuildConfig {},
+            cache,
+        };
+
+        // We want to store the outputs of our labor in a local target directory.
+        let lock = DirLock::acquire(&project.join("target"))?;
+        let layout = OutputLayout::new(lock).context("could not create local target directory")?;
+
+        let q = JobQueue::new(sources, &root, &ctx)?;
+        // Because we're just building, we don't need to do anything after executing the build
+        // process. Yay abstraction!
+        q.exec(&ctx, &Some(layout))
+    })
 }
 
-pub fn lock(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
+pub fn lock(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| Ok(()))
-}
-
-pub fn repl(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
-    solve_local(ctx, &project, |_, _, _| unimplemented!())
-}
-
-pub fn test(ctx: &BuildCtx, project: PathBuf) -> Res<()> {
-    solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
 pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(

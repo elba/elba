@@ -7,6 +7,7 @@ pub struct BuildContext<'a> {
     pub compiler: Compiler,
     /// The global cache to use.
     pub cache: &'a Cache,
+    pub config: BuildConfig,
 }
 
 // TODO: Verbosity, totality checking
@@ -23,7 +24,7 @@ pub struct Compiler {
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    // TODO: Actually lookup the compiler instead of the hard-coded string.
+    // TODO: Actually look up the compiler instead of the hard-coded string.
     pub fn new() -> Compiler {
         Compiler::default()
     }

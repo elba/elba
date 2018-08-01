@@ -7,8 +7,13 @@ pub mod lock;
 pub mod shell;
 
 use failure::ResultExt;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fs, io::Write, path::Path};
-use util::errors::Res;
+use std::{
+    path::{Component, PathBuf},
+    str::FromStr,
+};
+use util::errors::{Error, Res};
 use walkdir::{DirEntry, WalkDir};
 
 /// Turns an SHA2 hash into a nice hexified string.
@@ -19,6 +24,48 @@ pub fn hexify_hash(hash: &[u8]) -> String {
         s.push_str(&p);
     }
     s
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubPath(pub PathBuf);
+
+impl SubPath {
+    pub fn is_subpath(p: &Path) -> bool {
+        p.is_relative() && p.components().all(|x| x != Component::ParentDir)
+    }
+
+    pub fn from_path(p: &Path) -> Res<Self> {
+        if SubPath::is_subpath(&p) {
+            Ok(SubPath(p.to_path_buf()))
+        } else {
+            bail!("p {} isn't a strict subdirectory", p.display())
+        }
+    }
+}
+
+impl FromStr for SubPath {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let path = PathBuf::from(s);
+        SubPath::from_path(&path)
+    }
+}
+
+impl Serialize for SubPath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.0.to_string_lossy().as_ref())
+    }
+}
+
+impl<'de> Deserialize<'de> for SubPath {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
 }
 
 // TODO: create_dir_all too?

@@ -39,7 +39,7 @@ pub fn compile_lib(
     })?;
 
     // We know that source.path() will be relative to the package root
-    let src_path = source.path().join(&lib_target.path);
+    let src_path = source.path().join(&lib_target.path.0);
     let targets = lib_target
         .mods
         .iter()
@@ -65,7 +65,9 @@ pub fn compile_lib(
         // We strip the library prefix before copying
         // target_bin is something like src/Test.ibc
         // we want to move build/src/Test.ibc to lib/Test.ibc
-        let to = layout.lib.join(&target_bin.strip_prefix(source.path()).unwrap());
+        let to = layout
+            .lib
+            .join(&target_bin.strip_prefix(source.path()).unwrap());
 
         fs::create_dir_all(to.parent().unwrap())?;
         fs::rename(from, to)?;

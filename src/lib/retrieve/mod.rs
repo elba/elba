@@ -80,7 +80,7 @@ impl<'cache> Retriever<'cache> {
 
                 let source = self
                     .cache
-                    .checkout_source(sum.id(), loc, Some(sum.version()))
+                    .checkout_source(sum.id(), loc)
                     .context(format_err!("unable to retrieve package {}", sum))?;
 
                 Ok(source)
@@ -101,11 +101,11 @@ impl<'cache> Retriever<'cache> {
         // With stuff from lockfiles, we try to retrieve whatever version was specified in the
         // lockfile. However, if it fails, we don't want to error out; we want to try to find
         // the best version we can otherwise.
-        let pkg_verion = self
+        let pkg_version = self
             .lockfile
             .find_by(|sum| sum.id == *pkg)
             .map(|meta| &meta.version);
-        if let Some(v) = pkg_verion {
+        if let Some(v) = pkg_version {
             if con.satisfies(&v) {
                 let dir = if let Resolution::Direct(loc) = pkg.resolution() {
                     Some(loc)
@@ -117,7 +117,7 @@ impl<'cache> Retriever<'cache> {
                 };
 
                 if let Some(dir) = dir {
-                    if let Ok(src) = self.cache.checkout_source(pkg, dir, Some(&v)) {
+                    if let Ok(src) = self.cache.checkout_source(pkg, dir) {
                         return Ok(src.meta().version().clone());
                     }
                 }
@@ -127,7 +127,7 @@ impl<'cache> Retriever<'cache> {
         if let Resolution::Direct(loc) = pkg.resolution() {
             return Ok(self
                 .cache
-                .checkout_source(pkg, loc, None)?
+                .checkout_source(pkg, loc)?
                 .meta()
                 .version()
                 .clone());
@@ -181,7 +181,7 @@ impl<'cache> Retriever<'cache> {
         if let Resolution::Direct(loc) = pkg.resolution() {
             let deps = self
                 .cache
-                .checkout_source(pkg.id(), loc, Some(pkg.version()))?
+                .checkout_source(pkg.id(), loc)?
                 .meta()
                 .deps(&self.def_index, false);
             let mut res = vec![];

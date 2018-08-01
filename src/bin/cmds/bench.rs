@@ -26,5 +26,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::bench(&ctx, project)
+    build::bench(&ctx, &project)
 }
