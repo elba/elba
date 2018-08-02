@@ -172,6 +172,9 @@ impl Cache {
     pub fn checkout_tmp(&self, hash: &BuildHash) -> Res<OutputLayout> {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
+        if lock.path().exists() {
+            clear_dir(&lock.path()).context(format_err!("couldn't remove existing output path"))?;
+        }
         OutputLayout::new(lock)
     }
 
@@ -327,14 +330,13 @@ pub struct OutputLayout {
     pub lib: PathBuf,
     pub build: PathBuf,
     pub deps: PathBuf,
+    pub hash: Option<BuildHash>,
 }
 
 impl OutputLayout {
     pub fn new(lock: DirLock) -> Res<Self> {
-        if lock.path().exists() {
-            clear_dir(&lock.path()).context(format_err!("couldn't remove existing output path"))?;
-        }
         let root = lock.path().to_path_buf();
+
         let layout = OutputLayout {
             lock,
             root: root.clone(),
@@ -343,6 +345,7 @@ impl OutputLayout {
             lib: root.join("lib"),
             build: root.join("build"),
             deps: root.join("deps"),
+            hash: fs::read(root.join("hash")).map(|x| BuildHash(String::from_utf8_lossy(&x).to_string())).ok(),
         };
 
         // create_dir_all ignores pre-existing folders
@@ -353,6 +356,20 @@ impl OutputLayout {
         fs::create_dir_all(&layout.deps)?;
 
         Ok(layout)
+    }
+    
+    pub fn write_hash(&self, hash: &BuildHash) -> Res<()> {
+        fs::write(self.root.join("hash"), hash.0.as_bytes()).context(format_err!("couldn't write hash"))?;
+        
+        Ok(())
+    }
+    
+    pub fn is_built(&self, hash: &BuildHash) -> bool {
+        if let Some(sh) = &self.hash {
+            sh == hash
+        } else {
+            false
+        }
     }
 }
 
@@ -378,6 +395,8 @@ struct SourceInner {
 }
 
 impl Source {
+    /// Creates a Source from a folder on disk.
+    ///
     /// The purpose of having a hash is for builds. The resolution graph only stores Summaries. If we were
     /// to rely solely on hashing the Summaries of a package's dependencies to determine if we need
     /// to rebuild a package, we'd run into a big problem: a package would only get rebuilt iff its

@@ -7,7 +7,7 @@ pub mod job;
 use self::{context::BuildContext, invoke::CompileInvocation};
 use retrieve::cache::{Binary, OutputLayout, Source};
 use std::fs;
-use util::errors::Res;
+use util::{clear_dir, errors::Res};
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -88,6 +88,8 @@ pub fn compile_lib(
             source.meta().package.name
         )
     })?;
+    
+    clear_dir(&layout.lib)?;
 
     // We know that lib_target.path will be relative to the package root
     let src_path = source.path().join(&lib_target.path.0);

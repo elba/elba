@@ -6,29 +6,20 @@ use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use util::{errors::Res, graph::Graph};
+use util::{lock::DirLock, errors::Res, graph::Graph};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
     graph: Graph<Job>,
+    root_ol: Option<OutputLayout>,
 }
 
-// TODO: The main deficiency with the current system is in how we construct the Job graph:
-// specifically, how we check if a build is complete. Because we always check the global
-// cache for if a build folder for the package exists, there are several consequences:
-//
-//   - The root package will be unconditionally rebuilt every time, because its output
-//     only exists in the root directory.
-//     The solution to this is that we could deal with this by passing the root_ol
-//     into JobQueue::new instead of JobQueue::exec so that we can check the hash of the root
-//     Source from the graph versus the hash stored in the OutputLayout (we should add a hash to
-//     the OutputLayout too to store the previous hash of the source built in it). Maybe we should
-//     store the root OutputLayout as part of the struct?
-//
-//   - If a non-root package has multiple targets (say, a lib and 2 bins), but it's corrupted
-//     midway through the process, the system might be fooled into thinking that the Job is
-//     complete when it isn't (i.e. if it successfully builds the lib but fails in the bin).
-//     The solution to this really is just don't build targets in parallel.
+// With the current system, there's very little separation between preparing dependencies and
+// generating targets. It also tries to unify dealing with the root package. This can lead to some
+// awkward scenarios (we have to check NodeIndex::new(0) several times in this code because of
+// having to treat the root package differently). However, the benefit of this is that the entire
+// Job graph can have arbitrary targets, and in general we reduce code duplication (building the
+// root package is still just building another package, after all).
 //
 // The alternative is to completely separate building the root package and any targets required from
 // the JobQueue; the only job (heh) of the JobQueue is to build the *library dependencies* of the
@@ -42,19 +33,15 @@ pub struct JobQueue {
 //     and compile_bin functions that can be shared between the queue and whatever is responsible
 //     for the root, but it still feels like duplication of responsibilities.
 //
-//   - Building global packages (e.g. `elba install`) is less nice: we would have to make a
-//     temporary directory (as in somewhere in `/tmp/`) to replace what would be `./target/`,
-//     or we have to check out the temporary directory for the root package from the Cache
-//     manually.
+//   - Building global packages (e.g. `elba install`) is less nice: we have to check out the
+//     temporary directory for the root package from the Cache manually.
 //
 //   - If we want to support tasks, that becomes more complicated too.
 impl JobQueue {
-    // We're using Graph<Job> to move dependency preparation and target generation closer.
-    // Executing the JobQueue creates all of the binaries and stuff. Another function will be
-    // responsible for any moving around that has to take place.
     pub fn new(
         solve: Graph<Source>,
         root: Targets,
+        root_ol: Option<OutputLayout>,
         bcx: &BuildContext,
     ) -> Res<Self> {
         let mut graph = Graph::new(solve.inner.map(|_, _| Job::default(), |_, _| ()));
@@ -79,24 +66,32 @@ impl JobQueue {
                 } else {
                     Targets::new(vec![Target::Lib])
                 };
-
-                let job = match bcx.cache.checkout_build(&build_hash)? {
-                    Some(binary) => Job {
-                        work: Work::Fresh(binary),
+                
+                let root_ol = root_ol.as_ref();
+                let job = if node == NodeIndex::new(0) && root_ol.is_some() && root_ol.unwrap().is_built(&build_hash) {
+                    Job {
+                        work: Work::None,
                         targets
-                    },
-                    None => {
-                        next_layer.extend(
-                            graph
-                                .children(node)
-                                // If the Job is none, that means that it hasn't been visited yet.
-                                .filter(|(_, child)| child.is_none())
-                                .map(|(index, _)| index),
-                        );
-
-                        Job {
-                            work: Work::Dirty(source.clone(), build_hash),
+                    }
+                } else {
+                    match bcx.cache.checkout_build(&build_hash)? {
+                        Some(binary) => Job {
+                            work: Work::Fresh(binary),
                             targets
+                        },
+                        None => {
+                            next_layer.extend(
+                                graph
+                                    .children(node)
+                                    // If the Job is none, that means that it hasn't been visited yet.
+                                    .filter(|(_, child)| child.is_none())
+                                    .map(|(index, _)| index),
+                            );
+
+                            Job {
+                                work: Work::Dirty(source.clone(), build_hash),
+                                targets
+                            }
                         }
                     }
                 };
@@ -107,14 +102,16 @@ impl JobQueue {
         // We drop the all of the Sources, releasing our lock on them. We don't need them anymore.
         drop(solve);
 
-        Ok(JobQueue { graph })
+        Ok(JobQueue { graph, root_ol })
     }
 
     // TODO: Return relevant OutputLayouts
-    pub fn exec(mut self, bcx: &BuildContext, root_ol: &Option<OutputLayout>) -> Res<()> {
+    pub fn exec(mut self, bcx: &BuildContext) -> Res<()> {
         // TODO: How many threads do we want?
         let threads = 1;
         let mut thread_pool = Pool::new(threads);
+        
+        let root_ol = &self.root_ol;
 
         // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
         let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
@@ -156,8 +153,8 @@ impl JobQueue {
                             let op = || -> Res<Option<Binary>> {
                                 let layout = bcx.cache.checkout_tmp(&build_hash)?;
                                 let layout = if job_index == NodeIndex::new(0) {
-                                    if let Some(x) = &root_ol {
-                                        x
+                                    if let Some(x) = root_ol {
+                                        &x.clone()
                                     } else {
                                         &layout
                                     }
@@ -167,15 +164,15 @@ impl JobQueue {
                                 
                                 let mut res: Option<Binary> = None;
 
-                                // TODO: In order to build tasks in parallel, for everything except lib we could
-                                // spawn another task to execute
-                                // e.g. Target::Bin(ix) => { scoped.execute(move || ...) }
                                 for t in ts {
                                     match t {
                                         Target::Lib => {
                                             compile_lib(&source, &deps, &layout, bcx)?;
-                                            if job_index != NodeIndex::new(0) {
-                                                res = Some(bcx.cache.store_build(&layout.lib, &build_hash)?);
+                                            res = if job_index != NodeIndex::new(0) {
+                                                Some(bcx.cache.store_build(&layout.lib, &build_hash)?)
+                                            } else {
+                                                let target = DirLock::acquire(&layout.lib)?;
+                                                Some(Binary { target })
                                             }
                                         }
                                         Target::Bin(ix) => {
@@ -237,7 +234,6 @@ impl JobQueue {
                         }
                     }
                     // TODO: log error?
-                    // TODO: If the `~/.elba/build/hash` dir was created, remove it
                     Err(err) => return Err(err),
                 }
             }

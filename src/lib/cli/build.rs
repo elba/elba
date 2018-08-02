@@ -101,10 +101,10 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, root, &ctx)?;
+        let q = JobQueue::new(sources, root, Some(layout), &ctx)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        q.exec(&ctx, &Some(layout))
+        q.exec(&ctx)
     })
 }
 
