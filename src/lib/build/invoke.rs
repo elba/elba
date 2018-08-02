@@ -45,12 +45,12 @@ impl<'a> CompileInvocation<'a> {
 // we look to CodegenInvocation.
 #[derive(Debug)]
 pub struct CodegenInvocation<'a> {
-    pub build: &'a Path,
+    pub binary: &'a Path,
     pub output: String,
     pub backend: String,
     pub layout: &'a OutputLayout,
-    /// Whether the output should be treated as a binary (true) or artifact files (false)
-    pub binary: bool,
+    /// Whether the output should be treated as a binary (false) or artifact files (true)
+    pub is_artifact: bool,
 }
 
 impl<'a> CodegenInvocation<'a> {
@@ -67,7 +67,7 @@ impl<'a> CodegenInvocation<'a> {
             .current_dir(&self.layout.bin)
             .args(&["--codegen", &self.backend])
             .args(&["-o", &self.output])
-            .arg(&self.build);
+            .arg(&self.binary);
 
         process.spawn()?;
 

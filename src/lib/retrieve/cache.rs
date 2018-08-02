@@ -345,7 +345,9 @@ impl OutputLayout {
             lib: root.join("lib"),
             build: root.join("build"),
             deps: root.join("deps"),
-            hash: fs::read(root.join("hash")).map(|x| BuildHash(String::from_utf8_lossy(&x).to_string())).ok(),
+            hash: fs::read(root.join("hash"))
+                .map(|x| BuildHash(String::from_utf8_lossy(&x).to_string()))
+                .ok(),
         };
 
         // create_dir_all ignores pre-existing folders
@@ -357,19 +359,16 @@ impl OutputLayout {
 
         Ok(layout)
     }
-    
+
     pub fn write_hash(&self, hash: &BuildHash) -> Res<()> {
-        fs::write(self.root.join("hash"), hash.0.as_bytes()).context(format_err!("couldn't write hash"))?;
-        
+        fs::write(self.root.join("hash"), hash.0.as_bytes())
+            .context(format_err!("couldn't write hash"))?;
+
         Ok(())
     }
-    
+
     pub fn is_built(&self, hash: &BuildHash) -> bool {
-        if let Some(sh) = &self.hash {
-            sh == hash
-        } else {
-            false
-        }
+        self.hash.as_ref() == Some(hash)
     }
 }
 
