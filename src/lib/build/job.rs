@@ -6,7 +6,7 @@ use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use util::{lock::DirLock, errors::Res, graph::Graph};
+use util::{errors::Res, graph::Graph, lock::DirLock};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -66,31 +66,34 @@ impl JobQueue {
                 } else {
                     Targets::new(vec![Target::Lib])
                 };
-                
+
                 let root_ol = root_ol.as_ref();
-                let job = if node == NodeIndex::new(0) && root_ol.is_some() && root_ol.unwrap().is_built(&build_hash) {
+                let job = if node == NodeIndex::new(0)
+                    && root_ol.is_some()
+                    && root_ol.unwrap().is_built(&build_hash)
+                {
                     Job {
                         work: Work::None,
-                        targets
+                        targets,
                     }
                 } else {
                     match bcx.cache.checkout_build(&build_hash)? {
                         Some(binary) => Job {
                             work: Work::Fresh(binary),
-                            targets
+                            targets,
                         },
                         None => {
                             next_layer.extend(
                                 graph
                                     .children(node)
                                     // If the Job is none, that means that it hasn't been visited yet.
-                                    .filter(|(_, child)| child.is_none())
+                                    .filter(|(_, child)| child.work.is_none())
                                     .map(|(index, _)| index),
                             );
 
                             Job {
                                 work: Work::Dirty(source.clone(), build_hash),
-                                targets
+                                targets,
                             }
                         }
                     }
@@ -110,16 +113,16 @@ impl JobQueue {
         // TODO: How many threads do we want?
         let threads = 1;
         let mut thread_pool = Pool::new(threads);
-        
+
         let root_ol = &self.root_ol;
 
         // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
         let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
-            self.graph[index].is_dirty()
+            self.graph[index].work.is_dirty()
                 && self
                     .graph
                     .children(index)
-                    .all(|(child, _)| self.graph[child].is_fresh())
+                    .all(|(child, _)| self.graph[child].work.is_fresh())
         });
 
         // this queue only contains dirty jobs.
@@ -146,7 +149,7 @@ impl JobQueue {
                                 _ => unreachable!(),
                             })
                             .collect::<Vec<_>>();
-                        
+
                         let ts = self.graph[job_index].targets.0.to_vec();
 
                         scoped.execute(move || {
@@ -161,7 +164,7 @@ impl JobQueue {
                                 } else {
                                     &layout
                                 };
-                                
+
                                 let mut res: Option<Binary> = None;
 
                                 for t in ts {
@@ -169,15 +172,16 @@ impl JobQueue {
                                         Target::Lib => {
                                             compile_lib(&source, &deps, &layout, bcx)?;
                                             res = if job_index != NodeIndex::new(0) {
-                                                Some(bcx.cache.store_build(&layout.lib, &build_hash)?)
+                                                Some(
+                                                    bcx.cache
+                                                        .store_build(&layout.lib, &build_hash)?,
+                                                )
                                             } else {
                                                 let target = DirLock::acquire(&layout.lib)?;
                                                 Some(Binary { target })
                                             }
                                         }
-                                        Target::Bin(ix) => {
-                                            unimplemented!()
-                                        }
+                                        Target::Bin(ix) => unimplemented!(),
                                         Target::Test(ix) => {
                                             // TODO: Build a binary with just a dependency on the lib
                                             unimplemented!()
@@ -186,9 +190,7 @@ impl JobQueue {
                                             // TODO: Build a binary with just a dependency on the lib
                                             unimplemented!()
                                         }
-                                        Target::Doc => {
-                                            unimplemented!()
-                                        }
+                                        Target::Doc => unimplemented!(),
                                     }
                                 }
 
@@ -206,7 +208,7 @@ impl JobQueue {
                 match job_res {
                     Ok(binary) => {
                         if let Some(b) = binary {
-                            // If we got a compiled library out of it, set the 
+                            // If we got a compiled library out of it, set the
                             self.graph[job_index].work = Work::Fresh(b)
                         } else if self.graph[job_index].work.is_dirty() {
                             // The Targets struct ensures that the library target will always be
@@ -215,22 +217,33 @@ impl JobQueue {
                             // there's no lib target and nothing to depend on.
                             self.graph[job_index].work = Work::None
                         }
-                        
-                        let mut parents_done = true;
 
                         // push jobs that can be execute at next step into queue
                         for (parent, _) in self.graph.parents(job_index) {
-                            parents_done &= !self.graph[parent].is_dirty();
-                            let ready = self.graph.children(parent).all(|(_, job)| job.is_fresh());
+                            let ready = self
+                                .graph
+                                .children(parent)
+                                .all(|(_, job)| job.work.is_fresh());
 
-                            if ready && self.graph[parent].is_dirty() {
+                            if ready && self.graph[parent].work.is_dirty() {
                                 queue.push(parent);
                             }
                         }
-                        
-                        // If all of the parents of this dep are done, we can set ourselves to None
-                        if parents_done {
-                            self.graph[job_index].work = Work::None;
+
+                        // If the parents of any of the childs are done, we can set it to None
+                        let mut child_done = Vec::new();
+                        for (child, _) in self.graph.children(job_index) {
+                            let ready = self
+                                .graph
+                                .parents(child)
+                                .all(|(_, job)| job.work.is_fresh());
+
+                            if ready {
+                                child_done.push(child);
+                            }
+                        }
+                        for child in child_done {
+                            self.graph[child].work = Work::None;
                         }
                     }
                     // TODO: log error?
@@ -255,20 +268,6 @@ impl Default for Job {
             work: Work::None,
             targets: Targets::new(vec![Target::Lib]),
         }
-    }
-}
-
-impl Job {
-    pub fn is_none(&self) -> bool {
-        self.work.is_none()
-    }
-
-    pub fn is_dirty(&self) -> bool {
-        self.work.is_dirty()
-    }
-
-    pub fn is_fresh(&self) -> bool {
-        self.work.is_fresh()
     }
 }
 

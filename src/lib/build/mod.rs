@@ -4,7 +4,7 @@ pub mod context;
 pub mod invoke;
 pub mod job;
 
-use self::{context::BuildContext, invoke::CompileInvocation};
+use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
 use retrieve::cache::{Binary, OutputLayout, Source};
 use std::fs;
 use util::{clear_dir, errors::Res};
@@ -34,11 +34,11 @@ pub struct Targets(pub Vec<Target>);
 impl Targets {
     pub fn new(mut ts: Vec<Target>) -> Self {
         ts.sort();
-        
+
         let mut res = vec![];
-        
+
         let mut seen_lib = false;
-        
+
         for i in ts {
             match i {
                 Target::Lib => {
@@ -71,7 +71,7 @@ impl Targets {
                 }
             }
         }
-        
+
         Targets(res)
     }
 }
@@ -88,7 +88,7 @@ pub fn compile_lib(
             source.meta().package.name
         )
     })?;
-    
+
     clear_dir(&layout.lib)?;
 
     // We know that lib_target.path will be relative to the package root
@@ -97,7 +97,9 @@ pub fn compile_lib(
         .mods
         .iter()
         .map(|mod_name| {
-            lib_target.path.0
+            lib_target
+                .path
+                .0
                 .join(mod_name.replace(".", "/"))
                 .with_extension("idr")
         })
@@ -120,11 +122,57 @@ pub fn compile_lib(
         // we want to move build/src/Test.ibc to lib/Test.ibc
         let to = layout
             .lib
-            .join(&target_bin.strip_prefix(source.path()).unwrap());
+            .join(&target_bin.strip_prefix(&src_path).unwrap());
 
         fs::create_dir_all(to.parent().unwrap())?;
         fs::rename(from, to)?;
     }
+
+    Ok(())
+}
+
+// TODO: Return compilation result(path, meta or anything else)
+pub fn compile_bin(
+    source: &Source,
+    target: usize,
+    deps: &[&Binary],
+    layout: &OutputLayout,
+    bcx: &BuildContext,
+) -> Res<()> {
+    let bin_target = source.meta().targets.bin[target].clone();
+    let target_path = bin_target.main.0;
+    // TODO: Check this in manifest?
+    let src_path = target_path.parent().ok_or_else(|| {
+        format_err!(
+            "package {} has an invalid bin target {:?}",
+            source.meta().package.name,
+            target_path,
+        )
+    })?;
+    let target_path = target_path.with_extension("idr");
+
+    let compile_invoke = CompileInvocation {
+        src: &src_path,
+        deps,
+        targets: &[target_path.clone()],
+        layout: &layout,
+    };
+
+    compile_invoke.exec(bcx)?;
+
+    let target_bin = target_path.with_extension("ibc");
+
+    let codegen_invoke = CodegenInvocation {
+        binary: &layout.build.join(&target_bin),
+        output: bin_target.name.clone(),
+        // TODO
+        backend: "c".to_string(),
+        layout: &layout,
+        is_artifact: false,
+    };
+
+    // TODO: now the executabe is always generated in `taget/bin`
+    codegen_invoke.exec(bcx)?;
 
     Ok(())
 }
