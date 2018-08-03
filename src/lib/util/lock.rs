@@ -32,8 +32,7 @@ impl DirLock {
             .map(|_| DirLock {
                 path: path.to_path_buf(),
                 lock_path,
-            })
-            .context(ErrorKind::Locked)?;
+            }).context(ErrorKind::Locked)?;
 
         Ok(res)
     }

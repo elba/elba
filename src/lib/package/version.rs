@@ -452,8 +452,7 @@ impl Constraint {
                         Err((a2, b2))
                     }
                 }
-            })
-            .collect();
+            }).collect();
     }
 
     pub fn is_empty(&self) -> bool {
@@ -925,8 +924,8 @@ mod tests {
             "1.0.0+b1231231",
             "1.0.0-alpha.1+b1231231",
         ].into_iter()
-            .map(|v| CompleteStr(v))
-            .collect::<Vec<_>>();
+        .map(|v| CompleteStr(v))
+        .collect::<Vec<_>>();
 
         for v in vs {
             assert!(bare_version(v).is_ok());

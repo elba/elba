@@ -156,14 +156,7 @@ pub struct Targets {
     #[serde(default = "Vec::new")]
     pub bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
-    test: Vec<Target>,
-    #[serde(default = "Vec::new")]
-    bench: Vec<Target>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct Target {
-    pub path: SubPath,
+    pub test: Vec<BinTarget>,
 }
 
 // TODO: Prevent non-relative paths
@@ -176,7 +169,7 @@ pub struct LibTarget {
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct BinTarget {
     pub name: String,
-    // For binaries, benches, and tests, this should point to a file with a Main module.
+    // For binaries and tests, this should point to a file with a Main module.
     pub main: SubPath,
 }
 

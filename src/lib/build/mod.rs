@@ -20,9 +20,8 @@ pub enum Target {
     /// The usize field is the index of the BinTarget in the manifest's list of BinTargets which
     /// should be built
     Bin(usize),
-    // Both Test and Bench are like Bin, except that they require the lib to be built already.
+    // Test is like Bin, except that it requires the lib to be built already.
     Test(usize),
-    Bench(usize),
     // I would assume creating documentation requires the lib to be built too
     /// Create documentation
     Doc,
@@ -43,19 +42,14 @@ impl Targets {
             match i {
                 Target::Lib => {
                     if !seen_lib {
-                        seen_lib = true;
                         res.push(i);
+                        seen_lib = true;
                     }
                 }
-                Target::Bin(_) => {}
+                Target::Bin(_) => {
+                    res.push(i);
+                }
                 Target::Test(_) => {
-                    if !seen_lib {
-                        seen_lib = true;
-                        res.insert(0, Target::Lib);
-                        res.push(i);
-                    }
-                }
-                Target::Bench(_) => {
                     if !seen_lib {
                         seen_lib = true;
                         res.insert(0, Target::Lib);
@@ -102,8 +96,7 @@ pub fn compile_lib(
                 .0
                 .join(mod_name.replace(".", "/"))
                 .with_extension("idr")
-        })
-        .collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
 
     let invocation = CompileInvocation {
         src: &src_path,
@@ -134,22 +127,20 @@ pub fn compile_lib(
 // TODO: Return compilation result(path, meta or anything else)
 pub fn compile_bin(
     source: &Source,
-    target: usize,
+    target: Target,
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
 ) -> Res<()> {
-    let bin_target = source.meta().targets.bin[target].clone();
-    let target_path = bin_target.main.0;
+    let bin_target = match target {
+        Target::Bin(ix) => source.meta().targets.bin[ix].clone(),
+        Target::Test(ix) => source.meta().targets.test[ix].clone(),
+        _ => bail!("compile_bin called with non-binary target"),
+    };
+
+    let target_path = source.path().join(bin_target.main.0).with_extension("idr");
     // TODO: Check this in manifest?
-    let src_path = target_path.parent().ok_or_else(|| {
-        format_err!(
-            "package {} has an invalid bin target {:?}",
-            source.meta().package.name,
-            target_path,
-        )
-    })?;
-    let target_path = target_path.with_extension("idr");
+    let src_path = target_path.parent().unwrap();
 
     let compile_invoke = CompileInvocation {
         src: &src_path,
@@ -171,7 +162,7 @@ pub fn compile_bin(
         is_artifact: false,
     };
 
-    // TODO: now the executabe is always generated in `taget/bin`
+    // The output exectable will always go in target/bin
     codegen_invoke.exec(bcx)?;
 
     Ok(())

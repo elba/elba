@@ -1,4 +1,4 @@
-use super::{compile_lib, context::BuildContext, Target, Targets};
+use super::{compile_bin, compile_lib, context::BuildContext, Target, Targets};
 use crossbeam::queue::MsQueue;
 use petgraph::graph::NodeIndex;
 use retrieve::cache::OutputLayout;
@@ -118,11 +118,10 @@ impl JobQueue {
 
         // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
         let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
-            self.graph[index].work.is_dirty()
-                && self
-                    .graph
-                    .children(index)
-                    .all(|(child, _)| self.graph[child].work.is_fresh())
+            self.graph[index].work.is_dirty() && self
+                .graph
+                .children(index)
+                .all(|(child, _)| self.graph[child].work.is_fresh())
         });
 
         // this queue only contains dirty jobs.
@@ -147,8 +146,7 @@ impl JobQueue {
                             .map(|(_, job)| match &job.work {
                                 Work::Fresh(binary) => binary,
                                 _ => unreachable!(),
-                            })
-                            .collect::<Vec<_>>();
+                            }).collect::<Vec<_>>();
 
                         let ts = self.graph[job_index].targets.0.to_vec();
 
@@ -157,7 +155,7 @@ impl JobQueue {
                                 let layout = bcx.cache.checkout_tmp(&build_hash)?;
                                 let layout = if job_index == NodeIndex::new(0) {
                                     if let Some(x) = root_ol {
-                                        &x.clone()
+                                        x
                                     } else {
                                         &layout
                                     }
@@ -181,14 +179,25 @@ impl JobQueue {
                                                 Some(Binary { target })
                                             }
                                         }
-                                        Target::Bin(ix) => unimplemented!(),
-                                        Target::Test(ix) => {
-                                            // TODO: Build a binary with just a dependency on the lib
-                                            unimplemented!()
+                                        Target::Bin(ix) => {
+                                            compile_bin(
+                                                &source,
+                                                Target::Bin(ix),
+                                                &deps,
+                                                &layout,
+                                                bcx,
+                                            )?;
+                                            // TODO: store binary if global
                                         }
-                                        Target::Bench(ix) => {
-                                            // TODO: Build a binary with just a dependency on the lib
-                                            unimplemented!()
+                                        Target::Test(ix) => {
+                                            let deps = vec![res.as_ref().unwrap()];
+                                            compile_bin(
+                                                &source,
+                                                Target::Test(ix),
+                                                &deps,
+                                                &layout,
+                                                bcx,
+                                            )?;
                                         }
                                         Target::Doc => unimplemented!(),
                                     }
@@ -204,51 +213,51 @@ impl JobQueue {
             });
 
             // Handle the results of job execution
-            while let Some((job_index, job_res)) = done.try_pop() {
-                match job_res {
-                    Ok(binary) => {
-                        if let Some(b) = binary {
-                            // If we got a compiled library out of it, set the
-                            self.graph[job_index].work = Work::Fresh(b)
-                        } else if self.graph[job_index].work.is_dirty() {
-                            // The Targets struct ensures that the library target will always be
-                            // compiled first, meaning that the work will be set to Fresh.
-                            // If we're compiling a not-library and it's still dirty, that means
-                            // there's no lib target and nothing to depend on.
-                            self.graph[job_index].work = Work::None
-                        }
+            let (job_index, job_res) = done.pop();
+            match job_res {
+                Ok(binary) => {
+                    if let Some(b) = binary {
+                        // If we got a compiled library out of it, set the
+                        self.graph[job_index].work = Work::Fresh(b)
+                    } else if self.graph[job_index].work.is_dirty() {
+                        // The Targets struct ensures that the library target will always be
+                        // compiled first, meaning that the work will be set to Fresh.
+                        // If we're compiling a not-library and it's still dirty, that means
+                        // there's no lib target and nothing to depend on.
+                        self.graph[job_index].work = Work::None
+                    }
 
-                        // push jobs that can be execute at next step into queue
-                        for (parent, _) in self.graph.parents(job_index) {
-                            let ready = self
-                                .graph
-                                .children(parent)
-                                .all(|(_, job)| job.work.is_fresh());
+                    // push jobs that can be execute at next step into queue
+                    for (parent, _) in self.graph.parents(job_index) {
+                        let ready = self
+                            .graph
+                            .children(parent)
+                            .all(|(_, job)| job.work.is_fresh());
 
-                            if ready && self.graph[parent].work.is_dirty() {
-                                queue.push(parent);
-                            }
-                        }
-
-                        // If the parents of any of the childs are done, we can set it to None
-                        let mut child_done = Vec::new();
-                        for (child, _) in self.graph.children(job_index) {
-                            let ready = self
-                                .graph
-                                .parents(child)
-                                .all(|(_, job)| job.work.is_fresh());
-
-                            if ready {
-                                child_done.push(child);
-                            }
-                        }
-                        for child in child_done {
-                            self.graph[child].work = Work::None;
+                        if ready && self.graph[parent].work.is_dirty() {
+                            queue.push(parent);
                         }
                     }
-                    // TODO: log error?
-                    Err(err) => return Err(err),
+
+                    // For all of this package's dependencies, if all of the packages which
+                    // depend on them have been built, we can drop them entirely.
+                    let mut child_done = Vec::new();
+                    for (child, _) in self.graph.children(job_index) {
+                        let ready = self
+                            .graph
+                            .parents(child)
+                            .all(|(_, job)| job.work.is_fresh());
+
+                        if ready {
+                            child_done.push(child);
+                        }
+                    }
+                    for child in child_done {
+                        self.graph[child].work = Work::None;
+                    }
                 }
+                // TODO: log error?
+                Err(err) => return Err(err),
             }
         }
 

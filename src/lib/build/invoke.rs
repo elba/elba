@@ -35,7 +35,12 @@ impl<'a> CompileInvocation<'a> {
         }
 
         // The moment of truth:
-        process.spawn()?;
+        let process = process.output()?;
+        // TODO: Better print handling
+        if !process.status.success() {
+            print!("{}", String::from_utf8_lossy(&process.stdout));
+            bail!("build error")
+        }
 
         Ok(())
     }
@@ -69,7 +74,12 @@ impl<'a> CodegenInvocation<'a> {
             .args(&["-o", &self.output])
             .arg(&self.binary);
 
-        process.spawn()?;
+        let process = process.output()?;
+        // TODO: Better print handling
+        if !process.status.success() {
+            print!("{}", String::from_utf8_lossy(&process.stdout));
+            bail!("build error")
+        }
 
         Ok(())
     }

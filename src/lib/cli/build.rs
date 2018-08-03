@@ -1,7 +1,7 @@
 use build::{
     context::{BuildConfig, BuildContext, Compiler},
     job::JobQueue,
-    Target, Targets
+    Target, Targets,
 };
 use failure::ResultExt;
 use package::{
@@ -83,11 +83,11 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
         if manifest.targets.lib.is_some() {
             root.push(Target::Lib);
         }
-        
+
         for (ix, _) in manifest.targets.bin.iter().enumerate() {
             root.push(Target::Bin(ix));
         }
-        
+
         let root = Targets::new(root);
 
         let ctx = BuildContext {

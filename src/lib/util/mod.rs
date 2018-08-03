@@ -84,7 +84,7 @@ pub fn write(path: &Path, contents: &[u8]) -> Res<()> {
 pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     let walker = WalkDir::new(from)
         .into_iter()
-        .filter_entry(|e| valid_file(e));
+        .filter(|x| x.is_ok() && valid_file(x.as_ref().unwrap()));
     for entry in walker {
         let entry = entry.unwrap();
         let to_p = to.join(entry.path().strip_prefix(from).unwrap());
@@ -105,9 +105,5 @@ pub fn clear_dir(dir: &Path) -> Res<()> {
 }
 
 fn valid_file(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| !s.starts_with('.'))
-        .unwrap_or(false) && entry.file_type().is_file()
+    entry.file_type().is_file()
 }

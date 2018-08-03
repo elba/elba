@@ -296,15 +296,13 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                         .clone()
                         .into_iter()
                         .filter(|t| (&t.0, &t.1) != most_recent_term),
-                )
-                .chain(
+                ).chain(
                     cause
                         .deps()
                         .clone()
                         .into_iter()
                         .filter(|t| &t.0 != most_recent_satisfier.pkg()),
-                )
-                .collect();
+                ).collect();
 
             if let Some((pkg, diff)) = difference {
                 new_terms.insert(pkg.clone(), diff.complement());
@@ -397,16 +395,14 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                 let incompats = self.retriever.incompats(&sum).unwrap();
                 let mut conflict = false;
                 for ic in incompats {
-                    conflict = conflict
-                        || ic
-                            .deps
-                            .iter()
-                            .map(|(k, v)| {
-                                k == sum.id()
-                                    || self.relation(k, v) == Relation::Subset
-                                    || self.relation(k, v) == Relation::Equal
-                            })
-                            .all(|b| b);
+                    conflict = conflict || ic
+                        .deps
+                        .iter()
+                        .map(|(k, v)| {
+                            k == sum.id()
+                                || self.relation(k, v) == Relation::Subset
+                                || self.relation(k, v) == Relation::Equal
+                        }).all(|b| b);
                     self.incompatibility(ic.deps, ic.cause);
                 }
                 if !conflict {

@@ -10,3 +10,5 @@ pub struct Shell {
     try_color: bool,
     verbosity: Verbosity,
 }
+
+impl Shell {}

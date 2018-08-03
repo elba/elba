@@ -1,5 +1,5 @@
-mod bench;
 mod build;
+mod clean;
 mod init;
 mod install;
 mod lock;
@@ -17,8 +17,8 @@ pub type Exec = fn(&mut Config, &ArgMatches) -> Res<()>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
-        bench::cli(),
         build::cli(),
+        clean::cli(),
         init::cli(),
         install::cli(),
         new::cli(),
@@ -31,8 +31,8 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
 
 pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
-        "bench" => Some(bench::exec),
         "build" => Some(build::exec),
+        "clean" => Some(clean::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
         "new" => Some(new::exec),
