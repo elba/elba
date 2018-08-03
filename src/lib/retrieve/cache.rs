@@ -62,7 +62,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use tar::Builder;
 use util::{
     clear_dir, copy_dir,
     errors::{ErrorKind, Res},
@@ -70,6 +69,7 @@ use util::{
     hexify_hash,
     lock::DirLock,
 };
+use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
 ///
@@ -79,7 +79,7 @@ use util::{
 /// Note that a Cache can be located anywhere, including in the current directory!
 #[derive(Debug, Clone)]
 pub struct Cache {
-    layout: Layout,
+    pub layout: Layout,
     client: Client,
     pub logger: Logger,
 }
@@ -442,17 +442,22 @@ impl Source {
             )
         }
 
-        // Pack into a tar file to hash it quickly
-        // We don't need to put this tar file on-disk, we just want a nice single byte vec that we
-        // can hash quickly
-        let mut f = vec![];
-        let mut ar = Builder::new(&mut f);
-        ar.append_dir_all("irrelevant", path.path())?;
-
-        let _ = ar.into_inner()?;
-
-        let result = Sha256::digest(&f);
-        let hash = hexify_hash(result.as_slice());
+        // Creating the hash
+        let walker = WalkDir::new(path.path()).into_iter().filter_entry(|entry| {
+            entry.file_name() != "target" &&
+            entry.file_name()
+                .to_str()
+                .map(|s| !s.starts_with("."))
+                .unwrap_or(false) && entry.file_type().is_file() 
+        });
+        
+        let mut hash = Sha256::new();
+        for f in walker {
+            let mut file = fs::File::open(f.unwrap().path())?;
+            let fh = Sha256::digest_reader(&mut file)?;
+            hash.input(&fh);
+        }
+        let hash = hexify_hash(hash.result().as_slice());
 
         Ok(Source {
             inner: Arc::new(SourceInner {

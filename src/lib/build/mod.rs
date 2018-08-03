@@ -6,7 +6,7 @@ pub mod job;
 
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
 use retrieve::cache::{Binary, OutputLayout, Source};
-use std::fs;
+use std::{fs, path::PathBuf};
 use util::{clear_dir, errors::Res};
 
 /// A type of Target that should be built
@@ -99,6 +99,7 @@ pub fn compile_lib(
         }).collect::<Vec<_>>();
 
     let invocation = CompileInvocation {
+        pkg: source.meta().package.name.as_str(),
         src: &src_path,
         deps,
         targets: &targets,
@@ -138,11 +139,15 @@ pub fn compile_bin(
         _ => bail!("compile_bin called with non-binary target"),
     };
 
+    // This is the full target path
     let target_path = source.path().join(bin_target.main.0).with_extension("idr");
     // TODO: Check this in manifest?
     let src_path = target_path.parent().unwrap();
+    // This is the relative target path
+    let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
 
     let compile_invoke = CompileInvocation {
+        pkg: source.meta().package.name.as_str(),
         src: &src_path,
         deps,
         targets: &[target_path.clone()],
@@ -154,6 +159,7 @@ pub fn compile_bin(
     let target_bin = target_path.with_extension("ibc");
 
     let codegen_invoke = CodegenInvocation {
+        pkg: source.meta().package.name.as_str(),
         binary: &layout.build.join(&target_bin),
         output: bin_target.name.clone(),
         // TODO

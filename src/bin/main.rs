@@ -3,6 +3,7 @@
 
 #[macro_use]
 extern crate clap;
+extern crate console;
 extern crate elba;
 #[macro_use]
 extern crate failure;
@@ -15,6 +16,7 @@ extern crate slog_term;
 mod cmds;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
+use console::style;
 use elba::util::config::{Config, Verbosity};
 use failure::Error;
 use indicatif::HumanDuration;
@@ -128,8 +130,12 @@ fn main() {
     let res = go();
 
     if let Err(e) = res {
-        println!("[err] {}", e);
+        println!("{} {}", style("[err]").red().bold(), e);
     } else {
-        println!("finished in {}", HumanDuration(start.elapsed()));
+        println!(
+            "{} finished in {}",
+            style("done!").green().bold(),
+            HumanDuration(start.elapsed())
+        );
     }
 }

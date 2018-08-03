@@ -3,6 +3,7 @@ use build::{
     job::JobQueue,
     Target, Targets,
 };
+use console::style;
 use failure::ResultExt;
 use package::{
     lockfile::LockfileToml,
@@ -37,7 +38,57 @@ pub fn bench(ctx: &BuildCtx, project: &Path) -> Res<()> {
 }
 
 pub fn test(ctx: &BuildCtx, project: &Path) -> Res<()> {
-    solve_local(ctx, &project, |_, _, _| unimplemented!())
+    solve_local(ctx, &project, |cache, mut retriever, solve| {
+        let mut contents = String::new();
+        let mut manifest = fs::File::open(project.join("elba.toml"))
+            .context(format_err!("failed to read manifest file"))?;
+        manifest.read_to_string(&mut contents)?;
+        let manifest =
+            Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+
+        if manifest.targets.lib.is_none() {
+            bail!("running tests requires a defined library to test")
+        }
+        if manifest.targets.test.is_empty() {
+            bail!("at least one test must be defined")
+        }
+
+        let sources = retriever
+            .retrieve_packages(&solve)
+            .context(format_err!("package retrieval failed"))?;
+
+        // We drop the Retriever because we want to release our lock on the Indices as soon as we
+        // can to avoid stopping other instances of elba from downloading and resolving (even
+        // though we don't even need the Retriever anymore).
+        drop(retriever);
+
+        // TODO: Specifying targets to build
+        // By default, we build all test targets.
+        let mut root = vec![];
+        root.push(Target::Lib);
+        for (ix, _) in manifest.targets.test.iter().enumerate() {
+            root.push(Target::Test(ix));
+        }
+
+        let root = Targets::new(root);
+
+        let ctx = BuildContext {
+            // TODO: pick a better compiler pls
+            compiler: Compiler::default(),
+            config: BuildConfig {},
+            cache,
+        };
+
+        // We want to store the outputs of our labor in a local target directory.
+        let lock = DirLock::acquire(&project.join("target"))?;
+        let layout = OutputLayout::new(lock).context("could not create local target directory")?;
+
+        let q = JobQueue::new(sources, root, Some(layout), &ctx)?;
+        q.exec(&ctx)?;
+
+        // TODO: Run the tests
+        unimplemented!()
+    })
 }
 
 // The name argument is a Result because we want a generic Either type, but that's not in std
@@ -68,6 +119,7 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
         let manifest =
             Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
 
+        println!("{} Retrieving packages...", style("[2/3]").dim().bold());
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -96,6 +148,8 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
             config: BuildConfig {},
             cache,
         };
+
+        println!("{} Building targets...", style("[3/3]").dim().bold());
 
         // We want to store the outputs of our labor in a local target directory.
         let lock = DirLock::acquire(&project.join("target"))?;
@@ -153,7 +207,9 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
 
     let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
     let solver = Resolver::new(&retriever.logger.clone(), &mut retriever);
+    println!("{} Resolving dependencies...", style("[1/3]").dim().bold());
     let solve = solver.solve()?;
+    println!("{:>7} Writing lockfile...", style("[inf]").dim());
 
     let mut lockfile = fs::OpenOptions::new()
         .write(true)
@@ -193,6 +249,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<()>>(
     let lock = Graph::default();
 
     let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
+    println!("{} Resolving dependencies...", style("[1/3]").dim().bold());
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
 
     f(&cache, retriever, solve)

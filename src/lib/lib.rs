@@ -2,6 +2,7 @@
 
 //! A package manager for the Idris language.
 
+extern crate console;
 extern crate crossbeam;
 extern crate directories;
 #[macro_use]

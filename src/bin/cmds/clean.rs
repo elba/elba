@@ -1,19 +1,28 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, ArgMatches, SubCommand};
 use elba::{
-    cli::new,
-    package::Name,
-    util::{config::Config, errors::Res},
+    retrieve::cache::Layout,
+    util::{clear_dir, config::Config, errors::Res},
 };
 use failure::ResultExt;
-use std::env::current_dir;
 
 pub fn cli() -> App<'static, 'static> {
-    SubCommand::with_name("clean")
-        .about("Cleans the global cache")
+    SubCommand::with_name("clean").about("Cleans the global cache")
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
-    let local = !args.is_present("global");
+    let p = &c.directories.cache;
+    if p.exists() {
+        let layout = Layout::new(&p)?;
 
-    unimplemented!()
+        clear_dir(&layout.artifacts)
+            .context(format_err!("couldn't clear {}", layout.artifacts.display()))?;
+        clear_dir(&layout.src).context(format_err!("couldn't clear {}", layout.src.display()))?;
+        clear_dir(&layout.build)
+            .context(format_err!("couldn't clear {}", layout.build.display()))?;
+        clear_dir(&layout.indices)
+            .context(format_err!("couldn't clear {}", layout.indices.display()))?;
+        clear_dir(&layout.tmp).context(format_err!("couldn't clear {}", layout.tmp.display()))?;
+    }
+
+    Ok(())
 }

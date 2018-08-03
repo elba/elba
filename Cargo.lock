@@ -357,6 +357,7 @@ version = "0.1.0"
 dependencies = [
  "Inflector 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "console 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "digest 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "directories 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",

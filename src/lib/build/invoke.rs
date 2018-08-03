@@ -1,6 +1,7 @@
 //! Utilities for interacting with the Idris compiler
 
 use build::context::BuildContext;
+use console::style;
 use retrieve::cache::{Binary, OutputLayout};
 use std::path::{Path, PathBuf};
 use util::{clear_dir, copy_dir, errors::Res};
@@ -8,6 +9,7 @@ use util::{clear_dir, copy_dir, errors::Res};
 // CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
 pub struct CompileInvocation<'a> {
+    pub pkg: &'a str,
     pub src: &'a Path,
     pub deps: &'a [&'a Binary],
     pub targets: &'a [PathBuf],
@@ -38,8 +40,13 @@ impl<'a> CompileInvocation<'a> {
         let process = process.output()?;
         // TODO: Better print handling
         if !process.status.success() {
+            println!(
+                "{:>7} Package {} failed to build:",
+                style("[err]").red().bold(),
+                self.pkg,
+            );
             print!("{}", String::from_utf8_lossy(&process.stdout));
-            bail!("build error")
+            bail!("could not build successfully")
         }
 
         Ok(())
@@ -50,6 +57,7 @@ impl<'a> CompileInvocation<'a> {
 // we look to CodegenInvocation.
 #[derive(Debug)]
 pub struct CodegenInvocation<'a> {
+    pub pkg: &'a str,
     pub binary: &'a Path,
     pub output: String,
     pub backend: String,
@@ -77,8 +85,13 @@ impl<'a> CodegenInvocation<'a> {
         let process = process.output()?;
         // TODO: Better print handling
         if !process.status.success() {
+            println!(
+                "{:>7} Package {} failed to build:",
+                style("[err]").red().bold(),
+                self.pkg,
+            );
             print!("{}", String::from_utf8_lossy(&process.stdout));
-            bail!("build error")
+            bail!("could not build successfully")
         }
 
         Ok(())

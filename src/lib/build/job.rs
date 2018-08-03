@@ -152,15 +152,17 @@ impl JobQueue {
 
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
-                                let layout = bcx.cache.checkout_tmp(&build_hash)?;
+                                let tmp;
                                 let layout = if job_index == NodeIndex::new(0) {
                                     if let Some(x) = root_ol {
                                         x
                                     } else {
-                                        &layout
+                                        tmp = bcx.cache.checkout_tmp(&build_hash)?;
+                                        &tmp
                                     }
                                 } else {
-                                    &layout
+                                    tmp = bcx.cache.checkout_tmp(&build_hash)?;
+                                    &tmp
                                 };
 
                                 let mut res: Option<Binary> = None;
@@ -213,51 +215,52 @@ impl JobQueue {
             });
 
             // Handle the results of job execution
-            let (job_index, job_res) = done.pop();
-            match job_res {
-                Ok(binary) => {
-                    if let Some(b) = binary {
-                        // If we got a compiled library out of it, set the
-                        self.graph[job_index].work = Work::Fresh(b)
-                    } else if self.graph[job_index].work.is_dirty() {
-                        // The Targets struct ensures that the library target will always be
-                        // compiled first, meaning that the work will be set to Fresh.
-                        // If we're compiling a not-library and it's still dirty, that means
-                        // there's no lib target and nothing to depend on.
-                        self.graph[job_index].work = Work::None
-                    }
+            while let Some((job_index, job_res)) = done.try_pop() {
+                match job_res {
+                    Ok(binary) => {
+                        if let Some(b) = binary {
+                            // If we got a compiled library out of it, set the binary
+                            self.graph[job_index].work = Work::Fresh(b)
+                        } else if self.graph[job_index].work.is_dirty() {
+                            // The Targets struct ensures that the library target will always be
+                            // compiled first, meaning that the work will be set to Fresh.
+                            // If we're compiling a not-library and it's still dirty, that means
+                            // there's no lib target and nothing to depend on.
+                            self.graph[job_index].work = Work::None
+                        }
 
-                    // push jobs that can be execute at next step into queue
-                    for (parent, _) in self.graph.parents(job_index) {
-                        let ready = self
-                            .graph
-                            .children(parent)
-                            .all(|(_, job)| job.work.is_fresh());
+                        // push jobs that can be execute at next step into queue
+                        for (parent, _) in self.graph.parents(job_index) {
+                            let ready = self
+                                .graph
+                                .children(parent)
+                                .all(|(_, job)| job.work.is_fresh());
 
-                        if ready && self.graph[parent].work.is_dirty() {
-                            queue.push(parent);
+                            if ready && self.graph[parent].work.is_dirty() {
+                                queue.push(parent);
+                            }
+                        }
+
+                        // For all of this package's dependencies, if all of the packages which
+                        // depend on them have been built, we can drop them entirely.
+                        let mut child_done = Vec::new();
+                        for (child, _) in self.graph.children(job_index) {
+                            let ready = self
+                                .graph
+                                .parents(child)
+                                .all(|(_, job)| job.work.is_fresh());
+
+                            if ready {
+                                child_done.push(child);
+                            }
+                        }
+                        for child in child_done {
+                            self.graph[child].work = Work::None;
                         }
                     }
-
-                    // For all of this package's dependencies, if all of the packages which
-                    // depend on them have been built, we can drop them entirely.
-                    let mut child_done = Vec::new();
-                    for (child, _) in self.graph.children(job_index) {
-                        let ready = self
-                            .graph
-                            .parents(child)
-                            .all(|(_, job)| job.work.is_fresh());
-
-                        if ready {
-                            child_done.push(child);
-                        }
-                    }
-                    for child in child_done {
-                        self.graph[child].work = Work::None;
-                    }
+                    // TODO: log error?
+                    Err(err) => return Err(err),
                 }
-                // TODO: log error?
-                Err(err) => return Err(err),
             }
         }
 

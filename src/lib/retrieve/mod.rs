@@ -7,8 +7,10 @@
 pub mod cache;
 
 pub use self::cache::{Cache, Source};
+use console::style;
 use failure::{Error, ResultExt};
 use index::Indices;
+use indicatif::{ProgressBar, ProgressStyle};
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
@@ -66,8 +68,14 @@ impl<'cache> Retriever<'cache> {
     /// This downloads all the packages into the cache. If we wanted to parallelize downloads
     /// later, this is where we'd deal with all the Tokio stuff.
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
+        let mut prg = 0;
+        let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
+        pb.set_style(ProgressStyle::default_bar().template("{bar} {pos}/{len} {msg}"));
+
         let sources = solve.map(
             |_, sum| {
+                pb.set_message(sum.to_string().as_ref());
+
                 let wd = DirectRes::Dir {
                     url: env::current_dir()?,
                 };
@@ -83,10 +91,20 @@ impl<'cache> Retriever<'cache> {
                     .checkout_source(sum.id(), loc)
                     .context(format_err!("unable to retrieve package {}", sum))?;
 
+                prg += 1;
+                pb.set_position(prg);
+
                 Ok(source)
             },
             |_| Ok(()),
         )?;
+
+        pb.finish_and_clear();
+        println!(
+            "{:>7} Packages cached in {}",
+            style("[inf]").dim(),
+            self.cache.layout.root.display()
+        );
 
         Ok(sources)
     }
