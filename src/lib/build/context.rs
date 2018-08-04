@@ -4,6 +4,7 @@ use std::{path::PathBuf, process::Command};
 // TODO: triple target
 #[derive(Debug)]
 pub struct BuildContext<'a> {
+    pub backend: &'a (bool, String, Vec<String>),
     pub compiler: Compiler,
     /// The global cache to use.
     pub cache: &'a Cache,

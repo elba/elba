@@ -1,4 +1,4 @@
-use super::logger;
+use super::{args, logger, match_backends};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -8,7 +8,9 @@ use failure::ResultExt;
 use std::env::current_dir;
 
 pub fn cli() -> App<'static, 'static> {
-    SubCommand::with_name("test").about("Runs the tests of the root package")
+    SubCommand::with_name("test")
+        .about("Runs the tests of the root package")
+        .args(&args::backends())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
@@ -26,5 +28,8 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         logger,
     };
 
-    build::test(&ctx, &project)
+    // This is where our default codegen backend is set
+    let backend = match_backends(c, args);
+
+    build::test(&ctx, &project, &backend)
 }

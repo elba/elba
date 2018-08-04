@@ -37,7 +37,7 @@ pub fn bench(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
-pub fn test(ctx: &BuildCtx, project: &Path) -> Res<()> {
+pub fn test(ctx: &BuildCtx, project: &Path, backend: &(bool, String, Vec<String>)) -> Res<()> {
     solve_local(ctx, &project, |cache, mut retriever, solve| {
         let mut contents = String::new();
         let mut manifest = fs::File::open(project.join("elba.toml"))
@@ -73,6 +73,7 @@ pub fn test(ctx: &BuildCtx, project: &Path) -> Res<()> {
         let root = Targets::new(root);
 
         let ctx = BuildContext {
+            backend: &backend,
             // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
@@ -110,7 +111,12 @@ pub fn repl(ctx: &BuildCtx, project: &Path) -> Res<()> {
     solve_local(ctx, &project, |_, _, _| unimplemented!())
 }
 
-pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
+pub fn build(
+    ctx: &BuildCtx,
+    project: &Path,
+    targets: &(bool, Option<Vec<&str>>, Option<Vec<&str>>),
+    backend: &(bool, String, Vec<String>),
+) -> Res<()> {
     solve_local(ctx, &project, |cache, mut retriever, solve| {
         let mut contents = String::new();
         let mut manifest = fs::File::open(project.join("elba.toml"))
@@ -129,20 +135,49 @@ pub fn build(ctx: &BuildCtx, project: &Path) -> Res<()> {
         // though we don't even need the Retriever anymore).
         drop(retriever);
 
-        // TODO: Specifying targets to build
         // By default, we build all lib and bin targets.
         let mut root = vec![];
-        if manifest.targets.lib.is_some() {
+        if (targets.1.is_none() || targets.0) && manifest.targets.lib.is_some() {
             root.push(Target::Lib);
+        } else if targets.0 {
+            // The user specifically asked for a lib target but there wasn't any. Error.
+            bail!("the package doesn't have a library target. add one before proceeding")
         }
 
-        for (ix, _) in manifest.targets.bin.iter().enumerate() {
-            root.push(Target::Bin(ix));
+        if targets.1.as_ref().is_some() && manifest.targets.bin.is_empty() {
+            // The user specifically asked for a bin target(s) but there wasn't any. Error.
+            bail!("the package doesn't have any binary targets. add one before proceeding")
+        }
+
+        for (ix, bt) in manifest.targets.bin.iter().enumerate() {
+            // Case 1: If the --bin flag is passed by itself, we assume the user wants all binaries.
+            //         Or, the --bin flag might come with the name of a binary which we should build.
+            let target_specified = targets
+                .1
+                .as_ref()
+                .map(|v| v.is_empty() || v.contains(&bt.name.as_str()))
+                .unwrap_or(false);
+            // Case 2: Neither --bin nor --lib are specified.
+            let neither_specified = !targets.0 && targets.1.is_none();
+            if target_specified || neither_specified {
+                root.push(Target::Bin(ix));
+            }
+        }
+
+        // We only build test targets if the user asks for them.
+        if let Some(ts) = &targets.2 {
+            for (ix, bt) in manifest.targets.test.iter().enumerate() {
+                let target_specified = ts.is_empty() || ts.contains(&bt.name.as_str());
+                if target_specified {
+                    root.push(Target::Test(ix));
+                }
+            }
         }
 
         let root = Targets::new(root);
 
         let ctx = BuildContext {
+            backend: &backend,
             // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},

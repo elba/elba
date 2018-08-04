@@ -1,6 +1,7 @@
 use super::{compile_bin, compile_lib, context::BuildContext, Target, Targets};
 use console::style;
 use crossbeam::queue::MsQueue;
+use failure::ResultExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;
 use retrieve::cache::OutputLayout;
@@ -16,29 +17,8 @@ pub struct JobQueue {
     root_ol: Option<OutputLayout>,
 }
 
-// With the current system, there's very little separation between preparing dependencies and
-// generating targets. It also tries to unify dealing with the root package. This can lead to some
-// awkward scenarios (we have to check NodeIndex::new(0) several times in this code because of
-// having to treat the root package differently). However, the benefit of this is that the entire
-// Job graph can have arbitrary targets, and in general we reduce code duplication (building the
-// root package is still just building another package, after all).
-//
-// The alternative is to completely separate building the root package and any targets required from
-// the JobQueue; the only job (heh) of the JobQueue is to build the *library dependencies* of the
-// root package, and it's up to another set of functions to deal with building the root package and
-// any necessary targets (i.e. root package binaries, tests, benches, docs, tasks that the root
-// needs, etc.). This system is nice in that it clearly distinguishes root packages (we're doing a
-// lot of special-casing on NodeIndex::new(0) in JobQueue right now), but it has some drawbacks of
-// its own:
-//
-//   - We have to duplicate some code. Much of this can be mitigated because we're using compile_lib
-//     and compile_bin functions that can be shared between the queue and whatever is responsible
-//     for the root, but it still feels like duplication of responsibilities.
-//
-//   - Building global packages (e.g. `elba install`) is less nice: we have to check out the
-//     temporary directory for the root package from the Cache manually.
-//
-//   - If we want to support tasks, that becomes more complicated too.
+// The current implementation of the JobQueue combines target generation and dependency preparation
+// into one big Job graph.
 impl JobQueue {
     pub fn new(
         solve: Graph<Source>,
@@ -165,7 +145,7 @@ impl JobQueue {
                         pb.println(format!(
                             "{:>7} {} [{}..]",
                             style("[bld]").blue(),
-                            source.meta().summary(),
+                            source.summary(),
                             &build_hash.0[0..8]
                         ));
 
@@ -189,7 +169,16 @@ impl JobQueue {
                                 for t in ts {
                                     match t {
                                         Target::Lib => {
-                                            compile_lib(&source, &deps, &layout, bcx)?;
+                                            compile_lib(&source, &deps, &layout, bcx)
+                                                .with_context(|e| {
+                                                    format!(
+                                                        "{:>7} Couldn't build package {}\n{}",
+                                                        style("[err]").red().bold(),
+                                                        source.summary(),
+                                                        e
+                                                    )
+                                                })?;
+
                                             res = if job_index != NodeIndex::new(0) {
                                                 Some(
                                                     bcx.cache
@@ -207,8 +196,15 @@ impl JobQueue {
                                                 &deps,
                                                 &layout,
                                                 bcx,
-                                            )?;
-                                            // TODO: store binary if global
+                                            ).with_context(|e| {
+                                                format!(
+                                                    "{:>7} Couldn't build package {}\n{}",
+                                                    style("[err]").red().bold(),
+                                                    source.summary(),
+                                                    e
+                                                )
+                                            })?;
+                                            // TODO: store binary if global?
                                         }
                                         Target::Test(ix) => {
                                             let mut deps = deps.clone();
@@ -287,7 +283,11 @@ impl JobQueue {
                         }
                     }
                     // TODO: log error?
-                    Err(err) => return Err(err),
+                    Err(err) => {
+                        pb.finish_and_clear();
+                        println!("{}", err);
+                        bail!("one or more packages couldn't be built")
+                    }
                 }
             }
         }
@@ -296,6 +296,7 @@ impl JobQueue {
     }
 }
 
+/// A Job is an individual unit of work in the elba build graph.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub work: Work,
@@ -311,6 +312,12 @@ impl Default for Job {
     }
 }
 
+/// Work refers to either a Source and its BuildHash which needs to be built,
+/// a built library which is still being used by other code, or a built target
+/// with no remaining dependencies up the chain.
+///
+/// We separate things like this to drop our locks on directories as soon as we
+/// can, to allow other instances of elba to start work asap.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Work {
     None,

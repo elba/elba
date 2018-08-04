@@ -91,15 +91,11 @@ pub fn compile_lib(
         .mods
         .iter()
         .map(|mod_name| {
-            lib_target
-                .path
-                .0
-                .join(mod_name.replace(".", "/"))
-                .with_extension("idr")
+            let path: PathBuf = mod_name.replace(".", "/").into();
+            path.with_extension("idr")
         }).collect::<Vec<_>>();
 
     let invocation = CompileInvocation {
-        pkg: source.meta().package.name.as_str(),
         src: &src_path,
         deps,
         targets: &targets,
@@ -110,13 +106,11 @@ pub fn compile_lib(
 
     for target in targets {
         let target_bin = target.with_extension("ibc");
-        let from = layout.build.join(&target_bin);
+        let from = layout.build.join("lib").join(&target_bin);
         // We strip the library prefix before copying
         // target_bin is something like src/Test.ibc
         // we want to move build/src/Test.ibc to lib/Test.ibc
-        let to = layout
-            .lib
-            .join(&target_bin.strip_prefix(&src_path).unwrap());
+        let to = layout.lib.join(&target_bin);
 
         fs::create_dir_all(to.parent().unwrap())?;
         fs::rename(from, to)?;
@@ -147,7 +141,6 @@ pub fn compile_bin(
     let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
 
     let compile_invoke = CompileInvocation {
-        pkg: source.meta().package.name.as_str(),
         src: &src_path,
         deps,
         targets: &[target_path.clone()],
@@ -159,11 +152,8 @@ pub fn compile_bin(
     let target_bin = target_path.with_extension("ibc");
 
     let codegen_invoke = CodegenInvocation {
-        pkg: source.meta().package.name.as_str(),
         binary: &layout.build.join("bin").join(&target_bin),
         output: bin_target.name.clone(),
-        // TODO
-        backend: "c".to_string(),
         layout: &layout,
         is_artifact: false,
     };

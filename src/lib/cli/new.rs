@@ -54,8 +54,8 @@ mods = [
 ]
 
 "#,
-            name.group(),
-            name.name()
+            name.group().to_pascal_case(),
+            name.name().to_pascal_case(),
         )
     };
 
@@ -86,6 +86,9 @@ authors = [{}]
             format!(
                 r#"module {}.{}
 
+hello : IO ()
+hello = do
+  print "Hello, world!"
 "#,
                 name.group().to_pascal_case(),
                 name.name().to_pascal_case()
@@ -98,6 +101,9 @@ authors = [{}]
             &path.join("src/Main.idr"),
             br#"module Main
 
+main : IO ()
+main = do
+  print "Hello, world!"
 "#,
         )?;
     }

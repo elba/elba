@@ -56,3 +56,68 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<(), Error> {
 pub fn logger(_c: &mut Config) -> Logger {
     Logger::root(Discard, o!())
 }
+
+pub fn match_backends(c: &mut Config, args: &ArgMatches) -> (bool, String, Vec<String>) {
+    (
+        args.is_present("portable-backend"),
+        if args.is_present("backend") {
+            args.value_of_lossy("backend").unwrap().into_owned()
+        } else if args.is_present("portable-backend") {
+            args.value_of_lossy("portable-backend")
+                .unwrap()
+                .into_owned()
+        } else {
+            c.default_codegen.to_owned()
+        },
+        args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),
+    )
+}
+
+mod args {
+    use clap;
+
+    type Arg = clap::Arg<'static, 'static>;
+
+    pub fn target_lib() -> Arg {
+        Arg::with_name("lib")
+            .long("lib")
+            .help("Builds the library target")
+    }
+
+    pub fn target_bin() -> Arg {
+        Arg::with_name("bin")
+            .long("bin")
+            .takes_value(true)
+            .min_values(0)
+            .help("Builds the binaries specified (or all if no argument is provided)")
+    }
+
+    pub fn target_test() -> Arg {
+        Arg::with_name("test")
+            .long("test")
+            .takes_value(true)
+            .min_values(0)
+            .help("Builds the tests specified (or all if no argument is provided)")
+    }
+
+    pub fn backends() -> Vec<Arg> {
+        vec![
+            Arg::with_name("codegen")
+                .long("codegen")
+                .conflicts_with("portable-codegen")
+                .takes_value(true)
+                .number_of_values(1)
+                .help("Specifies the codegen backend to use during code generation"),
+            Arg::with_name("portable-backend")
+                .long("portable-backend")
+                .takes_value(true)
+                .number_of_values(1)
+                .help("Specifies the portable codegen backend to use during code generation"),
+            Arg::with_name("cg-opts")
+                .long("cg-opts")
+                .takes_value(true)
+                .min_values(1)
+                .help("Options to pass to the codegen backend"),
+        ]
+    }
+}

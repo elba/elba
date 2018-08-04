@@ -3,7 +3,6 @@
 //! As it is currently designed, `elba` doesn't need to lock individual files. It does, however,
 //! need to lock directories to prevent other processes from using them.
 
-use super::errors::ErrorKind;
 use failure::{Error, ResultExt};
 use std::{
     fs,
@@ -32,7 +31,7 @@ impl DirLock {
             .map(|_| DirLock {
                 path: path.to_path_buf(),
                 lock_path,
-            }).context(ErrorKind::Locked)?;
+            }).context(format_err!("path {} is locked", path.display()))?;
 
         Ok(res)
     }

@@ -1,7 +1,7 @@
 //! Utilities for interacting with the Idris compiler
 
 use build::context::BuildContext;
-use console::style;
+use itertools::Itertools;
 use retrieve::cache::{Binary, OutputLayout};
 use std::path::{Path, PathBuf};
 use util::{clear_dir, copy_dir, errors::Res};
@@ -9,7 +9,6 @@ use util::{clear_dir, copy_dir, errors::Res};
 // CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
 pub struct CompileInvocation<'a> {
-    pub pkg: &'a str,
     pub src: &'a Path,
     pub deps: &'a [&'a Binary],
     pub targets: &'a [PathBuf],
@@ -40,13 +39,7 @@ impl<'a> CompileInvocation<'a> {
         let process = process.output()?;
         // TODO: Better print handling
         if !process.status.success() {
-            println!(
-                "{:>7} Package {} failed to build:",
-                style("[err]").red().bold(),
-                self.pkg,
-            );
-            print!("{}", String::from_utf8_lossy(&process.stdout));
-            bail!("could not build successfully")
+            bail!("{}", String::from_utf8_lossy(&process.stdout))
         }
 
         Ok(())
@@ -57,41 +50,49 @@ impl<'a> CompileInvocation<'a> {
 // we look to CodegenInvocation.
 #[derive(Debug)]
 pub struct CodegenInvocation<'a> {
-    pub pkg: &'a str,
     pub binary: &'a Path,
     pub output: String,
-    pub backend: String,
     pub layout: &'a OutputLayout,
     /// Whether the output should be treated as a binary (false) or artifact files (true)
     pub is_artifact: bool,
 }
 
 impl<'a> CodegenInvocation<'a> {
-    // TODO: We need more logic here.
-    // If we're building an artifact, it should go there instead, with all the relevant info.
-    // If we're building a binary, maybe we need some file in the binary directory to keep track of
-    // which packages installed what binaries (so that uninstalling is easier)
     pub fn exec(self, bcx: &BuildContext) -> Res<()> {
         // Invoke the compiler.
         // TODO: Canonicalize the build path?
         let mut process = bcx.compiler.process();
+        let cwd;
 
         process
-            .current_dir(&self.layout.bin)
-            .args(&["--codegen", &self.backend])
-            .args(&["-o", &self.output])
-            .arg(&self.binary);
+            .current_dir(if self.is_artifact {
+                cwd = self.layout.artifacts.join(&bcx.backend.1);
+                &cwd
+            } else {
+                &self.layout.bin
+            }).args(&["-o", &self.output])
+            .args(&[
+                if bcx.backend.0 {
+                    "--portable-codegen"
+                } else {
+                    "--codegen"
+                },
+                &bcx.backend.1,
+            ]);
+
+        if !bcx.backend.2.is_empty() {
+            // We put all the cg-opts into a single argument because idk if the Idris compiler
+            // allows passing multiple cg-opts in one go
+            process.arg("--cg-opt").arg(bcx.backend.2.iter().join(" "));
+        }
+
+        process.arg(&self.binary);
 
         let process = process.output()?;
-        // TODO: Better print handling
-        if !process.status.success() {
-            println!(
-                "{:>7} Package {} failed to build:",
-                style("[err]").red().bold(),
-                self.pkg,
-            );
-            print!("{}", String::from_utf8_lossy(&process.stdout));
-            bail!("could not build successfully")
+        // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
+        // function in the file, so we check if stdout is empty instead
+        if !process.stdout.is_empty() {
+            bail!("{}", String::from_utf8_lossy(&process.stdout))
         }
 
         Ok(())

@@ -391,6 +391,7 @@ pub struct Source {
 struct SourceInner {
     /// The package's manifest
     meta: Manifest,
+    /// The original resolution of the package
     res: Resolution,
     location: DirectRes,
     /// The path to the package.
@@ -448,15 +449,15 @@ impl Source {
         }
 
         // Creating the hash
-        let walker = WalkDir::new(path.path()).into_iter().filter_entry(|entry| {
-            entry.file_name() != "target"
-                && entry
+        let walker = WalkDir::new(path.path())
+            .into_iter()
+            .filter_entry(|entry| {
+                entry.file_name() != "target" && entry
                     .file_name()
                     .to_str()
-                    .map(|s| !s.starts_with("."))
+                    .map(|s| !s.starts_with('.'))
                     .unwrap_or(false)
-                && entry.file_type().is_file()
-        });
+            }).filter(|e| e.as_ref().unwrap().file_type().is_file());
 
         let mut hash = Sha256::new();
         for f in walker {

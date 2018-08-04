@@ -30,9 +30,16 @@ pub struct Config {
     #[serde(default)]
     pub directories: Directories,
     // First index = default.
-    // In future, default for "indices" should be only official index..
+    // In future, default for "indices" should be only the official index...
     #[serde(default)]
     pub indices: Vec<DirectRes>,
+    #[serde(default = "default_codegen")]
+    pub default_codegen: String,
+    pub codegen: IndexMap<String, Codegen>,
+}
+
+fn default_codegen() -> String {
+    "c".to_string()
 }
 
 impl Config {
@@ -63,6 +70,8 @@ impl Default for Config {
             alias: default_aliases(),
             directories: Directories::default(),
             indices: Vec::default(),
+            default_codegen: default_codegen(),
+            codegen: IndexMap::new(),
         }
     }
 }
@@ -111,4 +120,10 @@ impl Default for Directories {
             rest: BaseDirs::new().unwrap().home_dir().join(".elba"),
         }
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Codegen {
+    pub runner: String,
+    pub opts: Vec<String>,
 }
