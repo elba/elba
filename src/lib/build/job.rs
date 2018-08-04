@@ -192,7 +192,12 @@ impl JobQueue {
                                             // TODO: store binary if global
                                         }
                                         Target::Test(ix) => {
-                                            let deps = vec![res.as_ref().unwrap()];
+                                            let mut deps = deps.clone();
+                                            let root_lib = {
+                                                let target = DirLock::acquire(&layout.build.join("lib"))?;
+                                                Binary { target }
+                                            };
+                                            deps.push(&root_lib);
                                             compile_bin(
                                                 &source,
                                                 Target::Test(ix),

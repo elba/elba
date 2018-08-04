@@ -103,7 +103,7 @@ pub fn compile_lib(
         src: &src_path,
         deps,
         targets: &targets,
-        layout: &layout,
+        build: &layout.build.join("lib"),
     };
 
     invocation.exec(bcx)?;
@@ -151,7 +151,7 @@ pub fn compile_bin(
         src: &src_path,
         deps,
         targets: &[target_path.clone()],
-        layout: &layout,
+        build: &layout.build.join("bin"),
     };
 
     compile_invoke.exec(bcx)?;
@@ -160,7 +160,7 @@ pub fn compile_bin(
 
     let codegen_invoke = CodegenInvocation {
         pkg: source.meta().package.name.as_str(),
-        binary: &layout.build.join(&target_bin),
+        binary: &layout.build.join("bin").join(&target_bin),
         output: bin_target.name.clone(),
         // TODO
         backend: "c".to_string(),

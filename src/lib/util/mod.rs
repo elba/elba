@@ -98,7 +98,9 @@ pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
 }
 
 pub fn clear_dir(dir: &Path) -> Res<()> {
-    fs::remove_dir_all(dir)?;
+    if dir.exists() {
+        fs::remove_dir_all(dir)?;
+    }
     fs::create_dir(dir)?;
     Ok(())
 }

@@ -13,17 +13,17 @@ pub struct CompileInvocation<'a> {
     pub src: &'a Path,
     pub deps: &'a [&'a Binary],
     pub targets: &'a [PathBuf],
-    pub layout: &'a OutputLayout,
+    pub build: &'a Path,
 }
 
 impl<'a> CompileInvocation<'a> {
     pub fn exec(&self, bcx: &BuildContext) -> Res<()> {
-        clear_dir(&self.layout.build)?;
-        copy_dir(&self.src, &self.layout.build)?;
+        clear_dir(&self.build)?;
+        copy_dir(&self.src, &self.build)?;
 
         // invoke compiler
         let mut process = bcx.compiler.process();
-        process.current_dir(&self.layout.build).arg("--check");
+        process.current_dir(&self.build).arg("--check");
 
         // Include dependencies
         for binary in self.deps {
