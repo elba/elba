@@ -50,7 +50,11 @@
 
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
-use package::{manifest::Manifest, resolution::DirectRes, PackageId};
+use package::{
+    manifest::Manifest,
+    resolution::{DirectRes, Resolution},
+    PackageId,
+};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use slog::Logger;
@@ -387,6 +391,7 @@ pub struct Source {
 struct SourceInner {
     /// The package's manifest
     meta: Manifest,
+    res: Resolution,
     location: DirectRes,
     /// The path to the package.
     path: DirLock,
@@ -444,13 +449,15 @@ impl Source {
 
         // Creating the hash
         let walker = WalkDir::new(path.path()).into_iter().filter_entry(|entry| {
-            entry.file_name() != "target" &&
-            entry.file_name()
-                .to_str()
-                .map(|s| !s.starts_with("."))
-                .unwrap_or(false) && entry.file_type().is_file() 
+            entry.file_name() != "target"
+                && entry
+                    .file_name()
+                    .to_str()
+                    .map(|s| !s.starts_with("."))
+                    .unwrap_or(false)
+                && entry.file_type().is_file()
         });
-        
+
         let mut hash = Sha256::new();
         for f in walker {
             let mut file = fs::File::open(f.unwrap().path())?;
@@ -462,11 +469,21 @@ impl Source {
         Ok(Source {
             inner: Arc::new(SourceInner {
                 meta: manifest,
+                res: pkg.resolution().clone(),
                 location,
                 path,
                 hash,
             }),
         })
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{}@{}@{}",
+            self.meta().package.name,
+            self.inner.res,
+            self.meta().version()
+        )
     }
 
     pub fn meta(&self) -> &Manifest {
@@ -501,7 +518,7 @@ pub struct Binary {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct BuildHash(String);
+pub struct BuildHash(pub String);
 
 impl BuildHash {
     pub fn new(root: &Source, sources: &Graph<Source>) -> Self {

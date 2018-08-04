@@ -1,5 +1,7 @@
 use super::{compile_bin, compile_lib, context::BuildContext, Target, Targets};
+use console::style;
 use crossbeam::queue::MsQueue;
+use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;
 use retrieve::cache::OutputLayout;
 use retrieve::cache::{Binary, BuildHash, Source};
@@ -129,6 +131,16 @@ impl JobQueue {
         // store job results from threads.
         let done = &MsQueue::new();
 
+        let mut prg = 0;
+        let pb = ProgressBar::new(
+            self.graph
+                .inner
+                .node_indices()
+                .filter(|&index| self.graph[index].work.is_dirty())
+                .count() as u64,
+        );
+        pb.set_style(ProgressStyle::default_bar().template("  {bar} {pos}/{len}"));
+
         loop {
             // break if the job queue is complete
             if queue.is_empty() {
@@ -149,6 +161,13 @@ impl JobQueue {
                             }).collect::<Vec<_>>();
 
                         let ts = self.graph[job_index].targets.0.to_vec();
+
+                        pb.println(format!(
+                            "{:>7} {} [{}..]",
+                            style("[bld]").blue(),
+                            source.meta().summary(),
+                            &build_hash.0[0..8]
+                        ));
 
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
@@ -194,7 +213,8 @@ impl JobQueue {
                                         Target::Test(ix) => {
                                             let mut deps = deps.clone();
                                             let root_lib = {
-                                                let target = DirLock::acquire(&layout.build.join("lib"))?;
+                                                let target =
+                                                    DirLock::acquire(&layout.build.join("lib"))?;
                                                 Binary { target }
                                             };
                                             deps.push(&root_lib);
@@ -223,6 +243,9 @@ impl JobQueue {
             while let Some((job_index, job_res)) = done.try_pop() {
                 match job_res {
                     Ok(binary) => {
+                        prg += 1;
+                        pb.set_position(prg);
+
                         if let Some(b) = binary {
                             // If we got a compiled library out of it, set the binary
                             self.graph[job_index].work = Work::Fresh(b)

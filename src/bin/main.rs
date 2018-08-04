@@ -129,6 +129,7 @@ fn main() {
     let start = Instant::now();
     let res = go();
 
+    println!();
     if let Err(e) = res {
         println!("{} {}", style("[err]").red().bold(), e);
     } else {

@@ -70,11 +70,11 @@ impl<'cache> Retriever<'cache> {
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
         let mut prg = 0;
         let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
-        pb.set_style(ProgressStyle::default_bar().template("{bar} {pos}/{len} {msg}"));
+        pb.set_style(ProgressStyle::default_bar().template("  {bar} {pos}/{len}"));
 
         let sources = solve.map(
             |_, sum| {
-                pb.set_message(sum.to_string().as_ref());
+                pb.println(format!("{:>7} {}", style("[rtv]").blue(), sum.to_string()));
 
                 let wd = DirectRes::Dir {
                     url: env::current_dir()?,
@@ -103,7 +103,7 @@ impl<'cache> Retriever<'cache> {
         println!(
             "{:>7} Packages cached in {}",
             style("[inf]").dim(),
-            self.cache.layout.root.display()
+            self.cache.layout.src.display()
         );
 
         Ok(sources)
