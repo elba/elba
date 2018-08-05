@@ -19,7 +19,6 @@ use clap::{App, AppSettings, Arg, ArgMatches};
 use console::style;
 use elba::util::config::{Config, Verbosity};
 use failure::Error;
-use indicatif::HumanDuration;
 use std::time::Instant;
 
 // Interaction with the main repo would just be implemented as a custom task.
@@ -89,7 +88,7 @@ fn expand_aliases(
     Ok(args)
 }
 
-fn go() -> Result<(), Error> {
+fn go() -> Result<String, Error> {
     let args = cli().get_matches();
     let mut config = Config::default();
     let args = expand_aliases(&mut config, args)?;
@@ -112,7 +111,7 @@ fn go() -> Result<(), Error> {
         (cmd, Some(args)) => (cmd, args),
         _ => {
             cli().print_help()?;
-            return Ok(());
+            return Ok("".to_string());
         }
     };
 
@@ -130,13 +129,19 @@ fn main() {
     let res = go();
 
     println!();
-    if let Err(e) = res {
-        println!("{} {}", style("[err]").red().bold(), e);
-    } else {
-        println!(
-            "{} finished in {}",
-            style("done!").green().bold(),
-            HumanDuration(start.elapsed())
-        );
+    match res {
+        Err(e) => println!("{} {}", style("[err]").red().bold(), e),
+        Ok(st) => {
+            let elapsed = start.elapsed();
+            if !st.is_empty() {
+                println!(
+                    "{} {} [{}.{}s]",
+                    style("done!").green().bold(),
+                    st,
+                    elapsed.as_secs(),
+                    elapsed.subsec_millis() / 10
+                );
+            }
+        }
     }
 }

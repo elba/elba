@@ -7,8 +7,8 @@ use petgraph::graph::NodeIndex;
 use retrieve::cache::OutputLayout;
 use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
-use std::collections::HashSet;
 use std::iter::FromIterator;
+use std::{collections::HashSet, path::PathBuf};
 use util::{errors::Res, graph::Graph, lock::DirLock};
 
 pub struct JobQueue {
@@ -41,13 +41,13 @@ impl JobQueue {
 
             for node in curr_layer.drain() {
                 let source = &solve[node];
-                let build_hash = BuildHash::new(source, &solve);
 
                 let targets = if node == NodeIndex::new(0) {
                     root.clone()
                 } else {
                     Targets::new(vec![Target::Lib])
                 };
+                let build_hash = BuildHash::new(source, &solve, &targets);
 
                 let root_ol = root_ol.as_ref();
                 let job = if node == NodeIndex::new(0)
@@ -90,8 +90,7 @@ impl JobQueue {
         Ok(JobQueue { graph, root_ol })
     }
 
-    // TODO: Return relevant OutputLayouts
-    pub fn exec(mut self, bcx: &BuildContext) -> Res<()> {
+    pub fn exec(mut self, bcx: &BuildContext) -> Res<Vec<(PathBuf, String)>> {
         // TODO: How many threads do we want?
         let threads = 1;
         let mut thread_pool = Pool::new(threads);
@@ -110,6 +109,8 @@ impl JobQueue {
         let mut queue: Vec<NodeIndex> = Vec::from_iter(bottom_jobs);
         // store job results from threads.
         let done = &MsQueue::new();
+        // We also store the locations and summaries of our binaries
+        let bins = &MsQueue::new();
 
         let mut prg = 0;
         let pb = ProgressBar::new(
@@ -119,7 +120,7 @@ impl JobQueue {
                 .filter(|&index| self.graph[index].work.is_dirty())
                 .count() as u64,
         );
-        pb.set_style(ProgressStyle::default_bar().template("  {bar} {pos}/{len}"));
+        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
         loop {
             // break if the job queue is complete
@@ -190,7 +191,7 @@ impl JobQueue {
                                             }
                                         }
                                         Target::Bin(ix) => {
-                                            compile_bin(
+                                            let bin_out = compile_bin(
                                                 &source,
                                                 Target::Bin(ix),
                                                 &deps,
@@ -204,7 +205,8 @@ impl JobQueue {
                                                     e
                                                 )
                                             })?;
-                                            // TODO: store binary if global?
+
+                                            bins.push((bin_out, source.summary()))
                                         }
                                         Target::Test(ix) => {
                                             let mut deps = deps.clone();
@@ -221,6 +223,9 @@ impl JobQueue {
                                                 &layout,
                                                 bcx,
                                             )?;
+
+                                            // For now, only the root package can do tests, so we
+                                            // don't worry about storing the binary anywhere.
                                         }
                                         Target::Doc => unimplemented!(),
                                     }
@@ -292,7 +297,12 @@ impl JobQueue {
             }
         }
 
-        Ok(())
+        let mut bins_vec = vec![];
+        while let Some((path, sum)) = bins.try_pop() {
+            bins_vec.push((path, sum));
+        }
+
+        Ok(bins_vec)
     }
 }
 

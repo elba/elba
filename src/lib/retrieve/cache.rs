@@ -48,12 +48,14 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
+use build::Targets;
+use console::style;
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, Resolution},
-    PackageId,
+    PackageId, Spec,
 };
 use reqwest::Client;
 use sha2::{Digest, Sha256};
@@ -182,6 +184,87 @@ impl Cache {
         OutputLayout::new(lock)
     }
 
+    pub fn store_bin(&self, from: &Path, summary: &str, force: bool) -> Res<()> {
+        let bin_name = from
+            .file_name()
+            .ok_or_else(|| format_err!("{} isn't a path to a binary", from.display()))?;
+        let to = self.layout.bin.join(bin_name);
+
+        // We use a file .bins in the bin directory to keep track of installed bins
+        let mut dot = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.layout.bin.join(".bins"))
+            .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
+
+        dot.write(format!("{} = {}", bin_name.to_string_lossy().as_ref(), summary).as_bytes())
+            .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
+
+        if !force && to.exists() {
+            bail!(
+                "binary {} already exists in the global bin directory",
+                bin_name.to_string_lossy().as_ref()
+            )
+        } else if to.exists() {
+            fs::remove_file(&to).with_context(|e| {
+                format!("could not remove existing binary {}:\n{}", to.display(), e)
+            })?;
+        }
+
+        fs::File::create(&to)
+            .with_context(|e| format_err!("couldn't create file {}:\n{}", to.display(), e))?;
+        let _ = fs::copy(&from, &to).with_context(|e| {
+            format_err!(
+                "couldn't copy {} to {}:\n{}",
+                from.display(),
+                to.display(),
+                e
+            )
+        })?;
+
+        Ok(())
+    }
+
+    // If bins is empty, it's assumed to mean "delete all binaries"
+    pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Res<u32> {
+        fn contains(sum: &str, query: &Spec) -> bool {
+            match (&query.name, query.resolution.as_ref(), query.version.as_ref()) {
+                (name, _, Some(ver)) => sum.contains(name.as_str()) && sum.contains(&ver.to_string()),
+                _ => sum.contains(&query.to_string()),
+            }
+        };
+        
+        let mut c = 0;
+        if self.layout.bin.join(".bins").exists() {
+            let mut s = String::new();
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .read(true)
+                .open(self.layout.bin.join(".bins"))
+                .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
+            let r = BufReader::new(&f);
+
+            for line in r.lines().map(|l| l.unwrap()) {
+                let mut split = line.splitn(2, '=');
+                let (bin, sum) = (split.next().unwrap(), split.next());
+                if (bins.is_empty() || bins.contains(&bin))
+                    && sum.map(|x| contains(x, query)).unwrap_or(false)
+                {
+                    fs::remove_file(self.layout.bin.join(&bin))
+                        .with_context(|e| format_err!("couldn't remove binary {}:\n{}", bin, e))?;
+                    c += 1;
+                } else {
+                    s.push_str(&line);
+                }
+            }
+
+            f.write(s.as_bytes())
+                .with_context(|e| format_err!("couldn't write to .bins file:\n{}", e))?;
+        }
+
+        Ok(c)
+    }
+
     pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Res<Binary> {
         let dest = self.layout.build.join(&hash.0);
 
@@ -215,6 +298,7 @@ impl Cache {
         let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
 
         while let Some(index) = q.pop_front() {
+            println!("{:>7} {}", style("[rtv]").dim(), index);
             if seen.contains(&index) {
                 continue;
             }
@@ -480,7 +564,7 @@ impl Source {
 
     pub fn summary(&self) -> String {
         format!(
-            "{}@{}@{}",
+            "{}@{}|{}",
             self.meta().package.name,
             self.inner.res,
             self.meta().version()
@@ -522,10 +606,16 @@ pub struct Binary {
 pub struct BuildHash(pub String);
 
 impl BuildHash {
-    pub fn new(root: &Source, sources: &Graph<Source>) -> Self {
+    pub fn new(root: &Source, sources: &Graph<Source>, targets: &Targets) -> Self {
         let mut hasher = Sha256::default();
         for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
             hasher.input(&src.hash().as_bytes());
+        }
+        // We also hash the targets because if we change the taregets for a package, we want to
+        // rebuild it
+        for t in &targets.0 {
+            let bytes: [u8; 5] = t.as_bytes();
+            hasher.input(&bytes);
         }
         let hash = hexify_hash(hasher.result().as_slice());
         BuildHash(hash)

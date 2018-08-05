@@ -70,7 +70,7 @@ impl<'cache> Retriever<'cache> {
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
         let mut prg = 0;
         let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
-        pb.set_style(ProgressStyle::default_bar().template("  {bar} {pos}/{len}"));
+        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
         let sources = solve.map(
             |_, sum| {

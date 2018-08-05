@@ -1,4 +1,4 @@
-use super::{args, logger, match_backends};
+use super::{args, logger, match_backends, match_threads};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -13,22 +13,24 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::target_lib())
         .arg(args::target_bin())
         .arg(args::target_test())
+        .arg(args::build_threads())
         .args(&args::backends())
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
     let indices = c.indices.to_vec();
     let global_cache = c.directories.cache.clone();
-
     let logger = logger(c);
+    let threads = match_threads(c, args);
 
     let ctx = build::BuildCtx {
         indices,
         global_cache,
         logger,
+        threads,
     };
 
     let ts = (

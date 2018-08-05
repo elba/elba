@@ -1,8 +1,8 @@
-use super::logger;
+use super::{args, logger, match_backends, match_threads};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
-    package::Name,
+    package::Spec,
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
@@ -11,16 +11,24 @@ use std::{env::current_dir, str::FromStr};
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("install")
         .about("Installs a package's artifacts")
-        .arg(Arg::with_name("name"))
+        .arg(Arg::with_name("spec"))
+        .arg(args::build_threads())
+        .arg(args::target_bin())
+        .arg(
+            Arg::with_name("force")
+                .long("force")
+                .help("Overwrite existing installed binaries"),
+        )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let current = current_dir();
 
-    let proj = if let Some(name) = args.value_of_lossy("name") {
-        let name = &*name;
-        let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
-        Ok(name)
+    let proj = if let Some(spec) = args.value_of_lossy("spec") {
+        let spec = &*spec;
+        let spec = Spec::from_str(spec)
+            .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;
+        Ok(spec)
     } else if let Ok(d) = current {
         Err(d)
     } else {
@@ -30,12 +38,21 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
     let logger = logger(c);
     let indices = c.indices.to_vec();
     let global_cache = c.directories.cache.clone();
+    let threads = match_threads(c, args);
 
     let ctx = build::BuildCtx {
         indices,
         global_cache,
         logger,
+        threads,
     };
 
-    build::install(&ctx, proj)
+    let targets = args
+        .values_of("bin")
+        .map(|x| x.collect())
+        .unwrap_or_else(|| vec![]);
+
+    let backend = match_backends(c, args);
+
+    build::install(&ctx, proj, &targets, &backend, args.is_present("force"))
 }

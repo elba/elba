@@ -12,7 +12,7 @@ pub struct NewCtx {
     pub bin: bool,
 }
 
-pub fn new(ctx: NewCtx) -> Res<()> {
+pub fn new(ctx: NewCtx) -> Res<String> {
     let path = &ctx.path;
     if fs::metadata(path).is_ok() {
         bail!(
@@ -27,7 +27,7 @@ pub fn new(ctx: NewCtx) -> Res<()> {
     init(ctx)
 }
 
-pub fn init(ctx: NewCtx) -> Res<()> {
+pub fn init(ctx: NewCtx) -> Res<String> {
     let name = &ctx.name;
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)
@@ -108,5 +108,9 @@ main = do
         )?;
     }
 
-    Ok(())
+    Ok(format!(
+        "new package with {} target created at {}",
+        if ctx.bin { "binary" } else { "library" },
+        path.display()
+    ))
 }

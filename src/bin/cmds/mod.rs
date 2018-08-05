@@ -9,11 +9,12 @@ mod test;
 mod uninstall;
 
 use clap::{App, ArgMatches};
+use elba::build::context::BuildBackend;
 use elba::util::{config::Config, errors::Res};
 use failure::Error;
 use slog::{Discard, Logger};
 
-pub type Exec = fn(&mut Config, &ArgMatches) -> Res<()>;
+pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
@@ -44,33 +45,42 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
     }
 }
 
-pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<(), Error> {
+pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
     let ext_args: Vec<&str> = args
         .values_of("")
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
     println!("we're supposed to execute elba-{} {:?}", cmd, ext_args);
-    Ok(())
+    Ok(format!("finished executing elba-{} {:?}", cmd, ext_args))
 }
 
 pub fn logger(_c: &mut Config) -> Logger {
     Logger::root(Discard, o!())
 }
 
-pub fn match_backends(c: &mut Config, args: &ArgMatches) -> (bool, String, Vec<String>) {
-    (
-        args.is_present("portable-backend"),
-        if args.is_present("backend") {
-            args.value_of_lossy("backend").unwrap().into_owned()
-        } else if args.is_present("portable-backend") {
-            args.value_of_lossy("portable-backend")
-                .unwrap()
-                .into_owned()
-        } else {
-            c.default_codegen.to_owned()
-        },
-        args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),
-    )
+pub fn match_backends(c: &mut Config, args: &ArgMatches) -> BuildBackend {
+    let name = if args.is_present("backend") {
+        args.value_of_lossy("backend").unwrap().into_owned()
+    } else if args.is_present("portable-backend") {
+        args.value_of_lossy("portable-backend")
+            .unwrap()
+            .into_owned()
+    } else {
+        c.default_codegen.to_owned()
+    };
+
+    BuildBackend {
+        portable: args.is_present("portable-backend"),
+        runner: c.codegen.get(&name).map(|x| x.runner.clone()),
+        name,
+        opts: args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),
+    }
+}
+
+pub fn match_threads(c: &mut Config, args: &ArgMatches) -> u8 {
+    args.value_of("build-threads")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1)
 }
 
 mod args {
@@ -81,7 +91,7 @@ mod args {
     pub fn target_lib() -> Arg {
         Arg::with_name("lib")
             .long("lib")
-            .help("Builds the library target")
+            .help("Makes the command apply to the library target")
     }
 
     pub fn target_bin() -> Arg {
@@ -89,7 +99,7 @@ mod args {
             .long("bin")
             .takes_value(true)
             .min_values(0)
-            .help("Builds the binaries specified (or all if no argument is provided)")
+            .help("The names of the binaries to which the command should apply (or all if no argument is provided)")
     }
 
     pub fn target_test() -> Arg {
@@ -97,7 +107,16 @@ mod args {
             .long("test")
             .takes_value(true)
             .min_values(0)
-            .help("Builds the tests specified (or all if no argument is provided)")
+            .help("The names of the tests to which the command should apply (or all if no argument is provided)")
+    }
+
+    pub fn build_threads() -> Arg {
+        Arg::with_name("build-threads")
+            .long("build-threads")
+            .short("j")
+            .takes_value(true)
+            .number_of_values(1)
+            .help("The number of threads to use to build")
     }
 
     pub fn backends() -> Vec<Arg> {

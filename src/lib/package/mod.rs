@@ -278,12 +278,66 @@ impl Summary {
 
 impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{}", self.id, self.version)
+        write!(f, "{}|{}", self.id, self.version)
     }
 }
 
 impl fmt::Debug for Summary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self)
+    }
+}
+
+/// A Spec is like a Summary, except with more optional parts.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Spec {
+    pub name: Name,
+    pub resolution: Option<Resolution>,
+    pub version: Option<Version>,
+}
+
+impl fmt::Display for Spec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some(r) = self.resolution.as_ref() {
+            write!(f, "@{}", r)?;
+        }
+        if let Some(v) = self.version.as_ref() {
+            write!(f, "|{}", v)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Spec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl FromStr for Spec {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut ver_split = s.splitn(2, '|');
+        let (pre, ver) = (ver_split.next().unwrap(), ver_split.next());
+        let version = if let Some(v) = ver {
+            Some(Version::from_str(v)?)
+        } else {
+            None
+        };
+        let mut res_split = pre.splitn(2, '@');
+        let (name, res) = (Name::from_str(res_split.next().unwrap())?, res_split.next());
+        let resolution = if let Some(r) = res {
+            Some(Resolution::from_str(r)?)
+        } else {
+            None
+        };
+
+        Ok(Spec {
+            name,
+            resolution,
+            version,
+        })
     }
 }

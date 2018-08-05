@@ -19,7 +19,7 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let name = &*args.value_of_lossy("name").unwrap();
     let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
     let bin = !args.is_present("lib");

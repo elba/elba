@@ -1,33 +1,34 @@
-use super::logger;
+use super::{args, logger};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
-    cli::build,
-    package::Name,
+    package::Spec,
+    retrieve::cache::Cache,
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
 use std::str::FromStr;
 
-// TODO: Uninstall all bins of a package or individual bin?
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("uninstall")
         .about("Uninstalls the binaries of a package")
-        .arg(Arg::with_name("name").required(true))
+        .arg(Arg::with_name("spec").required(true))
+        .arg(args::target_bin())
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
-    let name = &*args.value_of_lossy("name").unwrap();
-    let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+    let spec = &*args.value_of_lossy("spec").unwrap();
+    let spec = Spec::from_str(spec).with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;
+
+    let targets = args
+        .values_of("bin")
+        .map(|x| x.collect())
+        .unwrap_or_else(|| vec![]);
 
     let logger = logger(c);
-    let indices = c.indices.to_vec();
-    let global_cache = c.directories.cache.clone();
 
-    let ctx = build::BuildCtx {
-        indices,
-        global_cache,
-        logger,
-    };
+    let cache = Cache::from_disk(&logger, &c.directories.cache)?;
 
-    build::uninstall(&ctx, name)
+    let rc = cache.remove_bins(&spec, &targets)?;
+
+    Ok(format!("removed {} binaries", rc))
 }

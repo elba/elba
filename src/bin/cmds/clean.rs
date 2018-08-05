@@ -9,7 +9,7 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("clean").about("Cleans the global cache")
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let p = &c.directories.cache;
     if p.exists() {
         let layout = Layout::new(&p)?;
@@ -24,5 +24,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
         clear_dir(&layout.tmp).context(format_err!("couldn't clear {}", layout.tmp.display()))?;
     }
 
-    Ok(())
+    Ok(format!("cache directory {} cleared", p.display()))
 }

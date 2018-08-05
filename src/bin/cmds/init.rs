@@ -18,7 +18,7 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<()> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let cdir = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;

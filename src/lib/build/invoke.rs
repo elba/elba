@@ -3,7 +3,10 @@
 use build::context::BuildContext;
 use itertools::Itertools;
 use retrieve::cache::{Binary, OutputLayout};
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 use util::{clear_dir, copy_dir, errors::Res};
 
 // CompileInvocation is responsible for dealing with ibc stuff
@@ -28,6 +31,12 @@ impl<'a> CompileInvocation<'a> {
         for binary in self.deps {
             // We assume that the binary has already been compiled
             process.arg("-i").arg(binary.target.path());
+        }
+
+        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
+        // conflicting flags will be ignored (idris chooses the earliest flags first)
+        if let Ok(val) = env::var("IDRIS_OPTS") {
+            process.arg(val);
         }
 
         // Add compile units: the individual files that we want to "export" and make available
@@ -66,24 +75,32 @@ impl<'a> CodegenInvocation<'a> {
 
         process
             .current_dir(if self.is_artifact {
-                cwd = self.layout.artifacts.join(&bcx.backend.1);
+                cwd = self.layout.artifacts.join(&bcx.backend.name);
                 &cwd
             } else {
                 &self.layout.bin
             }).args(&["-o", &self.output])
             .args(&[
-                if bcx.backend.0 {
+                if bcx.backend.portable {
                     "--portable-codegen"
                 } else {
                     "--codegen"
                 },
-                &bcx.backend.1,
+                &bcx.backend.name,
             ]);
 
-        if !bcx.backend.2.is_empty() {
+        if !bcx.backend.opts.is_empty() {
             // We put all the cg-opts into a single argument because idk if the Idris compiler
             // allows passing multiple cg-opts in one go
-            process.arg("--cg-opt").arg(bcx.backend.2.iter().join(" "));
+            process
+                .arg("--cg-opt")
+                .arg(bcx.backend.opts.iter().join(" "));
+        }
+
+        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
+        // conflicting flags will be ignored (idris chooses the earliest flags first)
+        if let Ok(val) = env::var("IDRIS_OPTS") {
+            process.arg(val);
         }
 
         process.arg(&self.binary);

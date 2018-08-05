@@ -27,6 +27,32 @@ pub enum Target {
     Doc,
 }
 
+// This exists for the sake of hashing
+impl Target {
+    pub fn as_bytes(&self) -> [u8; 5] {
+        match self {
+            Target::Lib => [0, 0, 0, 0, 0],
+            Target::Doc => [1, 0, 0, 0, 0],
+            Target::Bin(x) => {
+                let x = *x as u32;
+                let b1: u8 = ((x >> 24) & 0xff) as u8;
+                let b2: u8 = ((x >> 16) & 0xff) as u8;
+                let b3: u8 = ((x >> 8) & 0xff) as u8;
+                let b4: u8 = (x & 0xff) as u8;
+                [2, b1, b2, b3, b4]
+            }
+            Target::Test(x) => {
+                let x = *x as u32;
+                let b1: u8 = ((x >> 24) & 0xff) as u8;
+                let b2: u8 = ((x >> 16) & 0xff) as u8;
+                let b3: u8 = ((x >> 8) & 0xff) as u8;
+                let b4: u8 = (x & 0xff) as u8;
+                [3, b1, b2, b3, b4]
+            }
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub struct Targets(pub Vec<Target>);
 
@@ -126,7 +152,7 @@ pub fn compile_bin(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<()> {
+) -> Res<PathBuf> {
     let bin_target = match target {
         Target::Bin(ix) => source.meta().targets.bin[ix].clone(),
         Target::Test(ix) => source.meta().targets.test[ix].clone(),
@@ -161,5 +187,5 @@ pub fn compile_bin(
     // The output exectable will always go in target/bin
     codegen_invoke.exec(bcx)?;
 
-    Ok(())
+    Ok(layout.bin.join(bin_target.name.clone()))
 }
