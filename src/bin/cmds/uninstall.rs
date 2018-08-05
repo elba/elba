@@ -17,7 +17,8 @@ pub fn cli() -> App<'static, 'static> {
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let spec = &*args.value_of_lossy("spec").unwrap();
-    let spec = Spec::from_str(spec).with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;
+    let spec = Spec::from_str(spec)
+        .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;
 
     let targets = args
         .values_of("bin")

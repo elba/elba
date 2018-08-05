@@ -89,7 +89,7 @@ pub fn test(
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, root, Some(layout), &ctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
         q.exec(&ctx)?;
 
         println!("{} Running tests...", style("[5/5]").dim().bold());
@@ -152,7 +152,7 @@ pub fn install(
         // We unconditionally use a global OutputLayout to force rebuilding of root packages
         // and to avoid dealing with making our own for global/remote packages
 
-        let q = JobQueue::new(sources, root, None, &ctx)?;
+        let q = JobQueue::new(sources, &root, None, &ctx)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
         let bins = q.exec(&ctx)?;
@@ -265,7 +265,7 @@ pub fn build(
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, root, Some(layout), &ctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
         q.exec(&ctx)?;

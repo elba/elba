@@ -228,12 +228,18 @@ impl Cache {
     // If bins is empty, it's assumed to mean "delete all binaries"
     pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Res<u32> {
         fn contains(sum: &str, query: &Spec) -> bool {
-            match (&query.name, query.resolution.as_ref(), query.version.as_ref()) {
-                (name, _, Some(ver)) => sum.contains(name.as_str()) && sum.contains(&ver.to_string()),
+            match (
+                &query.name,
+                query.resolution.as_ref(),
+                query.version.as_ref(),
+            ) {
+                (name, _, Some(ver)) => {
+                    sum.contains(name.as_str()) && sum.contains(&ver.to_string())
+                }
                 _ => sum.contains(&query.to_string()),
             }
         };
-        
+
         let mut c = 0;
         if self.layout.bin.join(".bins").exists() {
             let mut s = String::new();

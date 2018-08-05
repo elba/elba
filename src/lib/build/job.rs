@@ -22,7 +22,7 @@ pub struct JobQueue {
 impl JobQueue {
     pub fn new(
         solve: Graph<Source>,
-        root: Targets,
+        root: &Targets,
         root_ol: Option<OutputLayout>,
         bcx: &BuildContext,
     ) -> Res<Self> {
