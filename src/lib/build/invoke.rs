@@ -36,7 +36,7 @@ impl<'a> CompileInvocation<'a> {
         // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
         // conflicting flags will be ignored (idris chooses the earliest flags first)
         if let Ok(val) = env::var("IDRIS_OPTS") {
-            process.arg(val);
+            process.args(val.split(' ').collect::<Vec<_>>());
         }
 
         // Add compile units: the individual files that we want to "export" and make available
@@ -90,8 +90,6 @@ impl<'a> CodegenInvocation<'a> {
             ]);
 
         if !bcx.backend.opts.is_empty() {
-            // We put all the cg-opts into a single argument because idk if the Idris compiler
-            // allows passing multiple cg-opts in one go
             process
                 .arg("--cg-opt")
                 .arg(bcx.backend.opts.iter().join(" "));
@@ -100,7 +98,7 @@ impl<'a> CodegenInvocation<'a> {
         // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
         // conflicting flags will be ignored (idris chooses the earliest flags first)
         if let Ok(val) = env::var("IDRIS_OPTS") {
-            process.arg(val);
+            process.args(val.split(' ').collect::<Vec<_>>());
         }
 
         process.arg(&self.binary);

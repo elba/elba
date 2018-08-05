@@ -1,4 +1,4 @@
-use super::{args, logger, match_threads};
+use super::{args, logger, match_threads, match_backends};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -11,6 +11,9 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("repl")
         .about("Launches a repl, loading the root package")
         .arg(args::build_threads())
+        .arg(args::target_bin())
+        .arg(args::target_lib())
+        .args(&args::backends())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
@@ -21,6 +24,13 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let global_cache = c.directories.cache.clone();
     let logger = logger(c);
     let threads = match_threads(c, args);
+    
+    let backend = match_backends(c, args);
+
+    let ts = (
+        args.is_present("lib"),
+        args.values_of("bin").map(|x| x.collect::<Vec<_>>()),
+    );
 
     let ctx = build::BuildCtx {
         indices,
@@ -29,5 +39,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         threads,
     };
 
-    build::repl(&ctx, &project)
+    build::repl(&ctx, &project, &ts, &backend)
 }

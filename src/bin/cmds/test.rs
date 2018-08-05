@@ -13,6 +13,12 @@ pub fn cli() -> App<'static, 'static> {
         .args(&args::backends())
         .arg(args::build_threads())
         .arg(
+            Arg::with_name("test-threads")
+                .long("test-threads")
+                .takes_value(true)
+                .number_of_values(1)
+                .help("The number of threads to use to simultaneously run test binaries"),
+        ).arg(
             Arg::with_name("target")
                 .multiple(true)
                 .help("The names of the tests to run (all tests are run if unspecified)"),
@@ -43,5 +49,10 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
 
-    build::test(&ctx, &project, &targets, &backend)
+    let test_threads = args
+        .value_of("test-threads")
+        .and_then(|x| x.parse::<u32>().ok())
+        .unwrap_or(1);
+
+    build::test(&ctx, &project, &targets, &backend, test_threads)
 }

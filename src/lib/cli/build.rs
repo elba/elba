@@ -1,10 +1,12 @@
 use build::{
     context::{BuildBackend, BuildConfig, BuildContext, Compiler},
-    job::JobQueue,
+    job::{Job, JobQueue},
     Target, Targets,
 };
 use console::style;
+use crossbeam::queue::MsQueue;
 use failure::ResultExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use package::{
     lockfile::LockfileToml,
     manifest::Manifest,
@@ -16,11 +18,13 @@ use resolve::Resolver;
 use retrieve::cache::Cache;
 use retrieve::cache::OutputLayout;
 use retrieve::Retriever;
+use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
-    fs,
+    env, fs,
     io::prelude::*,
     path::{Path, PathBuf},
+    process::Command,
     str::FromStr,
 };
 use toml;
@@ -38,22 +42,22 @@ pub fn test(
     project: &Path,
     targets: &[&str],
     backend: &BuildBackend,
+    test_threads: u32,
 ) -> Res<String> {
+    let mut contents = String::new();
+    let mut manifest = fs::File::open(project.join("elba.toml"))
+        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+    manifest.read_to_string(&mut contents)?;
+    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+
+    if manifest.targets.lib.is_none() {
+        bail!("running tests requires a defined library to test")
+    }
+    if manifest.targets.test.is_empty() {
+        bail!("at least one test must be defined")
+    }
+
     solve_local(ctx, &project, 5, |cache, mut retriever, solve| {
-        let mut contents = String::new();
-        let mut manifest = fs::File::open(project.join("elba.toml"))
-            .context(format_err!("failed to read maifest file (elba.toml)"))?;
-        manifest.read_to_string(&mut contents)?;
-        let manifest =
-            Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
-
-        if manifest.targets.lib.is_none() {
-            bail!("running tests requires a defined library to test")
-        }
-        if manifest.targets.test.is_empty() {
-            bail!("at least one test must be defined")
-        }
-
         println!("{} Retrieving packages...", style("[3/5]").dim().bold());
         let sources = retriever
             .retrieve_packages(&solve)
@@ -64,16 +68,6 @@ pub fn test(
         // though we don't even need the Retriever anymore).
         drop(retriever);
 
-        let mut root = vec![];
-        root.push(Target::Lib);
-        let emp = targets.is_empty();
-        for (ix, bt) in manifest.targets.test.iter().enumerate() {
-            if emp || targets.contains(&bt.name.as_str()) {
-                root.push(Target::Test(ix));
-            }
-        }
-
-        let root = Targets::new(root);
         let ctx = BuildContext {
             backend,
             // TODO: pick a better compiler pls
@@ -89,13 +83,91 @@ pub fn test(
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
+        let bin_dir = layout.bin.clone();
+
+        let mut root = vec![];
+        root.push(Target::Lib);
+        let emp = targets.is_empty();
+        for (ix, bt) in manifest.targets.test.iter().enumerate() {
+            if emp || targets.contains(&bt.name.as_str()) {
+                root.push(Target::Test(ix));
+            }
+        }
+
+        let root = Targets::new(root);
         let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
         q.exec(&ctx)?;
 
         println!("{} Running tests...", style("[5/5]").dim().bold());
 
-        // TODO: Run the tests
-        unimplemented!()
+        let root = root
+            .0
+            .into_iter()
+            .filter_map(|t| {
+                if let Target::Test(ix) = t {
+                    Some(&manifest.targets.test[ix])
+                } else {
+                    None
+                }
+            }).collect::<Vec<_>>();
+
+        let pb = ProgressBar::new(root.len() as u64);
+        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
+
+        let results = &MsQueue::new();
+        let mut pool = Pool::new(test_threads);
+
+        pool.scoped(|scope| {
+            let mut prg = 0;
+
+            for test in &root {
+                let bin_dir = &bin_dir;
+                let pb = &pb;
+                scope.execute(move || {
+                    pb.println(format!("{:>7} {}", style("[tst]").blue(), &test.name));
+                    let out = Command::new(bin_dir.join(&test.name)).output();
+                    if out.is_err() {
+                        pb.println(format!(
+                            "{:>7} Test binary {} could not be executed",
+                            style("[err]").red().bold(),
+                            bin_dir.join(&test.name).display(),
+                        ));
+                    }
+                    results.push(out.map(|x| (&test.name, x)));
+                    prg += 1;
+                    pb.set_position(prg);
+                });
+            }
+
+            pb.finish_and_clear();
+        });
+
+        println!();
+        println!("{} Test results:", style("[inf]").dim().bold());
+        while let Some(res) = results.try_pop() {
+            match res {
+                Ok((test, out)) => {
+                    println!(
+                        "{:>7} {}",
+                        if out.status.success() {
+                            style("[pss]").green()
+                        } else {
+                            style("[fld]").red()
+                        },
+                        test
+                    );
+                    if !out.status.success() {
+                        println!("{}", style("[stdout]").dim());
+                        println!("{}", String::from_utf8_lossy(&out.stdout));
+                        println!("{}", style("[stderr]").dim());
+                        println!("{}", String::from_utf8_lossy(&out.stderr));
+                    }
+                }
+                Err(e) => bail!("not all tests executed:\n{}", e),
+            }
+        }
+
+        Ok(format!("{} test binaries executed", root.len()))
     })
 }
 
@@ -133,7 +205,7 @@ pub fn install(
         let emp = targets.is_empty();
         for (ix, bt) in manifest.targets.bin.iter().enumerate() {
             if emp || targets.contains(&bt.name.as_str()) {
-                root.push(Target::Test(ix));
+                root.push(Target::Bin(ix));
             }
         }
         let root = Targets::new(root);
@@ -155,7 +227,7 @@ pub fn install(
         let q = JobQueue::new(sources, &root, None, &ctx)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        let bins = q.exec(&ctx)?;
+        let bins = q.exec(&ctx)?.1;
         let binc = bins.len();
 
         println!("{} Installing binaries...", style("[5/5]").dim().bold());
@@ -181,25 +253,41 @@ pub fn install(
     }
 }
 
-pub fn repl(ctx: &BuildCtx, project: &Path) -> Res<String> {
-    solve_local(ctx, &project, 4, |_, _, _| unimplemented!())
-}
-
-pub fn build(
+pub fn repl(
     ctx: &BuildCtx,
     project: &Path,
-    targets: &(bool, Option<Vec<&str>>, Option<Vec<&str>>),
-    backend: &BuildBackend,
+    targets: &(bool, Option<Vec<&str>>),
+    backend: &BuildBackend
 ) -> Res<String> {
-    solve_local(ctx, &project, 4, |cache, mut retriever, solve| {
-        let mut contents = String::new();
-        let mut manifest = fs::File::open(project.join("elba.toml"))
-            .context(format_err!("failed to read maifest file (elba.toml)"))?;
-        manifest.read_to_string(&mut contents)?;
-        let manifest =
-            Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+    let mut contents = String::new();
+    let mut manifest = fs::File::open(project.join("elba.toml"))
+        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+    manifest.read_to_string(&mut contents)?;
+    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
 
-        println!("{} Retrieving packages...", style("[3/4]").dim().bold());
+    let mut paths = vec![];
+
+    if let Some(lib) = manifest.targets.lib {
+        if targets.1.is_none() || targets.0 {
+            paths.extend(lib.mods.iter().map(|mod_name| {
+                let np: PathBuf = mod_name.replace(".", "/").into();
+                lib.path.0.join(np).with_extension("idr")
+            }));
+        }
+    }
+
+    for bin in manifest.targets.bin {
+        if let Some(v) = targets.1.as_ref() {
+            if v.contains(&bin.name.as_ref()) {
+                paths.push(bin.main.0.clone());
+            }
+        } else if !targets.0 {
+            paths.push(bin.main.0.clone());
+        }
+    }
+
+    solve_local(ctx, &project, 5, |cache, mut retriever, solve| {
+        println!("{} Retrieving packages...", style("[3/5]").dim().bold());
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -209,46 +297,135 @@ pub fn build(
         // though we don't even need the Retriever anymore).
         drop(retriever);
 
-        // By default, we build all lib and bin targets.
-        let mut root = vec![];
-        if (targets.1.is_none() || targets.0) && manifest.targets.lib.is_some() {
-            root.push(Target::Lib);
-        } else if targets.0 {
-            // The user specifically asked for a lib target but there wasn't any. Error.
-            bail!("the package doesn't have a library target. add one before proceeding")
-        }
-
-        if targets.1.as_ref().is_some() && manifest.targets.bin.is_empty() {
-            // The user specifically asked for a bin target(s) but there wasn't any. Error.
-            bail!("the package doesn't have any binary targets. add one before proceeding")
-        }
-
-        for (ix, bt) in manifest.targets.bin.iter().enumerate() {
-            // Case 1: If the --bin flag is passed by itself, we assume the user wants all binaries.
-            //         Or, the --bin flag might come with the name of a binary which we should build.
-            let target_specified = targets
-                .1
-                .as_ref()
-                .map(|v| v.is_empty() || v.contains(&bt.name.as_str()))
-                .unwrap_or(false);
-            // Case 2: Neither --bin nor --lib are specified.
-            let neither_specified = !targets.0 && targets.1.is_none();
-            if target_specified || neither_specified {
-                root.push(Target::Bin(ix));
-            }
-        }
-
-        // We only build test targets if the user asks for them.
-        if let Some(ts) = &targets.2 {
-            for (ix, bt) in manifest.targets.test.iter().enumerate() {
-                let target_specified = ts.is_empty() || ts.contains(&bt.name.as_str());
-                if target_specified {
-                    root.push(Target::Test(ix));
-                }
-            }
-        }
-
+        // We add no targets because we're going to directly add the paths of the files (so we can
+        // interactively edit).
+        let root = vec![];
         let root = Targets::new(root);
+
+        let ctx = BuildContext {
+            backend,
+            // TODO: pick a better compiler pls
+            compiler: Compiler::default(),
+            config: BuildConfig {},
+            cache,
+            threads: ctx.threads,
+        };
+
+        println!("{} Building targets...", style("[4/5]").dim().bold());
+
+        let mut q = JobQueue::new(sources, &root, None, &ctx)?;
+
+        // We only want to build the dependencies; we expressly do NOT want to generate anything
+        // for the root package, because we're gonna manually add the files ourselves.
+        // The reason we do this is because the repl is often used for interactive development.
+        q.graph.inner[NodeIndex::new(0)] = Job::default();
+
+        let deps = q.exec(&ctx)?.0;
+
+        // From here, we basically manually build a CompileInvocation, but tailor-made for the
+        // repl command.
+        println!("{} Launching the repl...", style("[5/5]").dim().bold());
+        println!();
+        let mut process = ctx.compiler.process();
+        // TODO: Do we want to straight up add the import paths of the lib/bin/etc? Or stay with the
+        // current strategy of including only {exported files for libs}/{main files for bins}?
+        // Include dependencies
+        for binary in deps {
+            // We assume that the binary has already been compiled
+            process.arg("-i").arg(binary);
+        }
+        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
+        // conflicting flags will be ignored (idris chooses the earliest flags first)
+        if let Ok(val) = env::var("IDRIS_OPTS") {
+            process.args(val.split(' ').collect::<Vec<_>>());
+        }
+        // Add the files we want to make available for the repl
+        for target in &paths {
+            process.arg(target);
+        }
+        // The moment of truth:
+        process
+            .spawn()
+            .with_context(|e| format_err!("couldn't launch the repl:\n{}", e))?
+            .wait_with_output()
+            .with_context(|e| format_err!("misc. repl failure:\n{}", e))?;
+
+        // Clean up after ourselves
+        for target in &paths {
+            let bin = target.with_extension("ibc");
+            if bin.exists() {
+                fs::remove_file(&bin).with_context(|e| {
+                    format_err!("couldn't remove ibc file {}:\n{}", bin.display(), e)
+                })?;
+            }
+        }
+
+        Ok("finished repl session".to_string())
+    })
+}
+
+pub fn build(
+    ctx: &BuildCtx,
+    project: &Path,
+    targets: &(bool, Option<Vec<&str>>, Option<Vec<&str>>),
+    backend: &BuildBackend,
+) -> Res<String> {
+    let mut contents = String::new();
+    let mut manifest = fs::File::open(project.join("elba.toml"))
+        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+    manifest.read_to_string(&mut contents)?;
+    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+
+    // By default, we build all lib and bin targets.
+    let mut root = vec![];
+    if (targets.1.is_none() || targets.0) && manifest.targets.lib.is_some() {
+        root.push(Target::Lib);
+    } else if targets.0 {
+        // The user specifically asked for a lib target but there wasn't any. Error.
+        bail!("the package doesn't have a library target. add one before proceeding")
+    }
+
+    if targets.1.as_ref().is_some() && manifest.targets.bin.is_empty() {
+        // The user specifically asked for a bin target(s) but there wasn't any. Error.
+        bail!("the package doesn't have any binary targets. add one before proceeding")
+    }
+
+    for (ix, bt) in manifest.targets.bin.iter().enumerate() {
+        // Case 1: If the --bin flag is passed by itself, we assume the user wants all binaries.
+        //         Or, the --bin flag might come with the name of a binary which we should build.
+        let target_specified = targets
+            .1
+            .as_ref()
+            .map(|v| v.is_empty() || v.contains(&bt.name.as_str()))
+            .unwrap_or(false);
+        // Case 2: Neither --bin nor --lib are specified.
+        let neither_specified = !targets.0 && targets.1.is_none();
+        if target_specified || neither_specified {
+            root.push(Target::Bin(ix));
+        }
+    }
+
+    // We only build test targets if the user asks for them.
+    if let Some(ts) = &targets.2 {
+        for (ix, bt) in manifest.targets.test.iter().enumerate() {
+            let target_specified = ts.is_empty() || ts.contains(&bt.name.as_str());
+            if target_specified {
+                root.push(Target::Test(ix));
+            }
+        }
+    }
+
+    let root = Targets::new(root);
+    solve_local(ctx, &project, 4, |cache, mut retriever, solve| {
+        println!("{} Retrieving packages...", style("[3/4]").dim().bold());
+        let sources = retriever
+            .retrieve_packages(&solve)
+            .context(format_err!("package retrieval failed"))?;
+
+        // We drop the Retriever because we want to release our lock on the Indices as soon as we
+        // can to avoid stopping other instances of elba from downloading and resolving (even
+        // though we don't even need the Retriever anymore).
+        drop(retriever);
 
         let ctx = BuildContext {
             backend,

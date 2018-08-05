@@ -13,8 +13,8 @@ use util::{errors::Res, graph::Graph, lock::DirLock};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
-    graph: Graph<Job>,
-    root_ol: Option<OutputLayout>,
+    pub graph: Graph<Job>,
+    pub root_ol: Option<OutputLayout>,
 }
 
 // The current implementation of the JobQueue combines target generation and dependency preparation
@@ -90,7 +90,7 @@ impl JobQueue {
         Ok(JobQueue { graph, root_ol })
     }
 
-    pub fn exec(mut self, bcx: &BuildContext) -> Res<Vec<(PathBuf, String)>> {
+    pub fn exec(mut self, bcx: &BuildContext) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
         // TODO: How many threads do we want?
         let threads = 1;
         let mut thread_pool = Pool::new(threads);
@@ -149,6 +149,15 @@ impl JobQueue {
                             source.summary(),
                             &build_hash.0[0..8]
                         ));
+
+                        // TODO: Change how we print errors?
+                        // As it is right now, we wait until every package in the "layer"
+                        // is built before printing errors; maybe we shouldn't do that
+                        // If we want to do the pb.println thing, we need a:
+                        //
+                        // let pb = &pb;
+                        //
+                        // before the scope.
 
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
@@ -302,7 +311,18 @@ impl JobQueue {
             bins_vec.push((path, sum));
         }
 
-        Ok(bins_vec)
+        let root_children = self
+            .graph
+            .children(NodeIndex::new(0))
+            .filter_map(|(_, j)| {
+                if let Work::Fresh(b) = &j.work {
+                    Some(b.target.path().to_owned())
+                } else {
+                    None
+                }
+            }).collect::<Vec<_>>();
+
+        Ok((root_children, bins_vec))
     }
 }
 
