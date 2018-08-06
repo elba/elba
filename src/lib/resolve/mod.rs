@@ -13,6 +13,7 @@ use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
+use console::style;
 use failure::Error;
 use indexmap::IndexMap;
 use package::{
@@ -28,6 +29,7 @@ use retrieve::Retriever;
 use semver::Version;
 use slog::Logger;
 use std::{cmp, collections::VecDeque};
+use textwrap::fill;
 use util::errors::ErrorKind;
 use util::graph::Graph;
 
@@ -76,7 +78,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
 
         if r.is_err() {
             error!(s.logger, "solve failed");
-            bail!("{}", s.pp_error(s.incompats.len() - 1))
+            bail!("{}", fill(&s.pp_error(s.incompats.len() - 1), 80))
         } else {
             info!(s.logger, "solve successful");
             Ok(r.unwrap())
@@ -389,32 +391,36 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             // TODO: What if we want to minimize our packages?
             let best = self.retriever.best(package.0, package.1, false);
             let res = Some(package.0.clone());
-            if let Ok(best) = best {
-                let sum = Summary::new(package.0.clone(), best.clone());
-                // We know the package exists, so unwrapping here is fine
-                let incompats = self.retriever.incompats(&sum).unwrap();
-                let mut conflict = false;
-                for ic in incompats {
-                    conflict = conflict || ic
-                        .deps
-                        .iter()
-                        .map(|(k, v)| {
-                            k == sum.id()
-                                || self.relation(k, v) == Relation::Subset
-                                || self.relation(k, v) == Relation::Equal
-                        }).all(|b| b);
-                    self.incompatibility(ic.deps, ic.cause);
+            match best {
+                Ok(best) => {
+                    let sum = Summary::new(package.0.clone(), best.clone());
+                    // We know the package exists, so unwrapping here is fine
+                    let incompats = self.retriever.incompats(&sum).unwrap();
+                    let mut conflict = false;
+                    for ic in incompats {
+                        conflict = conflict || ic
+                            .deps
+                            .iter()
+                            .map(|(k, v)| {
+                                k == sum.id()
+                                    || self.relation(k, v) == Relation::Subset
+                                    || self.relation(k, v) == Relation::Equal
+                            }).all(|b| b);
+                        self.incompatibility(ic.deps, ic.cause);
+                    }
+                    if !conflict {
+                        self.decision(sum.id, best);
+                    }
                 }
-                if !conflict {
-                    self.decision(sum.id, best);
+                Err(e) => {
+                    // This case encapsulates everything from "no versions were found" to "the package
+                    // literally doesn't exist in the index"
+                    println!("{:>7} Couldn't add package {} {}: {}", style("[wrn]").yellow().bold(), package.0, package.1, e);
+                    let pkgs = indexmap!(
+                        package.0.clone() => package.1.clone()
+                    );
+                    self.incompatibility(pkgs, IncompatibilityCause::Unavailable);
                 }
-            } else {
-                // This case encapsulates everything from "no versions were found" to "the package
-                // literally doesn't exist in the index"
-                let pkgs = indexmap!(
-                    package.0.clone() => package.1.clone()
-                );
-                self.incompatibility(pkgs, IncompatibilityCause::Unavailable);
             }
             res
         }

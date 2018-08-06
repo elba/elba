@@ -12,7 +12,6 @@ use std::{path::PathBuf, str::FromStr};
 use toml;
 use url::Url;
 use url_serde;
-use util::errors::*;
 use util::SubPath;
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
@@ -83,7 +82,7 @@ impl FromStr for Manifest {
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         let toml: Manifest = toml::from_str(raw)
-            .context(ErrorKind::InvalidManifestFile)
+            .with_context(|e| format_err!("invalid manifest file: {}", e))
             .map_err(Error::from)?;
 
         if toml.targets.lib.is_none() && toml.targets.bin.is_empty() {

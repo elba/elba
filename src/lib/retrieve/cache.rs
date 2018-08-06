@@ -521,7 +521,7 @@ impl Source {
         file.read_to_string(&mut contents)
             .context(ErrorKind::InvalidIndex)?;
 
-        let manifest = Manifest::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+        let manifest = Manifest::from_str(&contents)?;
 
         if let Some(p) = manifest.workspace.get(pkg.name()) {
             let lock = DirLock::acquire(&path.path().join(&p.0))?;

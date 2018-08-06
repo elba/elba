@@ -11,8 +11,6 @@ pub type Res<T> = Result<T, Error>;
 pub enum ErrorKind {
     #[fail(display = "invalid lockfile")]
     InvalidLockfile,
-    #[fail(display = "invalid manifest file")]
-    InvalidManifestFile,
     #[fail(display = "invalid source url")]
     InvalidSourceUrl,
     #[fail(display = "invalid package id")]

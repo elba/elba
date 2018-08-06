@@ -48,7 +48,7 @@ pub fn test(
     let mut manifest = fs::File::open(project.join("elba.toml"))
         .context(format_err!("failed to read maifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+    let manifest = Manifest::from_str(&contents)?;
 
     if manifest.targets.lib.is_none() {
         bail!("running tests requires a defined library to test")
@@ -212,7 +212,7 @@ pub fn install(
             .context(format_err!("failed to read maifest file (elba.toml)"))?;
         manifest.read_to_string(&mut contents)?;
         let manifest =
-            Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+            Manifest::from_str(&contents)?;
 
         // By default, we build all bin targets.
         let mut root = vec![];
@@ -277,7 +277,7 @@ pub fn repl(
     let mut manifest = fs::File::open(project.join("elba.toml"))
         .context(format_err!("failed to read maifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+    let manifest = Manifest::from_str(&contents)?;
 
     let mut paths = vec![];
 
@@ -388,7 +388,7 @@ pub fn build(
     let mut manifest = fs::File::open(project.join("elba.toml"))
         .context(format_err!("failed to read maifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+    let manifest = Manifest::from_str(&contents)?;
 
     // By default, we build all lib and bin targets.
     let mut root = vec![];
@@ -482,7 +482,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     let mut contents = String::new();
     manifest.read_to_string(&mut contents)?;
 
-    let manifest = Manifest::from_str(&contents).context(format_err!("invalid manifest format"))?;
+    let manifest = Manifest::from_str(&contents)?;
 
     let op = || -> Res<Graph<Summary>> {
         let mut f = fs::File::open(&project.join("elba.lock"))?;

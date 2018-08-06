@@ -31,6 +31,7 @@ extern crate slog;
 extern crate petgraph;
 extern crate symlink;
 extern crate tar;
+extern crate textwrap;
 extern crate toml;
 extern crate url;
 extern crate url_serde;
