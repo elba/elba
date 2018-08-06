@@ -20,7 +20,7 @@ use clap::{App, AppSettings, Arg, ArgMatches};
 use console::style;
 use elba::util::config::{Config, Verbosity};
 use failure::{Error, ResultExt};
-use std::time::Instant;
+use std::{process::exit, time::Instant};
 
 // Interaction with the main repo would just be implemented as a custom task.
 // Maybe tasks should be allowed to be designated in the manifest too. These would be placed in the
@@ -136,7 +136,10 @@ fn main() {
 
     println!();
     match res {
-        Err(e) => println!("{} {}", style("[err]").red().bold(), e),
+        Err(e) => {
+            eprintln!("{} {}", style("[err]").red().bold(), e);
+            exit(1);
+        },
         Ok(st) => {
             let elapsed = start.elapsed();
             if !st.is_empty() {
@@ -148,6 +151,7 @@ fn main() {
                     elapsed.subsec_millis() / 10
                 );
             }
+            exit(0);
         }
     }
 }
