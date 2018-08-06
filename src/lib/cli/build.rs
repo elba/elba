@@ -144,6 +144,7 @@ pub fn test(
 
         println!();
         println!("{} Test results:", style("[inf]").dim().bold());
+        let mut errs = 0;
         while let Some(res) = results.try_pop() {
             match res {
                 Ok((test, out)) => {
@@ -161,13 +162,22 @@ pub fn test(
                         println!("{}", String::from_utf8_lossy(&out.stdout));
                         println!("{}", style("[stderr]").dim());
                         println!("{}", String::from_utf8_lossy(&out.stderr));
+                        errs += 1;
                     }
                 }
                 Err(e) => bail!("not all tests executed:\n{}", e),
             }
         }
 
-        Ok(format!("{} test binaries executed", root.len()))
+        if errs != 0 {
+            Err(format_err!(
+                "{} test binaries executed with {} failures",
+                root.len(),
+                errs
+            ))
+        } else {
+            Ok(format!("{} test binaries executed", root.len()))
+        }
     })
 }
 
@@ -257,7 +267,7 @@ pub fn repl(
     ctx: &BuildCtx,
     project: &Path,
     targets: &(bool, Option<Vec<&str>>),
-    backend: &BuildBackend
+    backend: &BuildBackend,
 ) -> Res<String> {
     let mut contents = String::new();
     let mut manifest = fs::File::open(project.join("elba.toml"))

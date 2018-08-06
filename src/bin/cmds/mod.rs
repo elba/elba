@@ -11,8 +11,10 @@ mod uninstall;
 use clap::{App, ArgMatches};
 use elba::build::context::BuildBackend;
 use elba::util::{config::Config, errors::Res};
-use failure::Error;
+use failure::{Error, ResultExt};
+use itertools::Itertools;
 use slog::{Discard, Logger};
+use std::process::Command;
 
 pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
 
@@ -50,8 +52,32 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
         .values_of("")
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
-    println!("we're supposed to execute elba-{} {:?}", cmd, ext_args);
-    Ok(format!("finished executing elba-{} {:?}", cmd, ext_args))
+
+    Command::new(cmd)
+        .args(&ext_args)
+        .spawn()
+        .with_context(|e| {
+            format_err!(
+                "failed to spawn external command `elba-{} {}`:\n{}",
+                cmd,
+                ext_args.iter().join(" "),
+                e
+            )
+        })?.wait_with_output()
+        .with_context(|e| {
+            format_err!(
+                "failed to get output of external command `elba-{} {}`:\n{}",
+                cmd,
+                ext_args.iter().join(" "),
+                e
+            )
+        })?;
+
+    Ok(format!(
+        "finished executing `elba-{} {}`",
+        cmd,
+        ext_args.iter().join(" ")
+    ))
 }
 
 pub fn logger(_c: &mut Config) -> Logger {

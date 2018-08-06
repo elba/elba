@@ -6,10 +6,11 @@
 //!
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
+use config;
 use directories::BaseDirs;
 use indexmap::IndexMap;
 use package::resolution::DirectRes;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 /// The requested verbosity of output
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
@@ -20,8 +21,9 @@ pub enum Verbosity {
     Quiet,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    #[serde(default)]
     pub profile: Option<Profile>,
     #[serde(default)]
     pub term: Term,
@@ -35,6 +37,7 @@ pub struct Config {
     pub indices: Vec<DirectRes>,
     #[serde(default = "default_codegen")]
     pub default_codegen: String,
+    #[serde(default)]
     pub codegen: IndexMap<String, Codegen>,
 }
 
@@ -43,12 +46,35 @@ fn default_codegen() -> String {
 }
 
 impl Config {
-    pub fn merge_files(&mut self) -> &mut Config {
-        self
-    }
+    pub fn new() -> Result<Config, config::ConfigError> {
+        let mut c = config::Config::new();
 
-    pub fn merge_env(&mut self) -> &mut Config {
-        self
+        let cwd = env::current_dir();
+
+        c.merge(
+            config::File::with_name(
+                format!(
+                    "{}/.elba/config",
+                    BaseDirs::new().unwrap().home_dir().display()
+                ).as_ref(),
+            ).format(config::FileFormat::Toml)
+            .required(false),
+        )?;
+
+        if let Ok(cwd) = cwd {
+            // TODO: I just wanted to reverse the order that the ancestors were merged :v
+            for parent in cwd.ancestors().collect::<Vec<_>>().iter().rev() {
+                c.merge(
+                    config::File::from(parent.join(".elba/config"))
+                        .format(config::FileFormat::Toml)
+                        .required(false),
+                )?;
+            }
+        }
+
+        c.merge(config::Environment::with_prefix("elba"))?;
+
+        c.try_into()
     }
 
     pub fn verbosity(&mut self, v: Verbosity) -> &mut Config {
@@ -85,13 +111,13 @@ fn default_aliases() -> IndexMap<String, String> {
     )
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Profile {
     pub name: String,
     pub email: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Term {
     pub color: bool,
     pub verbosity: Verbosity,
@@ -106,7 +132,7 @@ impl Default for Term {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Directories {
     pub cache: PathBuf,
     pub rest: PathBuf,
@@ -122,7 +148,7 @@ impl Default for Directories {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Codegen {
     pub runner: String,
     pub opts: Vec<String>,

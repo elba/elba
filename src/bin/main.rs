@@ -8,6 +8,7 @@ extern crate elba;
 #[macro_use]
 extern crate failure;
 extern crate indicatif;
+extern crate itertools;
 extern crate toml;
 #[macro_use]
 extern crate slog;
@@ -18,7 +19,7 @@ mod cmds;
 use clap::{App, AppSettings, Arg, ArgMatches};
 use console::style;
 use elba::util::config::{Config, Verbosity};
-use failure::Error;
+use failure::{Error, ResultExt};
 use std::time::Instant;
 
 // Interaction with the main repo would just be implemented as a custom task.
@@ -90,10 +91,9 @@ fn expand_aliases(
 
 fn go() -> Result<String, Error> {
     let args = cli().get_matches();
-    let mut config = Config::default();
+    let mut config =
+        Config::new().with_context(|e| format!("could not load configuration:\n{}", e))?;
     let args = expand_aliases(&mut config, args)?;
-
-    config.merge_files().merge_env();
 
     if args.is_present("verbose") {
         config.verbosity(Verbosity::Verbose);
@@ -119,7 +119,13 @@ fn go() -> Result<String, Error> {
         return exec(&mut config, subcommand_args);
     }
 
-    cmds::execute_external(cmd, subcommand_args)
+    let res = cmds::execute_external(cmd, subcommand_args);
+
+    if res.is_err() {
+        cli().print_help()?;
+    }
+
+    res
 }
 
 // TODO: Actually pretty-print the error, using the `Shell` struct.

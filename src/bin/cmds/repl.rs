@@ -1,4 +1,4 @@
-use super::{args, logger, match_threads, match_backends};
+use super::{args, logger, match_backends, match_threads};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -24,7 +24,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let global_cache = c.directories.cache.clone();
     let logger = logger(c);
     let threads = match_threads(c, args);
-    
+
     let backend = match_backends(c, args);
 
     let ts = (

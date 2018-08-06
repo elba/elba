@@ -1,14 +1,14 @@
-# elba: A Guide
+# The elba Guide
 
-"elba: A Guide" is intended to be a user-facing guide for using `elba` for day-to-day development tasks. It might include information for devs too (who knows).
+"The elba Guide" is intended to be exactly what it says on the tin: a user-facing guide for using `elba` for day-to-day development tasks and understanding its functionality.
 
 ## Building
 
-The guide uses [mdBook](https://github.com/rust-lang-nursery/mdBook) at the moment, so you'll have to install first:
+The guide uses [mdBook](https://github.com/rust-lang-nursery/mdBook) at the moment, so you'll have to install that first:
 
 ```
 $ # install the rust toolchain somehow
-$ # if you're building elba it should be installed already
+$ # if you're building elba or installing with cargo it should be installed already
 $ cargo install mdbook
 ```
 

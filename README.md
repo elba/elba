@@ -4,14 +4,20 @@
 
 A modern and (hopefully!) fast package manager for Idris.
 
-Development is currently in the pre-release stage; it's currently impossible to actually build a package with elba, but hopefully that'll change soon.
-
 ## Installation
 
-`elba` is written in Rust, so the Cargo and the Rust compiler are required for building.
+There are three options for installing elba:
 
-After those are installed, clone this repo and whack `cargo install`.
+1. Download the pre-built binary corresponding to your platform from GitHub Releases and place it in your PATH.
+2. Install the package from Rust's crates.io repository using `cargo install elba`
+3. Manually build and install elba yourself using the source code with `git clone https://github.com/dcao/elba.git && cd elba && cargo install`.
 
-## Testing
+## Documentation
 
-One note for testing is that the integration tests will lock folders in the `data/` directory, since in a real-life application you don't want multiple instances of `elba` clobbering each others' work directory, so make sure to pass `--test-threads 1` to the test binary.
+[The elba Guide](https://github.com/dcao/elba/tree/master/docs) is intended to be the ultimate source of information on using elba and understanding its functionality.
+
+Documentation for elba-the-Rust-library is hosted at [docs.rs/elba](docs.rs/elba).
+
+## License
+
+elba itself is distributed under the [MIT License](./LICENSE).
