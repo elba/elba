@@ -125,7 +125,11 @@ pub fn test(
                 let pb = &pb;
                 scope.execute(move || {
                     pb.println(format!("{:>7} {}", style("[tst]").blue(), &test.name));
-                    let out = Command::new(bin_dir.join(&test.name)).output();
+                    let out = if let Some(r) = &backend.runner {
+                        Command::new(r).arg(bin_dir.join(&test.name)).output()
+                    } else {
+                        Command::new(bin_dir.join(&test.name)).output()
+                    };
                     if out.is_err() {
                         pb.println(format!(
                             "{:>7} Test binary {} could not be executed",
