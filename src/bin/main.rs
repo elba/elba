@@ -139,7 +139,7 @@ fn main() {
         Err(e) => {
             eprintln!("{} {}", style("[err]").red().bold(), e);
             exit(1);
-        },
+        }
         Ok(st) => {
             let elapsed = start.elapsed();
             if !st.is_empty() {

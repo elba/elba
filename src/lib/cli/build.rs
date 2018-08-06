@@ -211,8 +211,7 @@ pub fn install(
         let mut manifest = fs::File::open(sources[NodeIndex::new(0)].path().join("elba.toml"))
             .context(format_err!("failed to read maifest file (elba.toml)"))?;
         manifest.read_to_string(&mut contents)?;
-        let manifest =
-            Manifest::from_str(&contents)?;
+        let manifest = Manifest::from_str(&contents)?;
 
         // By default, we build all bin targets.
         let mut root = vec![];
@@ -245,14 +244,7 @@ pub fn install(
         let binc = bins.len();
 
         println!("{} Installing binaries...", style("[5/5]").dim().bold());
-        for (path, sum) in bins {
-            println!(
-                "{:>7} {}",
-                style("[ins]").blue(),
-                path.file_name().unwrap().to_string_lossy().as_ref()
-            );
-            cache.store_bin(&path, &sum, force)?;
-        }
+        cache.store_bins(&bins, force)?;
 
         Ok(format!(
             "{} binaries installed into {}",

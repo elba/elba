@@ -415,7 +415,13 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                 Err(e) => {
                     // This case encapsulates everything from "no versions were found" to "the package
                     // literally doesn't exist in the index"
-                    println!("{:>7} Couldn't add package {} {}: {}", style("[wrn]").yellow().bold(), package.0, package.1, e);
+                    println!(
+                        "{:>7} Couldn't add package {} {}: {}",
+                        style("[wrn]").yellow().bold(),
+                        package.0,
+                        package.1,
+                        e
+                    );
                     let pkgs = indexmap!(
                         package.0.clone() => package.1.clone()
                     );

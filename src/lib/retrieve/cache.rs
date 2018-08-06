@@ -52,6 +52,7 @@ use build::Targets;
 use console::style;
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
+use indexmap::IndexMap;
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, Resolution},
@@ -68,6 +69,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use toml;
 use util::{
     clear_dir, copy_dir,
     errors::{ErrorKind, Res},
@@ -184,21 +186,53 @@ impl Cache {
         OutputLayout::new(lock)
     }
 
-    pub fn store_bin(&self, from: &Path, summary: &str, force: bool) -> Res<()> {
+    pub fn store_bins(&self, bins: &[(PathBuf, String)], force: bool) -> Res<()> {
+        // We use a file .bins in the bin directory to keep track of installed bins
+        let mut dot_f = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(self.layout.bin.join(".bins"))
+            .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
+
+        let mut dot = String::new();
+        dot_f
+            .read_to_string(&mut dot)
+            .with_context(|e| format_err!("could not read .bins file:\n{}", e))?;
+
+        let mut dot: IndexMap<String, String> = toml::from_str(&dot)
+            .with_context(|e| format_err!("could not deserialize .bins file:\n{}", e))?;
+
+        for (path, sum) in bins {
+            println!(
+                "{:>7} {}",
+                style("[ins]").blue(),
+                path.file_name().unwrap().to_string_lossy().as_ref()
+            );
+            self.store_bin(path, force)?;
+            dot.insert(
+                // We can unwrap the file name; we checked for an error in store_bin
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_owned()
+                    .to_string(),
+                sum.to_string(),
+            );
+        }
+
+        dot_f
+            .write_all(toml::to_string(&dot).unwrap().as_bytes())
+            .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
+
+        Ok(())
+    }
+
+    fn store_bin(&self, from: &Path, force: bool) -> Res<()> {
         let bin_name = from
             .file_name()
             .ok_or_else(|| format_err!("{} isn't a path to a binary", from.display()))?;
         let to = self.layout.bin.join(bin_name);
-
-        // We use a file .bins in the bin directory to keep track of installed bins
-        let mut dot = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.layout.bin.join(".bins"))
-            .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
-
-        dot.write(format!("{} = {}", bin_name.to_string_lossy().as_ref(), summary).as_bytes())
-            .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
 
         if !force && to.exists() {
             bail!(
@@ -213,6 +247,7 @@ impl Cache {
 
         fs::File::create(&to)
             .with_context(|e| format_err!("couldn't create file {}:\n{}", to.display(), e))?;
+
         let _ = fs::copy(&from, &to).with_context(|e| {
             format_err!(
                 "couldn't copy {} to {}:\n{}",
@@ -248,23 +283,25 @@ impl Cache {
                 .read(true)
                 .open(self.layout.bin.join(".bins"))
                 .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
-            let r = BufReader::new(&f);
 
-            for line in r.lines().map(|l| l.unwrap()) {
-                let mut split = line.splitn(2, '=');
-                let (bin, sum) = (split.next().unwrap(), split.next());
-                if (bins.is_empty() || bins.contains(&bin))
-                    && sum.map(|x| contains(x, query)).unwrap_or(false)
-                {
-                    fs::remove_file(self.layout.bin.join(&bin))
-                        .with_context(|e| format_err!("couldn't remove binary {}:\n{}", bin, e))?;
-                    c += 1;
-                } else {
-                    s.push_str(&line);
-                }
+            f.read_to_string(&mut s)
+                .with_context(|e| format_err!("could not read from .bins file:\n{}", e))?;
+
+            let dot: IndexMap<String, String> = toml::from_str(&s)
+                .with_context(|e| format_err!("could not deserialize .bins file:\n{}", e))?;
+
+            let (dot, discard): (IndexMap<_, _>, IndexMap<_, _>) =
+                dot.into_iter().partition(|(bin, sum)| {
+                    (bins.is_empty() || bins.contains(&bin.as_str())) && contains(sum, query)
+                });
+
+            for (bin, _) in discard {
+                fs::remove_file(self.layout.bin.join(&bin))
+                    .with_context(|e| format_err!("couldn't remove binary {}:\n{}", bin, e))?;
+                c += 1;
             }
 
-            f.write(s.as_bytes())
+            f.write(toml::to_string(&dot).unwrap().as_bytes())
                 .with_context(|e| format_err!("couldn't write to .bins file:\n{}", e))?;
         }
 
