@@ -14,6 +14,7 @@ directories = "1"
 failure = "0.1"
 flate2 = "1.0"
 git2 = "0.7"
+glob = "0.2"
 indexmap = { version = "1", features = ["serde-1"] }
 indicatif = { git = "https://github.com/mitsuhiko/indicatif.git" }
 Inflector = "0.11"
