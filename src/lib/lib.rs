@@ -10,6 +10,7 @@ extern crate directories;
 extern crate failure;
 extern crate flate2;
 extern crate git2;
+extern crate glob;
 #[macro_use]
 extern crate indexmap;
 extern crate indicatif;

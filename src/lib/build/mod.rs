@@ -5,6 +5,7 @@ pub mod invoke;
 pub mod job;
 
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
+use glob::glob;
 use retrieve::cache::{Binary, OutputLayout, Source};
 use std::{fs, path::PathBuf};
 use util::{clear_dir, errors::Res};
@@ -119,20 +120,21 @@ pub fn compile_lib(
         .map(|mod_name| {
             let path: PathBuf = mod_name.replace(".", "/").into();
             path.with_extension("idr")
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
     let invocation = CompileInvocation {
         src: &src_path,
         deps,
         targets: &targets,
-        build: &layout.build.join("lib"),
+        build: &layout.build,
     };
 
     invocation.exec(bcx)?;
 
     for target in targets {
         let target_bin = target.with_extension("ibc");
-        let from = layout.build.join("lib").join(&target_bin);
+        let from = layout.build.join(&target_bin);
         // We strip the library prefix before copying
         // target_bin is something like src/Test.ibc
         // we want to move build/src/Test.ibc to lib/Test.ibc
@@ -170,7 +172,7 @@ pub fn compile_bin(
         src: &src_path,
         deps,
         targets: &[target_path.clone()],
-        build: &layout.build.join("bin"),
+        build: &layout.build,
     };
 
     compile_invoke.exec(bcx)?;
@@ -178,7 +180,7 @@ pub fn compile_bin(
     let target_bin = target_path.with_extension("ibc");
 
     let codegen_invoke = CodegenInvocation {
-        binary: &layout.build.join("bin").join(&target_bin),
+        binary: &layout.build.join(&target_bin),
         output: bin_target.name.clone(),
         layout: &layout,
         is_artifact: false,
@@ -187,5 +189,14 @@ pub fn compile_bin(
     // The output exectable will always go in target/bin
     codegen_invoke.exec(bcx)?;
 
-    Ok(layout.bin.join(bin_target.name.clone()))
+    // Find the codegen executable since different backend
+    // generates by different format.
+    let pattern = layout.bin.join(&bin_target.name).with_extension("*");
+    let bin_path = glob(&format!("{}", &pattern.display()))
+        .unwrap()
+        .filter_map(Result::ok)
+        .next()
+        .ok_or_else(|| format_err!("Codegen invocation does not generate target file."))?;
+
+    Ok(bin_path)
 }

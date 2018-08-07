@@ -9,7 +9,7 @@ use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::iter::FromIterator;
 use std::{collections::HashSet, path::PathBuf};
-use util::{errors::Res, graph::Graph, lock::DirLock};
+use util::{errors::Res, graph::Graph, lock::DirLock, clear_dir};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -296,7 +296,6 @@ impl JobQueue {
                             self.graph[child].work = Work::None;
                         }
                     }
-                    // TODO: log error?
                     Err(err) => {
                         pb.finish_and_clear();
                         println!("{}", err);
@@ -304,6 +303,10 @@ impl JobQueue {
                     }
                 }
             }
+        }
+
+        if let Some(root_ol) = self.root_ol {
+            clear_dir(&root_ol.build).ok();
         }
 
         let mut bins_vec = vec![];
