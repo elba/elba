@@ -16,7 +16,7 @@ There are three options for installing elba:
 
 [The elba Guide](https://github.com/dcao/elba/tree/master/docs) is intended to be the ultimate source of information on using elba and understanding its functionality.
 
-Documentation for elba-the-Rust-library is hosted at [docs.rs/elba](docs.rs/elba).
+Documentation for elba-the-Rust-library is hosted at [docs.rs/elba](https://docs.rs/elba).
 
 ## License
 

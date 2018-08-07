@@ -3,7 +3,7 @@
 This section intends to be a whirlwind tour of all the functionality available with elba. For more information on each step, refer to either the Usage or Reference chapters.
 
 ### Creating a package
-Creating a package is easy with elba: all you need is a package name. Note that names in elba are special in that they are *always namespaced*; every name in elba comes with a group part and a name part, separated with a slash. For more information, see the chapter on [identifying packages](../reference/identifying_packages).
+Creating a package is easy with elba: all you need is a package name. Note that names in elba are special in that they are *always namespaced*; every name in elba comes with a group part and a name part, separated with a slash. For more information, see the information on names in the [manifest chapter](../usage/manifest.md).
 
 ```sh
 $ elba new asd # won't work: no namespace
@@ -25,14 +25,12 @@ If you already have an Idris project and want to turn it into an elba project, u
 Now that a new package has been created, you can start to add packages as part of your dependencies. A package can originate from one of three places: a git repository, a file directory, or a package index. Ordinary dependencies are placed under the `[dependencies]` section, while dependencies that are only needed for tests and the like are placed under `[dev_dependencies]`. Examples are shown below:
 
 ```toml
-# snip
 [dependencies]
 "index/version" = "0.1.5" # uses the default index (i.e. the first specified one in configuration)
 "index/explicit" = { version = "0.1.5", index = "index+dir+../index" } # uses the index specified
 "directory/only" = { path = "../awesome" } # uses the package in the path specified
 "git/master" = { git = "https://github.com/doesnt/exist" } # uses the master branch
 "git/explicit" = { git = "https://github.com/doesnt/exist", branch = "beta" } # "branch" can be an arbitrary git ref: a tag, commit, etc.
-# snip
 ```
 
 For more information on the syntax regarding specifying and adding custom indices, see the chapters on [Resolutions](../reference/resolutions.md) and [Configuration](../usage/configuration.md). More information about dependency specification syntax is available at [its relevant chapter](../reference/specifying_dependencies.md).
@@ -47,22 +45,26 @@ The manifest also allows you to specify which targets you want to have built for
 
 - A **library target** allows this package to be depended on by other packages. A package can only have one library, and the syntax follows the following:
 
-```toml
-[targets.lib]
-path = "src/" # the path which contains all of the lib files (*cannot* be a parent directory)
-mods = [ # a list of files to export
-    "Awesome.A", # the file src/Awesome/A.idr
-    "Control.Zygohistomorphic.Prepromorphisms", # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
-]
-```
+  ```toml
+  [targets.lib]
+  # the path which contains all of the lib files (*cannot* be a parent directory)
+  path = "src/"
+  # a list of files to export
+  mods = [
+      "Awesome.A", # the file src/Awesome/A.idr
+      "Control.Zygohistomorphic.Prepromorphisms", # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
+  ]
+  ```
 
 - A **bin target** specifies a binary to be built. Multiple binaries can correspond to one package.
 
-```toml
-[[targets.bin]]
-name = "awes" # the name of the binary to create
-main = "src/Awesome/B.idr" # the path to the Main module of the binary
-```
+  ```toml
+  [[targets.bin]]
+  # the name of the binary to create
+  name = "awes"
+  # the path to the Main module of the binary
+  main = "src/Awesome/B.idr"
+  ```
 
 - A **test target** specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use `[[targets.test]]` to specify them and the test binary can depend on the dev-dependencies as well as the root package's library (at the moment, tests require a library target to be present).
 

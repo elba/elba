@@ -92,11 +92,19 @@ pub fn match_backends(c: &mut Config, args: &ArgMatches) -> BuildBackend {
             .unwrap()
             .into_owned()
     } else {
-        c.default_codegen.to_owned()
+        c.default_codegen.name.to_owned()
+    };
+
+    let portable = if args.is_present("backend") {
+        false
+    } else if args.is_present("portable-backend") {
+        true
+    } else {
+        c.default_codegen.portable
     };
 
     BuildBackend {
-        portable: args.is_present("portable-backend"),
+        portable,
         runner: c.codegen.get(&name).map(|x| x.runner.clone()),
         name,
         opts: args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),

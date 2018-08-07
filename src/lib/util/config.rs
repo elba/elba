@@ -35,14 +35,25 @@ pub struct Config {
     // In future, default for "indices" should be only the official index...
     #[serde(default)]
     pub indices: Vec<DirectRes>,
-    #[serde(default = "default_codegen")]
-    pub default_codegen: String,
+    #[serde(default)]
+    pub default_codegen: DefaultCodegen,
     #[serde(default)]
     pub codegen: IndexMap<String, Codegen>,
 }
 
-fn default_codegen() -> String {
-    "c".to_string()
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DefaultCodegen {
+    pub name: String,
+    pub portable: bool,
+}
+
+impl Default for DefaultCodegen {
+    fn default() -> Self {
+        DefaultCodegen {
+            name: "c".to_string(),
+            portable: false,
+        }
+    }
 }
 
 impl Config {
@@ -96,7 +107,7 @@ impl Default for Config {
             alias: default_aliases(),
             directories: Directories::default(),
             indices: Vec::default(),
-            default_codegen: default_codegen(),
+            default_codegen: DefaultCodegen::default(),
             codegen: IndexMap::new(),
         }
     }
@@ -107,7 +118,6 @@ fn default_aliases() -> IndexMap<String, String> {
         "i".to_owned() => "install".to_owned(),
         "b".to_owned() => "build".to_owned(),
         "t".to_owned() => "test".to_owned(),
-        "r".to_owned() => "run".to_owned(),
     )
 }
 
@@ -135,7 +145,6 @@ impl Default for Term {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Directories {
     pub cache: PathBuf,
-    pub rest: PathBuf,
 }
 
 impl Default for Directories {
@@ -143,7 +152,6 @@ impl Default for Directories {
         Directories {
             // TOOD: no unwrapperino pls
             cache: BaseDirs::new().unwrap().home_dir().join(".elba"),
-            rest: BaseDirs::new().unwrap().home_dir().join(".elba"),
         }
     }
 }
