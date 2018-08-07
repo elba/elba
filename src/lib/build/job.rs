@@ -9,7 +9,7 @@ use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::iter::FromIterator;
 use std::{collections::HashSet, path::PathBuf};
-use util::{errors::Res, graph::Graph, lock::DirLock};
+use util::{clear_dir, errors::Res, graph::Graph, lock::DirLock};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -303,6 +303,18 @@ impl JobQueue {
                         bail!("one or more packages couldn't be built")
                     }
                 }
+            }
+        }
+
+        if let Some(ol) = root_ol.as_ref() {
+            let res = clear_dir(&ol.build);
+            if let Err(e) = res {
+                println!(
+                    "{:>7} Couldn't clear build directory {}: {}",
+                    style("[err]").yellow().bold(),
+                    ol.build.display(),
+                    e
+                );
             }
         }
 

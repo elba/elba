@@ -9,6 +9,7 @@ extern crate directories;
 #[macro_use]
 extern crate failure;
 extern crate flate2;
+extern crate fs2;
 extern crate git2;
 #[macro_use]
 extern crate indexmap;

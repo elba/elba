@@ -4,6 +4,7 @@
 //! need to lock directories to prevent other processes from using them.
 
 use failure::{Error, ResultExt};
+use fs2::FileExt;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -19,21 +20,43 @@ pub struct DirLock {
 
 impl DirLock {
     pub fn acquire(path: &Path) -> Result<Self, Error> {
-        // Note! canonicalize will error if the path does not already exist.
-        // let path = fs::canonicalize(path).context(ErrorKind::Locked)?;
+        fs::create_dir_all(&path).with_context(|e| {
+            format_err!(
+                "couldn't create dir {} while locking: {}",
+                path.display(),
+                e
+            )
+        })?;
 
-        let lock_path = { path.with_extension("lock") };
+        let lock_path = path.join(".dirlock");
 
-        let res = fs::OpenOptions::new()
+        let f = fs::OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(&lock_path)
-            .map(|_| DirLock {
-                path: path.to_path_buf(),
-                lock_path,
-            }).context(format_err!("path {} is locked", path.display()))?;
+            .with_context(|e| {
+                format_err!("couldn't open lockfile {}: {}", lock_path.display(), e)
+            })?;
 
-        Ok(res)
+        if f.metadata()
+            .with_context(|e| format_err!("couldn't get lockfile metadata: {}", e))?
+            .len()
+            != 0
+        {
+            bail!(
+                "lockfile name conflict with existing file {}",
+                lock_path.display()
+            )
+        }
+
+        f.lock_exclusive().with_context(|e| {
+            format_err!("couldn't lock lockfile {}: {}", lock_path.display(), e)
+        })?;
+
+        Ok(DirLock {
+            path: path.to_path_buf(),
+            lock_path,
+        })
     }
 
     pub fn path(&self) -> &Path {
@@ -43,6 +66,51 @@ impl DirLock {
 
 impl Drop for DirLock {
     fn drop(&mut self) {
+        let f = fs::OpenOptions::new()
+            .read(true)
+            .create(true)
+            .open(&self.lock_path);
+
+        if let Ok(f) = f {
+            let _ = f.unlock();
+        }
+
         let _ = fs::remove_file(&self.lock_path);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    extern crate tempdir;
+
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn dirlock_simple() {
+        // As long as nothing panics, we're ok.
+        let tmp = tempdir::TempDir::new("elba").unwrap();
+        DirLock::acquire(tmp.path()).unwrap();
+    }
+
+    #[test]
+    fn dirlock_wrong_order() {
+        // As long as nothing panics, we're ok.
+        let tmp = tempdir::TempDir::new("elba").unwrap();
+        let lock = DirLock::acquire(tmp.path()).unwrap();
+
+        // Purposely drop in the wrong order
+        drop(tmp);
+        drop(lock);
+    }
+
+    #[test]
+    fn dirlock_existing_err() {
+        let tmp = tempdir::TempDir::new("elba").unwrap();
+        fs::write(tmp.path().join(".dirlock"), b"hello world").unwrap();
+
+        let lock = DirLock::acquire(tmp.path());
+
+        assert!(lock.is_err());
     }
 }

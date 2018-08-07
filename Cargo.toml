@@ -13,6 +13,7 @@ digest = { version = "0.7", features = ["std"]}
 directories = "1"
 failure = "0.1"
 flate2 = "1.0"
+fs2 = "0.4"
 git2 = "0.7"
 indexmap = { version = "1", features = ["serde-1"] }
 indicatif = { git = "https://github.com/mitsuhiko/indicatif.git" }
@@ -41,6 +42,7 @@ walkdir = "2"
 
 [dev-dependencies]
 lazy_static = "1"
+tempdir = "0.3"
 
 [lib]
 name = "elba"
