@@ -2,7 +2,7 @@
 
 use self::version::Constraint;
 use super::{
-    resolution::{DirectRes, IndexRes, Resolution},
+    resolution::{DirectRes, IndexRes},
     *,
 };
 use failure::{Error, ResultExt};
@@ -48,13 +48,12 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn summary(&self) -> Summary {
-        let pid = PackageId::new(self.package.name.clone(), Resolution::Root);
-        Summary::new(pid, self.package.version.clone())
-    }
-
     pub fn version(&self) -> &Version {
         &self.package.version
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.package.name
     }
 
     pub fn deps(&self, def_index: &IndexRes, dev_deps: bool) -> IndexMap<PackageId, Constraint> {

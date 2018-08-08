@@ -23,7 +23,7 @@ $ elba install --bin yeet # only install the binary named "yeet"
 If one or more package indices is [specified in elba's configuration](./configuration.md), you also have the option of installing a package from one of those indices. `elba install` optionally takes a **package spec** as an argument, which consists of three parts:
 
 - The name of the package to install (required)
-- The **resolution** of the package; for the time being, this must be the url of an index (see [Indices](../reference/indices.md))
+- The **resolution** of the package; for the time being, this must be the resolution of an index (see [Resolutions](../reference/resolutions.md))
 - The version of the package
 
 The following are examples of valid `elba install` invocations:

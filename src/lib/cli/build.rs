@@ -491,7 +491,11 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Graph::default()
     };
 
-    let root = manifest.summary();
+    let root = {
+        let cur = env::current_dir().with_context(|e| format_err!("unable to get current directory: {}", e))?;
+        let pid = PackageId::new(manifest.name().clone(), DirectRes::Dir { url: cur }.into());
+        Summary::new(pid, manifest.version().clone())
+    };
 
     let def_index = def_index(ctx);
 

@@ -20,7 +20,6 @@ use util::{hexify_hash, lock::DirLock};
 pub enum Resolution {
     Direct(DirectRes),
     Index(IndexRes),
-    Root,
 }
 
 impl From<DirectRes> for Resolution {
@@ -40,9 +39,7 @@ impl FromStr for Resolution {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let direct = DirectRes::from_str(s);
-        if s == "root" {
-            Ok(Resolution::Root)
-        } else if direct.is_ok() {
+        if direct.is_ok() {
             direct.map(Resolution::Direct)
         } else {
             IndexRes::from_str(s).map(Resolution::Index)
@@ -55,7 +52,6 @@ impl fmt::Display for Resolution {
         match self {
             Resolution::Direct(d) => write!(f, "{}", d),
             Resolution::Index(i) => write!(f, "{}", i),
-            Resolution::Root => write!(f, "root"),
         }
     }
 }

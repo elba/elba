@@ -21,7 +21,9 @@ The namespaced name and version are the two most important parts of this specifi
 > Having to supply a namespace to all package names might seem like unnecessary work, but it has its benefits; this design decision to require all package names to be namespaced was borne out of observations of other package ecosystems where the lack of namespaces lead to significant problems down the line. In particular, namespaced packages provide the following benefits:
 >
 > - Packages which should belong to a single "group" or are a part of a single ecosystem can easily be grouped together, rather than using ad-hoc kinda-sorta-namespacing by prefixing all related packages with some name, which any untrusted package uploader can do
+>
 > - Name-squatting becomes less of an issue; instead of one global `http` package in a package index, there are now separate `jsmith/http` or `whatever/http` packages
+>
 > - Namespacing doesn't stop people from coming up with "creative" names; you can still create a package called `jsmith/unicorns_and_butterflies` if you'd like.
 
 ### `[dependencies]` and `[dev_dependencies]`
@@ -114,4 +116,4 @@ An example workspace section is shown below:
 
 ### An aside: the lockfile
 
-In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called `elba.lock`. This lockfile SHOULD NOT be modified in any way, as it can lead to unpredictable results during the build process.
+In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called `elba.lock`. This lockfile **should not be modified** in any way, as it can lead to unpredictable results during the build process.

@@ -567,11 +567,11 @@ impl Source {
             return Source::from_folder(pkg, lock, location);
         }
 
-        if manifest.summary().name() != pkg.name() {
+        if manifest.name() != pkg.name() {
             bail!(
                 "names don't match: {} was declared, but {} was found in elba.toml",
                 pkg.name(),
-                manifest.summary().name()
+                manifest.name()
             )
         }
 

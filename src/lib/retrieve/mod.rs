@@ -12,14 +12,13 @@ use failure::{Error, ResultExt};
 use index::Indices;
 use indicatif::{ProgressBar, ProgressStyle};
 use package::{
-    resolution::{DirectRes, IndexRes, Resolution},
+    resolution::{IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
-use std::env;
 use util::errors::{ErrorKind, Res};
 use util::graph::Graph;
 
@@ -76,13 +75,8 @@ impl<'cache> Retriever<'cache> {
             |_, sum| {
                 pb.println(format!("{:>7} {}", style("[rtv]").blue(), sum.to_string()));
 
-                let wd = DirectRes::Dir {
-                    url: env::current_dir()?,
-                };
-
                 let loc = match sum.resolution() {
                     Resolution::Direct(direct) => direct,
-                    Resolution::Root => &wd,
                     Resolution::Index(_) => &self.indices.select(sum).unwrap().location,
                 };
 
@@ -149,10 +143,6 @@ impl<'cache> Retriever<'cache> {
                 .meta()
                 .version()
                 .clone());
-        }
-
-        if let Resolution::Root = pkg.resolution() {
-            return Ok(self.root.version.clone());
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self

@@ -4,7 +4,7 @@
 
 use failure::{Error, ResultExt};
 use indexmap::IndexSet;
-use petgraph;
+use petgraph::{self, graph::NodeIndex};
 use std::iter::FromIterator;
 use toml;
 use util::graph::Graph;
@@ -37,10 +37,7 @@ impl FromStr for LockfileToml {
 // TODO: Is here a good place for these?
 impl Into<LockfileToml> for Graph<Summary> {
     fn into(self) -> LockfileToml {
-        // TODO: Is the unwrap safe here?
-        let root = self
-            .find_by(|sum| *sum.resolution() == Resolution::Root)
-            .unwrap();
+        let root = &self[NodeIndex::new(0)];
 
         let pkg_iter = self
             .sub_tree(self.find_id(root).unwrap())
