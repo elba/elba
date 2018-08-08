@@ -17,5 +17,3 @@
     - [Indices](./reference/indices.md)
     - [Dependencies](./reference/dependencies.md)
     - [The Global Cache](./reference/cache.md)
-
-[FAQ](./faq.md)

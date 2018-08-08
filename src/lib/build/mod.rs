@@ -12,8 +12,8 @@ use util::{clear_dir, errors::Res};
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
 pub enum Target {
-    /// Typecheck a library without codegen
-    Lib,
+    /// Build a library; the bool field is whether we should use codegen too
+    Lib(bool),
     /// Compile a standalone executable which doesn't require the package's lib to be
     /// built
     ///
@@ -31,7 +31,7 @@ pub enum Target {
 impl Target {
     pub fn as_bytes(&self) -> [u8; 5] {
         match self {
-            Target::Lib => [0, 0, 0, 0, 0],
+            Target::Lib(x) => [0, 0, 0, 0, *x as u8],
             Target::Doc => [1, 0, 0, 0, 0],
             Target::Bin(x) => {
                 let x = *x as u32;
@@ -66,7 +66,7 @@ impl Targets {
 
         for i in ts {
             match i {
-                Target::Lib => {
+                Target::Lib(_) => {
                     if !seen_lib {
                         res.push(i);
                         seen_lib = true;
@@ -78,14 +78,14 @@ impl Targets {
                 Target::Test(_) => {
                     if !seen_lib {
                         seen_lib = true;
-                        res.insert(0, Target::Lib);
+                        res.insert(0, Target::Lib(false));
                         res.push(i);
                     }
                 }
                 Target::Doc => {
                     if !seen_lib {
                         seen_lib = true;
-                        res.insert(0, Target::Lib);
+                        res.insert(0, Target::Lib(false));
                         res.push(i);
                     }
                 }
@@ -98,6 +98,7 @@ impl Targets {
 
 pub fn compile_lib(
     source: &Source,
+    codegen: bool,
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
@@ -130,6 +131,8 @@ pub fn compile_lib(
 
     invocation.exec(bcx)?;
 
+    let mut lib_files = vec![];
+
     for target in targets {
         let target_bin = target.with_extension("ibc");
         let from = layout.build.join("lib").join(&target_bin);
@@ -139,7 +142,24 @@ pub fn compile_lib(
         let to = layout.lib.join(&target_bin);
 
         fs::create_dir_all(to.parent().unwrap())?;
-        fs::rename(from, to)?;
+        fs::rename(&from, &to)?;
+
+        if codegen {
+            lib_files.push(to);
+        }
+    }
+
+    if codegen {
+        clear_dir(&layout.artifacts.join(&bcx.backend.name))?;
+        
+        let codegen_invoke = CodegenInvocation {
+            binary: &lib_files,
+            output: &bcx.backend.name,
+            layout: &layout,
+            is_artifact: true,
+        };
+
+        codegen_invoke.exec(&bcx)?;
     }
 
     Ok(())
@@ -178,8 +198,8 @@ pub fn compile_bin(
     let target_bin = target_path.with_extension("ibc");
 
     let codegen_invoke = CodegenInvocation {
-        binary: &layout.build.join("bin").join(&target_bin),
-        output: bin_target.name.clone(),
+        binary: &[layout.build.join("bin").join(&target_bin)],
+        output: &bin_target.name,
         layout: &layout,
         is_artifact: false,
     };

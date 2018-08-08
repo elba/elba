@@ -45,7 +45,7 @@ impl JobQueue {
                 let targets = if node == NodeIndex::new(0) {
                     root.clone()
                 } else {
-                    Targets::new(vec![Target::Lib])
+                    Targets::new(vec![Target::Lib(false)])
                 };
                 let build_hash = BuildHash::new(source, &solve, &targets);
 
@@ -178,8 +178,8 @@ impl JobQueue {
 
                                 for t in ts {
                                     match t {
-                                        Target::Lib => {
-                                            compile_lib(&source, &deps, &layout, bcx)
+                                        Target::Lib(cg) => {
+                                            compile_lib(&source, cg, &deps, &layout, bcx)
                                                 .with_context(|e| {
                                                     format!(
                                                         "{:>7} Couldn't build package {}\n{}",
@@ -349,7 +349,7 @@ impl Default for Job {
     fn default() -> Self {
         Job {
             work: Work::None,
-            targets: Targets::new(vec![Target::Lib]),
+            targets: Targets::new(vec![Target::Lib(false)]),
         }
     }
 }

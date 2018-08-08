@@ -411,8 +411,6 @@ impl Cache {
 pub struct Layout {
     /// Root directory of the Layout
     pub root: PathBuf,
-    /// Build location of codegen'd libraries
-    pub artifacts: PathBuf,
     /// Location to dump binaries
     pub bin: PathBuf,
     /// Source download directory
@@ -430,7 +428,6 @@ impl Layout {
         let layout = Layout {
             root: root.to_path_buf(),
             bin: root.join("bin"),
-            artifacts: root.join("artifacts"),
             src: root.join("src"),
             build: root.join("build"),
             indices: root.join("indices"),
@@ -439,7 +436,6 @@ impl Layout {
 
         // create_dir_all ignores pre-existing folders
         fs::create_dir_all(&layout.root)?;
-        fs::create_dir_all(&layout.artifacts)?;
         fs::create_dir_all(&layout.bin)?;
         fs::create_dir_all(&layout.src)?;
         fs::create_dir_all(&layout.build)?;

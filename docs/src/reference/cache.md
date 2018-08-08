@@ -5,7 +5,6 @@ elba uses a global cache to store downloaded packages, build packages in a tempo
 ```sh
 ~/.elba/cache or wherever
 |
-|-- artifacts
 |-- bin
 |   +-- .bins
 |-- build
@@ -21,10 +20,6 @@ elba uses a global cache to store downloaded packages, build packages in a tempo
     |-- a78bu877c78deadbeef...
     +-- # snip
 ```
-
-### `artifacts`
-
-The artifacts folder *would be* where the output of codegen'd libraries would be stored... but since this is impossible at the moment, elba doesn't use this folder for anything.
 
 ### `bin`
 

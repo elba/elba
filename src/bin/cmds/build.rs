@@ -1,5 +1,5 @@
 use super::{args, logger, match_backends, match_threads};
-use clap::{App, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
     util::{config::Config, errors::Res},
@@ -11,6 +11,11 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("build")
         .about("Builds the root package")
         .arg(args::target_lib())
+        .arg(
+            Arg::with_name("lib-cg")
+                .long("lib-cg")
+                .help("Use export lists from the library to generate code with the codegen backend")
+        )
         .arg(args::target_bin())
         .arg(args::target_test())
         .arg(args::build_threads())
@@ -35,6 +40,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     let ts = (
         args.is_present("lib"),
+        args.is_present("lib-cg"),
         args.values_of("bin").map(|x| x.collect::<Vec<_>>()),
         args.values_of("test").map(|x| x.collect::<Vec<_>>()),
     );

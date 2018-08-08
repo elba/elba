@@ -45,10 +45,9 @@ impl<'a> CompileInvocation<'a> {
         }
 
         // The moment of truth:
-        let process = process.output()?;
-        // TODO: Better print handling
-        if !process.status.success() {
-            bail!("{}", String::from_utf8_lossy(&process.stdout))
+        let res = process.output()?;
+        if !res.status.success() {
+            bail!("Invocation: {:#?}\n{}", process, String::from_utf8_lossy(&res.stdout))
         }
 
         Ok(())
@@ -59,8 +58,8 @@ impl<'a> CompileInvocation<'a> {
 // we look to CodegenInvocation.
 #[derive(Debug)]
 pub struct CodegenInvocation<'a> {
-    pub binary: &'a Path,
-    pub output: String,
+    pub binary: &'a [PathBuf],
+    pub output: &'a str,
     pub layout: &'a OutputLayout,
     /// Whether the output should be treated as a binary (false) or artifact files (true)
     pub is_artifact: bool,
@@ -71,12 +70,10 @@ impl<'a> CodegenInvocation<'a> {
         // Invoke the compiler.
         // TODO: Canonicalize the build path?
         let mut process = bcx.compiler.process();
-        let cwd;
 
         process
             .current_dir(if self.is_artifact {
-                cwd = self.layout.artifacts.join(&bcx.backend.name);
-                &cwd
+                &self.layout.artifacts
             } else {
                 &self.layout.bin
             }).args(&["-o", &self.output])
@@ -88,6 +85,10 @@ impl<'a> CodegenInvocation<'a> {
                 },
                 &bcx.backend.name,
             ]);
+
+        if self.is_artifact {
+            process.arg("--interface");
+        }
 
         if !bcx.backend.opts.is_empty() {
             process
@@ -101,13 +102,15 @@ impl<'a> CodegenInvocation<'a> {
             process.args(val.split(' ').collect::<Vec<_>>());
         }
 
-        process.arg(&self.binary);
+        for bin in self.binary {
+            process.arg(bin);
+        }
 
-        let process = process.output()?;
+        let res = process.output()?;
         // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
         // function in the file, so we check if stdout is empty instead
-        if !process.stdout.is_empty() {
-            bail!("{}", String::from_utf8_lossy(&process.stdout))
+        if !res.stdout.is_empty() {
+            bail!("Invocation: {:#?}\n{}", process, String::from_utf8_lossy(&res.stdout))
         }
 
         Ok(())

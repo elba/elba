@@ -86,7 +86,7 @@ pub fn test(
         let bin_dir = layout.bin.clone();
 
         let mut root = vec![];
-        root.push(Target::Lib);
+        root.push(Target::Lib(false));
         let emp = targets.is_empty();
         for (ix, bt) in manifest.targets.test.iter().enumerate() {
             if emp || targets.contains(&bt.name.as_str()) {
@@ -373,7 +373,7 @@ pub fn repl(
 pub fn build(
     ctx: &BuildCtx,
     project: &Path,
-    targets: &(bool, Option<Vec<&str>>, Option<Vec<&str>>),
+    targets: &(bool, bool, Option<Vec<&str>>, Option<Vec<&str>>),
     backend: &BuildBackend,
 ) -> Res<String> {
     let mut contents = String::new();
@@ -384,14 +384,14 @@ pub fn build(
 
     // By default, we build all lib and bin targets.
     let mut root = vec![];
-    if (targets.1.is_none() || targets.0) && manifest.targets.lib.is_some() {
-        root.push(Target::Lib);
-    } else if targets.0 {
+    if (targets.2.is_none() || targets.0 || targets.1) && manifest.targets.lib.is_some() {
+        root.push(Target::Lib(targets.1));
+    } else if targets.0 || targets.1 {
         // The user specifically asked for a lib target but there wasn't any. Error.
         bail!("the package doesn't have a library target. add one before proceeding")
     }
 
-    if targets.1.as_ref().is_some() && manifest.targets.bin.is_empty() {
+    if targets.2.as_ref().is_some() && manifest.targets.bin.is_empty() {
         // The user specifically asked for a bin target(s) but there wasn't any. Error.
         bail!("the package doesn't have any binary targets. add one before proceeding")
     }
@@ -400,19 +400,19 @@ pub fn build(
         // Case 1: If the --bin flag is passed by itself, we assume the user wants all binaries.
         //         Or, the --bin flag might come with the name of a binary which we should build.
         let target_specified = targets
-            .1
+            .2
             .as_ref()
             .map(|v| v.is_empty() || v.contains(&bt.name.as_str()))
             .unwrap_or(false);
-        // Case 2: Neither --bin nor --lib are specified.
-        let neither_specified = !targets.0 && targets.1.is_none();
+        // Case 2: Neither --bin nor --lib are specified. We're fine with --lib-cg.
+        let neither_specified = !targets.0 && targets.2.is_none();
         if target_specified || neither_specified {
             root.push(Target::Bin(ix));
         }
     }
 
     // We only build test targets if the user asks for them.
-    if let Some(ts) = &targets.2 {
+    if let Some(ts) = &targets.3 {
         for (ix, bt) in manifest.targets.test.iter().enumerate() {
             let target_specified = ts.is_empty() || ts.contains(&bt.name.as_str());
             if target_specified {

@@ -14,8 +14,6 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     if p.exists() {
         let layout = Layout::new(&p)?;
 
-        clear_dir(&layout.artifacts)
-            .context(format_err!("couldn't clear {}", layout.artifacts.display()))?;
         clear_dir(&layout.src).context(format_err!("couldn't clear {}", layout.src.display()))?;
         clear_dir(&layout.build)
             .context(format_err!("couldn't clear {}", layout.build.display()))?;
