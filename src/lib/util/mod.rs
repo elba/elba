@@ -107,7 +107,7 @@ pub fn clear_dir(dir: &Path) -> Res<()> {
     if dir.exists() {
         fs::remove_dir_all(dir)?;
     }
-    fs::create_dir(dir)?;
+    fs::create_dir_all(dir)?;
     Ok(())
 }
 

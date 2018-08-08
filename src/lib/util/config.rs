@@ -36,20 +36,20 @@ pub struct Config {
     #[serde(default)]
     pub indices: Vec<DirectRes>,
     #[serde(default)]
-    pub default_codegen: DefaultCodegen,
+    pub default_backend: DefaultBackend,
     #[serde(default)]
-    pub codegen: IndexMap<String, Codegen>,
+    pub backend: IndexMap<String, Backend>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct DefaultCodegen {
+pub struct DefaultBackend {
     pub name: String,
     pub portable: bool,
 }
 
-impl Default for DefaultCodegen {
+impl Default for DefaultBackend {
     fn default() -> Self {
-        DefaultCodegen {
+        DefaultBackend {
             name: "c".to_string(),
             portable: false,
         }
@@ -107,8 +107,8 @@ impl Default for Config {
             alias: default_aliases(),
             directories: Directories::default(),
             indices: Vec::default(),
-            default_codegen: DefaultCodegen::default(),
-            codegen: IndexMap::new(),
+            default_backend: DefaultBackend::default(),
+            backend: IndexMap::new(),
         }
     }
 }
@@ -157,7 +157,7 @@ impl Default for Directories {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Codegen {
+pub struct Backend {
     pub runner: String,
     pub opts: Vec<String>,
 }

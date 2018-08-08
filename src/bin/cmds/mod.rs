@@ -92,7 +92,7 @@ pub fn match_backends(c: &mut Config, args: &ArgMatches) -> BuildBackend {
             .unwrap()
             .into_owned()
     } else {
-        c.default_codegen.name.to_owned()
+        c.default_backend.name.to_owned()
     };
 
     let portable = if args.is_present("backend") {
@@ -100,12 +100,12 @@ pub fn match_backends(c: &mut Config, args: &ArgMatches) -> BuildBackend {
     } else if args.is_present("portable-backend") {
         true
     } else {
-        c.default_codegen.portable
+        c.default_backend.portable
     };
 
     BuildBackend {
         portable,
-        runner: c.codegen.get(&name).map(|x| x.runner.clone()),
+        runner: c.backend.get(&name).map(|x| x.runner.clone()),
         name,
         opts: args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),
     }
@@ -155,9 +155,9 @@ mod args {
 
     pub fn backends() -> Vec<Arg> {
         vec![
-            Arg::with_name("codegen")
-                .long("codegen")
-                .conflicts_with("portable-codegen")
+            Arg::with_name("backend")
+                .long("backend")
+                .conflicts_with("portable-backend")
                 .takes_value(true)
                 .number_of_values(1)
                 .help("Specifies the codegen backend to use during code generation"),

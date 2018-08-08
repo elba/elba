@@ -98,7 +98,7 @@ In order to know which files to build and how to build them, elba manifest files
 
 An elba package **must** specify either a lib target or a bin target, or else the manifest will be rejected as invalid.
 
-For local packages, after building, all binaries will be output to the `target/bin` folder, and any library will be output to the `target/lib` folder. Note that while you can use a codegen backend with binaries, you currently cannot with libraries (i.e. what would normally be accomplished with the `--interface` flag). This is a deficiency that will be fixed in a future release.
+For local packages, after building, all binaries will be output to the `target/bin` folder, and any library will be output to the `target/lib` folder. Additionally, for libraries, if you pass the `--lib-cg` flag, elba will use the codegen backend specified (or the C backend by default) and any export lists specified in the exported files of the library to create output files under `target/artifacts/<codegen name>` (for more information on export lists and the like, see [this test case in the Idris compiler](https://github.com/idris-lang/Idris-dev/tree/master/test/ffi006)).
 
 ### `[workspace]`
 

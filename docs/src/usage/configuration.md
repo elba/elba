@@ -23,7 +23,7 @@ A complete default elba configuration file is listed below. Any options which ar
 ```toml
 indices = []
 
-[default_codegen]
+[default_backend]
 name = "c"
 portable = "false"
 
@@ -50,7 +50,7 @@ This key specifies all of the indices that should be made available to packages 
 
 At the moment, the default indices list is empty, but in the future, if we make an official elba package index, the first item in this list will become that official index by default.
 
-#### `[default_codegen]`
+#### `[default_backend]`
 
 This section defines options for the default codegen backend, including its name and whether it's portable or not.
 
@@ -85,13 +85,13 @@ $ elba b # builds the local package with the default alias settings
 
 This section only contains one key: `cache`, for the location where the global cache should be placed. This controls not only the location of elba's temporary build directories but also the location of the global bin directory.
 
-#### `[codegen]`
+#### `[backend]`
 
 This section also contains no values by default, and can be used to specify extra information about a codegen backend, like what command to use when running binaries generated with that backend, and any extra options to pass to the backend.
 
 ```toml
 # an example:
-[codegen.node]
+[backend.node]
 # we want to run node binaries with "node __":
 runner = "node"
 # and we want to pass the option "--potatoes" to the code generator:

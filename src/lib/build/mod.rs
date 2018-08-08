@@ -110,8 +110,6 @@ pub fn compile_lib(
         )
     })?;
 
-    clear_dir(&layout.lib)?;
-
     // We know that lib_target.path will be relative to the package root
     let src_path = source.path().join(&lib_target.path.0);
     let targets = lib_target
@@ -130,6 +128,8 @@ pub fn compile_lib(
     };
 
     invocation.exec(bcx)?;
+
+    clear_dir(&layout.lib)?;
 
     let mut lib_files = vec![];
 
@@ -154,7 +154,7 @@ pub fn compile_lib(
         
         let codegen_invoke = CodegenInvocation {
             binary: &lib_files,
-            output: &bcx.backend.name,
+            output: source.meta().name().name(),
             layout: &layout,
             is_artifact: true,
         };

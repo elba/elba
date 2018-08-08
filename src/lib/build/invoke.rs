@@ -47,7 +47,12 @@ impl<'a> CompileInvocation<'a> {
         // The moment of truth:
         let res = process.output()?;
         if !res.status.success() {
-            bail!("Invocation: {:#?}\n{}", process, String::from_utf8_lossy(&res.stdout))
+            bail!(
+                "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
+                process,
+                String::from_utf8_lossy(&res.stderr),
+                String::from_utf8_lossy(&res.stdout)
+            )
         }
 
         Ok(())
@@ -70,10 +75,16 @@ impl<'a> CodegenInvocation<'a> {
         // Invoke the compiler.
         // TODO: Canonicalize the build path?
         let mut process = bcx.compiler.process();
+        let cwd;
 
+        if self.is_artifact {
+            process.arg("--interface");
+        }
+        
         process
             .current_dir(if self.is_artifact {
-                &self.layout.artifacts
+                cwd = self.layout.artifacts.join(&bcx.backend.name);
+                &cwd
             } else {
                 &self.layout.bin
             }).args(&["-o", &self.output])
@@ -85,10 +96,6 @@ impl<'a> CodegenInvocation<'a> {
                 },
                 &bcx.backend.name,
             ]);
-
-        if self.is_artifact {
-            process.arg("--interface");
-        }
 
         if !bcx.backend.opts.is_empty() {
             process
@@ -110,7 +117,12 @@ impl<'a> CodegenInvocation<'a> {
         // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
         // function in the file, so we check if stdout is empty instead
         if !res.stdout.is_empty() {
-            bail!("Invocation: {:#?}\n{}", process, String::from_utf8_lossy(&res.stdout))
+            bail!(
+                "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
+                process,
+                String::from_utf8_lossy(&res.stderr),
+                String::from_utf8_lossy(&res.stdout)
+            )
         }
 
         Ok(())

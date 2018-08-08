@@ -12,11 +12,10 @@ pub fn cli() -> App<'static, 'static> {
         .about("Builds the root package")
         .arg(args::target_lib())
         .arg(
-            Arg::with_name("lib-cg")
-                .long("lib-cg")
-                .help("Use export lists from the library to generate code with the codegen backend")
-        )
-        .arg(args::target_bin())
+            Arg::with_name("lib-cg").long("lib-cg").help(
+                "Use export lists from the library to generate code with the codegen backend",
+            ),
+        ).arg(args::target_bin())
         .arg(args::target_test())
         .arg(args::build_threads())
         .args(&args::backends())
