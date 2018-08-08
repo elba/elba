@@ -16,6 +16,7 @@ environment:
 install:
   - ps: >-
       If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+        ren "C:\Program Files\Git\usr\bin\sh.exe" _sh.exe
         $Env:PATH += ';C:\msys64\mingw64\bin'
       } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
         $Env:PATH += ';C:\msys64\mingw32\bin'

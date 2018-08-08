@@ -1,31 +1,16 @@
-extern crate elba;
-#[macro_use]
-extern crate lazy_static;
-extern crate semver;
-#[macro_use]
-extern crate slog;
-extern crate slog_async;
-extern crate slog_term;
-extern crate url;
-
+use super::util::{index, CACHE};
 use elba::{
-    index::{Index, Indices},
+    index::Indices,
     package::{
         resolution::{DirectRes, IndexRes, Resolution},
         Name, PackageId, Summary,
     },
     resolve::Resolver,
-    retrieve::{Cache, Retriever},
-    util::{graph::Graph, lock::DirLock},
+    retrieve::Retriever,
+    util::graph::Graph,
 };
 use semver::Version;
-use slog::*;
-use std::{path::PathBuf, str::FromStr};
-
-lazy_static! {
-    static ref LOGGER: Logger = new_logger();
-    static ref CACHE: Cache = cache();
-}
+use std::str::FromStr;
 
 macro_rules! sum {
     ($a:tt, $b:tt) => {{
@@ -36,17 +21,6 @@ macro_rules! sum {
         );
         Summary::new(root_pkg, Version::parse($b).unwrap())
     }};
-}
-
-fn new_logger() -> Logger {
-    /*
-    let decorator = slog_term::TermDecorator::new().build();
-    let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    */
-
-    // Suppress logging output during tests - we don't need to see it
-    Logger::root(slog::Discard, o!())
 }
 
 // Even though we could use &CACHE.get_indices, we don't here.
@@ -61,26 +35,9 @@ fn new_logger() -> Logger {
 // dependencies() would turn short names into proper `DirectRes` structs. By doing this, we could
 // do the env! trick within just the index.toml file.
 fn indices() -> Indices {
-    let url = DirectRes::from_str("dir+data/index/").unwrap();
-    let start = env!("CARGO_MANIFEST_DIR");
-    let mut path = PathBuf::new();
-    path.push(start);
-    path.push("tests/data/index");
-
-    let path = DirLock::acquire(&path).unwrap();
-
-    let v = vec![Index::from_disk(url, path).unwrap()];
+    let v = vec![index()];
 
     Indices::new(v)
-}
-
-fn cache() -> Cache {
-    let start = env!("CARGO_MANIFEST_DIR");
-    let mut path = PathBuf::new();
-    path.push(start);
-    path.push("tests/data/cache");
-
-    Cache::from_disk(&LOGGER, &path).unwrap()
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {
