@@ -41,11 +41,11 @@ fn index_dir() -> TempDir {
     let mut path = PathBuf::new();
     path.push(start);
     path.push("tests/data/index");
-    
+
     let tmp = TempDir::new("elba").unwrap();
-    
+
     copy_dir(&path, tmp.path()).unwrap();
-    
+
     tmp
 }
 
@@ -56,8 +56,8 @@ fn cache_dir() -> TempDir {
     path.push("tests/data/cache");
 
     let tmp = TempDir::new("elba").unwrap();
-    
+
     copy_dir(&path, tmp.path()).unwrap();
-    
+
     tmp
 }

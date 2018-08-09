@@ -48,6 +48,16 @@ pub struct Manifest {
 }
 
 impl Manifest {
+    // Returns only the workspace portion of a manifest.
+    pub fn workspace(s: &str) -> Option<IndexMap<Name, SubPath>> {
+        toml::value::Value::try_from(&s)
+            .ok()?
+            .get("workspace")?
+            .clone()
+            .try_into()
+            .ok()
+    }
+
     pub fn version(&self) -> &Version {
         &self.package.version
     }

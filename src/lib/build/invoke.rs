@@ -80,7 +80,7 @@ impl<'a> CodegenInvocation<'a> {
         if self.is_artifact {
             process.arg("--interface");
         }
-        
+
         process
             .current_dir(if self.is_artifact {
                 cwd = self.layout.artifacts.join(&bcx.backend.name);

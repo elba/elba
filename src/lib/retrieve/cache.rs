@@ -554,14 +554,16 @@ impl Source {
         file.read_to_string(&mut contents)
             .context(ErrorKind::InvalidIndex)?;
 
-        let manifest = Manifest::from_str(&contents)?;
-
-        if let Some(p) = manifest.workspace.get(pkg.name()) {
-            let lock = DirLock::acquire(&path.path().join(&p.0))?;
-            // We immediately release our lock on the parent folder
-            drop(path);
-            return Source::from_folder(pkg, lock, location);
+        if let Some(x) = Manifest::workspace(&contents) {
+            if let Some(p) = x.get(pkg.name()) {
+                let lock = DirLock::acquire(&path.path().join(&p.0))?;
+                // We immediately release our lock on the parent folder
+                drop(path);
+                return Source::from_folder(pkg, lock, location);
+            }
         }
+
+        let manifest = Manifest::from_str(&contents)?;
 
         if manifest.name() != pkg.name() {
             bail!(

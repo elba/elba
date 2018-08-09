@@ -151,7 +151,7 @@ pub fn compile_lib(
 
     if codegen {
         clear_dir(&layout.artifacts.join(&bcx.backend.name))?;
-        
+
         let codegen_invoke = CodegenInvocation {
             binary: &lib_files,
             output: source.meta().name().name(),

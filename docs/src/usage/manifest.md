@@ -114,6 +114,8 @@ An example workspace section is shown below:
 "other/pkg" = "wherever/youd/like"
 ```
 
+Note that a a `[workspace]` section can stand alone and be parsed as a valid manifest if there is no package in the root directory.
+
 ### An aside: the lockfile
 
 In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called `elba.lock`. This lockfile **should not be modified** in any way, as it can lead to unpredictable results during the build process.
