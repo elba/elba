@@ -16,11 +16,9 @@ environment:
 install:
   - ps: >-
       If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
-        set PATH=%PATH:C:\Program Files (x86)\Git\bin;=%
         copy c:\msys64\mingw64\bin\mingw32-make.exe c:\msys64\mingw64\bin\make.exe
         $Env:PATH += ';C:\msys64\mingw64\bin;C:\msys64\usr\bin'
       } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
-        set PATH=%PATH:C:\Program Files (x86)\Git\bin;=%
         copy c:\msys64\mingw32\bin\mingw32-make.exe c:\msys64\mingw32\bin\make.exe
         $Env:PATH += ';C:\msys64\mingw32\bin;C:\msys64\usr\bin'
       }
