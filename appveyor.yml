@@ -8,7 +8,7 @@ environment:
 
   matrix:
     # Testing other channels
-    - TARGET: x86_64-pc-windows-gnu
+    - TARGET: i686-pc-windows-msvc
       RUST_VERSION: nightly
     - TARGET: x86_64-pc-windows-msvc
       RUST_VERSION: nightly
@@ -16,9 +16,11 @@ environment:
 install:
   - ps: >-
       If ($Env:TARGET -eq 'x86_64-pc-windows-gnu') {
+        ren "C:\Program Files\Git\usr\bin\sh.exe" _sh.exe
         copy c:\msys64\mingw64\bin\mingw32-make.exe c:\msys64\mingw64\bin\make.exe
         $Env:PATH += ';C:\msys64\mingw64\bin;C:\msys64\usr\bin'
       } ElseIf ($Env:TARGET -eq 'i686-pc-windows-gnu') {
+        ren "C:\Program Files\Git\usr\bin\sh.exe" _sh.exe
         copy c:\msys64\mingw32\bin\mingw32-make.exe c:\msys64\mingw32\bin\make.exe
         $Env:PATH += ';C:\msys64\mingw32\bin;C:\msys64\usr\bin'
       }
