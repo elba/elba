@@ -273,10 +273,11 @@ impl Cache {
                 query.resolution.as_ref(),
                 query.version.as_ref(),
             ) {
-                (name, _, Some(ver)) => {
-                    sum.contains(name.as_str()) && sum.contains(&ver.to_string())
+                (_, Some(_), Some(_)) => sum == query.to_string(),
+                (name, None, Some(ver)) => {
+                    sum.starts_with(&name.to_string()) && sum.ends_with(&ver.to_string())
                 }
-                _ => sum.contains(&query.to_string()),
+                _ => sum.starts_with(&query.to_string()),
             }
         };
 

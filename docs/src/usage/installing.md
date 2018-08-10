@@ -29,10 +29,31 @@ If one or more package indices is [specified in elba's configuration](./configur
 The following are examples of valid `elba install` invocations:
 
 ```sh
-$ elba install jsmith/one # install the latest version of `jsmith/one` from the default index
-$ elba install "jsmith/one|1.0.0" # install version 1.0.0 of `jsmith/one` from the default index
-$ elba install "jsmith/one@index+tar+https://example.com/index.tar.gz" # install the latest version of `jsmith/one` from the index specified
-$ elba install "jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0" # install version 1.0.0 of `jsmith/one` from the index specified
+# installs the latest version of `jsmith/one` from the default index:
+$ elba install "jsmith/one"
+# installs version 1.0.0 of `jsmith/one` from the default index:
+$ elba install "jsmith/one|1.0.0"
+# installs the latest version of `jsmith/one` from the index specified:
+$ elba install "jsmith/one@index+tar+https://example.com/index.tar.gz"
+# installs version 1.0.0 of `jsmith/one` from the index specified:
+$ elba install "jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0"
 ```
 
 As with installing a local package, if you want to replace any old binaries in the global bin directory, use the `--force` flag, and if you want to choose which binaries to install, use the `--bin` flag.
+
+### Uninstalling a package
+
+Uninstalling a package is much the same process as installing: just pass a spec
+to the `elba uninstall` invocation. Note that one key different here is that
+`elba uninstall` will eagerly try to uninstall as much as it can given the spec:
+
+```sh
+# uninstalls every version of every package named `jsmith/one` regardless of index:
+$ elba uninstall "jsmith/one"
+# uninstalls version 1.0.0 of every package named `jsmith/one` regardless of index:
+$ elba uninstall "jsmith/one|1.0.0"
+# uninstalls every version of `jsmith/one` originating from this index:
+$ elba uninstall "jsmith/one@index+tar+https://example.com/index.tar.gz"
+# uninstalls version 1.0.0 of `jsmith/one` originating from this index:
+$ elba uninstall "jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0"
+```

@@ -85,15 +85,15 @@ impl Config {
         self.backend
             .iter()
             .find(|x| x.default)
-            .map(|x| x.clone())
-            .unwrap_or_else(|| Backend::default())
+            .cloned()
+            .unwrap_or_else(Backend::default)
     }
 
     pub fn get_backend(&self, name: &str) -> Option<Backend> {
         self.backend
             .iter()
             .find(|x| x.name == name)
-            .map(|x| x.clone())
+            .cloned()
     }
 }
 
