@@ -114,3 +114,14 @@ pub fn clear_dir(dir: &Path) -> Res<()> {
 fn valid_file(entry: &DirEntry) -> bool {
     entry.file_type().is_file()
 }
+
+pub fn generate_ipkg(name: &str, src_dir: &str, opts: &str, mods: &str) -> String {
+    format!(
+        r#"package {}
+sourcedir = {}
+opts = "{}"
+modules = {}
+    "#,
+        name, src_dir, opts, mods
+    )
+}

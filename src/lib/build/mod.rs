@@ -5,9 +5,10 @@ pub mod invoke;
 pub mod job;
 
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
+use failure::ResultExt;
 use retrieve::cache::{Binary, OutputLayout, Source};
-use std::{fs, path::PathBuf};
-use util::{clear_dir, errors::Res};
+use std::{env, fs, path::PathBuf};
+use util::{clear_dir, errors::Res, generate_ipkg};
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -79,15 +80,15 @@ impl Targets {
                     if !seen_lib {
                         seen_lib = true;
                         res.insert(0, Target::Lib(false));
-                        res.push(i);
                     }
+                    res.push(i);
                 }
                 Target::Doc => {
                     if !seen_lib {
                         seen_lib = true;
                         res.insert(0, Target::Lib(false));
-                        res.push(i);
                     }
+                    res.push(i);
                 }
             }
         }
@@ -222,4 +223,74 @@ pub fn compile_bin(
     } else {
         bail!("couldn't locate codegen output file: {}", out.display())
     }
+}
+
+pub fn compile_doc(
+    source: &Source,
+    deps: &[&Binary],
+    layout: &OutputLayout,
+    bcx: &BuildContext,
+) -> Res<()> {
+    let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
+        format_err!(
+            "package {} doesn't contain a lib target, which is needed to build docs",
+            source.meta().name()
+        )
+    })?;
+
+    // If we're compiling docs, we assume that we've already built the lib
+
+    // Generate IPKG file
+    let name = source.meta().name().name();
+    let lib_path = "lib";
+    let mut opts = String::new();
+    let mods = lib_target.mods.join(", ");
+
+    // Include dependencies
+    for binary in deps {
+        // We assume that the binary has already been compiled
+        opts.push_str(format!("-i {}", &*binary.target.path().to_string_lossy()).as_ref());
+    }
+
+    // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
+    // conflicting flags will be ignored (idris chooses the earliest flags first)
+    if let Ok(val) = env::var("IDRIS_OPTS") {
+        opts.push_str(&val);
+    }
+
+    let ipkg = generate_ipkg(&name, lib_path, &opts, &mods);
+
+    fs::write(layout.build.join(".ipkg"), ipkg.as_bytes())
+        .with_context(|e| format_err!("couldn't create temporary .ipkg file:\n{}", e))?;
+
+    clear_dir(&layout.build.join("docs"))?;
+
+    let mut process = bcx.compiler.process();
+    process.current_dir(&layout.build);
+    process.arg("--mkdoc").arg(".ipkg");
+
+    let res = process.output()?;
+    if !res.status.success() {
+        bail!(
+            "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
+            process,
+            String::from_utf8_lossy(&res.stderr),
+            String::from_utf8_lossy(&res.stdout)
+        )
+    }
+
+    fs::remove_file(layout.build.join(".ipkg"))
+        .with_context(|e| format_err!("couldn't remove temporary .ipkg file:\n{}", e))?;
+
+    clear_dir(&layout.docs)?;
+
+    fs::rename(layout.build.join(format!("{}_doc", &name)), &layout.docs).with_context(|e| {
+        format_err!(
+            "docs located at {}_doc; couldn't move them to docs:\n{}",
+            name,
+            e
+        )
+    })?;
+
+    Ok(())
 }

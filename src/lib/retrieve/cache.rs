@@ -465,9 +465,9 @@ pub struct OutputLayout {
     pub root: PathBuf,
     pub artifacts: PathBuf,
     pub bin: PathBuf,
+    pub docs: PathBuf,
     pub lib: PathBuf,
     pub build: PathBuf,
-    pub deps: PathBuf,
     pub hash: Option<BuildHash>,
 }
 
@@ -480,9 +480,9 @@ impl OutputLayout {
             root: root.clone(),
             artifacts: root.join("artifacts"),
             bin: root.join("bin"),
+            docs: root.join("docs"),
             lib: root.join("lib"),
             build: root.join("build"),
-            deps: root.join("deps"),
             hash: fs::read(root.join("hash"))
                 .map(|x| BuildHash(String::from_utf8_lossy(&x).to_string()))
                 .ok(),
@@ -490,10 +490,11 @@ impl OutputLayout {
 
         // create_dir_all ignores pre-existing folders
         fs::create_dir_all(&layout.root)?;
+        fs::create_dir_all(&layout.artifacts)?;
         fs::create_dir_all(&layout.bin)?;
+        fs::create_dir_all(&layout.docs)?;
         fs::create_dir_all(&layout.lib)?;
         fs::create_dir_all(&layout.build)?;
-        fs::create_dir_all(&layout.deps)?;
 
         Ok(layout)
     }

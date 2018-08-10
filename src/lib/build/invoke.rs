@@ -6,6 +6,7 @@ use retrieve::cache::{Binary, OutputLayout};
 use std::{
     env,
     path::{Path, PathBuf},
+    process::Output,
 };
 use util::{clear_dir, copy_dir, errors::Res};
 
@@ -19,7 +20,7 @@ pub struct CompileInvocation<'a> {
 }
 
 impl<'a> CompileInvocation<'a> {
-    pub fn exec(&self, bcx: &BuildContext) -> Res<()> {
+    pub fn exec(&self, bcx: &BuildContext) -> Res<Output> {
         clear_dir(&self.build)?;
         copy_dir(&self.src, &self.build)?;
 
@@ -55,7 +56,7 @@ impl<'a> CompileInvocation<'a> {
             )
         }
 
-        Ok(())
+        Ok(res)
     }
 }
 

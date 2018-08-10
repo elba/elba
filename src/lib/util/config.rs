@@ -90,10 +90,7 @@ impl Config {
     }
 
     pub fn get_backend(&self, name: &str) -> Option<Backend> {
-        self.backend
-            .iter()
-            .find(|x| x.name == name)
-            .cloned()
+        self.backend.iter().find(|x| x.name == name).cloned()
     }
 }
 

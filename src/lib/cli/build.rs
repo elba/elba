@@ -370,6 +370,65 @@ pub fn repl(
     })
 }
 
+pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
+    let mut contents = String::new();
+    let mut manifest = fs::File::open(project.join("elba.toml"))
+        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+    manifest.read_to_string(&mut contents)?;
+    let manifest = Manifest::from_str(&contents)?;
+
+    // By default, we build all lib and bin targets.
+    let mut root = vec![];
+    if manifest.targets.lib.is_some() {
+        root.push(Target::Lib(false));
+        root.push(Target::Doc);
+    } else {
+        // The user specifically asked for a lib target but there wasn't any. Error.
+        bail!("the package doesn't have a library target. add one before proceeding")
+    }
+    let root = Targets::new(root);
+
+    solve_local(ctx, &project, 4, |cache, mut retriever, solve| {
+        println!("{} Retrieving packages...", style("[3/4]").dim().bold());
+        let sources = retriever
+            .retrieve_packages(&solve)
+            .context(format_err!("package retrieval failed"))?;
+
+        // We drop the Retriever because we want to release our lock on the Indices as soon as we
+        // can to avoid stopping other instances of elba from downloading and resolving (even
+        // though we don't even need the Retriever anymore).
+        drop(retriever);
+
+        let backend = Backend::default();
+
+        let ctx = BuildContext {
+            // We just use the default backend cause it doesn't matter for this case
+            backend: &backend,
+            // TODO: pick a better compiler pls
+            compiler: Compiler::default(),
+            config: BuildConfig {},
+            cache,
+            threads: ctx.threads,
+        };
+
+        println!(
+            "{} Building targets + root docs...",
+            style("[4/4]").dim().bold()
+        );
+
+        // We want to store the outputs of our labor in a local target directory.
+        let lock = DirLock::acquire(&project.join("target"))?;
+        let layout = OutputLayout::new(lock).context("could not create local target directory")?;
+
+        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
+        // Because we're just building, we don't need to do anything after executing the build
+        // process. Yay abstraction!
+        q.exec(&ctx)?;
+
+        Ok("docs output available at `./target/docs`".to_string())
+    })
+}
+
 pub fn build(
     ctx: &BuildCtx,
     project: &Path,

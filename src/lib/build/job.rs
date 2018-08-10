@@ -1,4 +1,4 @@
-use super::{compile_bin, compile_lib, context::BuildContext, Target, Targets};
+use super::{compile_bin, compile_doc, compile_lib, context::BuildContext, Target, Targets};
 use console::style;
 use crossbeam::queue::MsQueue;
 use failure::ResultExt;
@@ -96,6 +96,13 @@ impl JobQueue {
         let mut thread_pool = Pool::new(threads);
 
         let root_ol = &self.root_ol;
+        let root_hash = self.graph.inner.raw_nodes().get(0).and_then(|x| {
+            if let Work::Dirty(_, h) = &x.weight.work {
+                Some(h.clone())
+            } else {
+                None
+            }
+        });
 
         // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
         let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
@@ -150,15 +157,6 @@ impl JobQueue {
                             &build_hash.0[0..8]
                         ));
 
-                        // TODO: Change how we print errors?
-                        // As it is right now, we wait until every package in the "layer"
-                        // is built before printing errors; maybe we shouldn't do that
-                        // If we want to do the pb.println thing, we need a:
-                        //
-                        // let pb = &pb;
-                        //
-                        // before the scope.
-
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
                                 let tmp;
@@ -182,7 +180,7 @@ impl JobQueue {
                                             compile_lib(&source, cg, &deps, &layout, bcx)
                                                 .with_context(|e| {
                                                     format!(
-                                                        "{:>7} Couldn't build package {}\n{}",
+                                                        "{:>7} Couldn't build library target for {}\n{}",
                                                         style("[err]").red().bold(),
                                                         source.summary(),
                                                         e
@@ -208,7 +206,8 @@ impl JobQueue {
                                                 bcx,
                                             ).with_context(|e| {
                                                 format!(
-                                                    "{:>7} Couldn't build package {}\n{}",
+                                                    "{:>7} Couldn't build binary {} for {}\n{}",
+                                                    ix,
                                                     style("[err]").red().bold(),
                                                     source.summary(),
                                                     e
@@ -231,12 +230,34 @@ impl JobQueue {
                                                 &deps,
                                                 &layout,
                                                 bcx,
-                                            )?;
+                                            ).with_context(|e| {
+                                                format!(
+                                                    "{:>7} Couldn't build test {} for {}\n{}",
+                                                    ix,
+                                                    style("[err]").red().bold(),
+                                                    source.summary(),
+                                                    e
+                                                )
+                                            })?;
 
                                             // For now, only the root package can do tests, so we
                                             // don't worry about storing the binary anywhere.
                                         }
-                                        Target::Doc => unimplemented!(),
+                                        Target::Doc => {
+                                            compile_doc(
+                                                &source,
+                                                &deps,
+                                                &layout,
+                                                bcx
+                                            ).with_context(|e| {
+                                                format!(
+                                                    "{:>7} Couldn't build docs for {}\n{}",
+                                                    style("[err]").red().bold(),
+                                                    source.summary(),
+                                                    e
+                                                )
+                                            })?;
+                                        }
                                     }
                                 }
 
@@ -315,6 +336,17 @@ impl JobQueue {
                     ol.build.display(),
                     e
                 );
+            }
+
+            if let Some(r) = root_hash {
+                let res = ol.write_hash(&r);
+                if let Err(e) = res {
+                    println!(
+                        "{:>7} Couldn't write build hash (root will be rebuilt on next run): {}",
+                        style("[err]").yellow().bold(),
+                        e
+                    );
+                }
             }
         }
 

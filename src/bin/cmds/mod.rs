@@ -1,5 +1,6 @@
 mod build;
 mod clean;
+mod doc;
 mod init;
 mod install;
 mod lock;
@@ -24,6 +25,7 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
         build::cli(),
         clean::cli(),
+        doc::cli(),
         init::cli(),
         install::cli(),
         new::cli(),
@@ -38,6 +40,7 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
         "build" => Some(build::exec),
         "clean" => Some(clean::exec),
+        "doc" => Some(doc::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
         "new" => Some(new::exec),

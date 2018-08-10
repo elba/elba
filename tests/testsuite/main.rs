@@ -13,7 +13,3 @@ mod build;
 mod index;
 mod resolver;
 mod util;
-
-fn main() {
-    println!("Hello, world!");
-}
