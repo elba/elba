@@ -1,0 +1,292 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Dependencies - The elba Guide</title>
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body class="light">
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">var path_to_root = "../";</script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { } 
+            if (theme === null || theme === undefined) { theme = 'light'; }
+            document.body.className = theme;
+            document.querySelector('html').className = theme + ' js';
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html" class="active"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="../faq.html">FAQ</a></li></ol>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light <span class="default">(default)</span></button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">The elba Guide</h1> 
+
+                        <div class="right-buttons">
+                            <a href="../print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <a class="header" href="#dependencies" id="dependencies"><h2>Dependencies</h2></a>
+<p>The most important job of a package manager is building dependencies of a package. Packages in elba can depend on other packages in external <a href="./indices.html">indices</a>, a local file directory, or a git repository.</p>
+<a class="header" href="#versions" id="versions"><h3>Versions</h3></a>
+<p>Versions in elba follow a slightly modified version of <a href="https://semver.org/">Semantic Versioning</a> in order to ensure that packages stay compatible with each other. Most of the core concepts of Semantic Versioning are carried over:</p>
+<ul>
+<li>Differences in the major version indicate backwards incompatibility.</li>
+<li>Differences in the minor version indicate feature additions.</li>
+<li>Differences in the patch version indicate bug fixes or other non-feature additions.</li>
+<li>Pre-release versions can be indicated with suffixes: <code>1.0.0-pre.2-beta.5</code></li>
+</ul>
+<p>In version constraints, the second and third components of a version can be omitted, in which case they are assumed to be <code>0</code>. A pre-release cannot be specified without also specifying the second and third components.</p>
+<a class="header" href="#version-constraints" id="version-constraints"><h4>Version constraints</h4></a>
+<p>We say that a constraint <strong>satisfies</strong> a particular version if that particular version falls within the version constraint.</p>
+<p>elba's version constraints offer all the same standard operators (<code>&lt;</code>, <code>&gt;</code>, <code>^</code>, <code>~</code>, etc.), but they have some idiosyncrasies which distinguish them from how other package managers
+work.</p>
+<a class="header" href="#inequality-constraints" id="inequality-constraints"><h4>Inequality constraints</h4></a>
+<p>The &quot;lowest-level&quot; constraints elba offers are <strong>inequality constraints</strong>, which are fairly simple: <code>&lt; 1.0.0</code>, <code>&gt;= 1.0.0</code>, etc.</p>
+<p>By default, <strong><code>&lt;</code> constraints will ignore pre-release versions</strong>. for ergonomic reasons. If a package specifies that they depend on <code>&lt; 1.0.0</code>, they likely don't want to have any of the pre-release versions of 1.0.0 selected, even if those technically satisfy the constraint. If a package wants to include the pre-release versions as well it can opt in to pre-releases by adding a bang after the constraint symbol like so: <code>&lt;! 1.0.0</code>.</p>
+<p>The bang trick also works for <code>&gt;=</code> constraints as well: while <code>&gt;= 1.0.0</code> doesn't match pre-releases of <code>1.0.0</code>, <code>&gt;=! 1.0.0</code> does.</p>
+<p>The constraint parser will allow you to add bangs to all types of less-than or greater-than constraints, but some of them won't do anything: <code>&lt;= 1.0.0</code> and <code>&lt;=! 1.0.0</code> mean the exact same thing, as do <code>&gt; 1.0.0</code> and <code>&gt;! 1.0.0</code>.</p>
+<p>Additionally, if the constraint specifies a pre-release, it will satisfy other pre-releases.</p>
+<p>Two inequality constraints can be intersected to produce a new compound constraint. Note that at the moment, this is the only case in which the parser will accept multiple constraints. Additionally, the greater-than bound must be written before the less-than bound.</p>
+<p>The new constraint must allow at least one version for it to be valid:</p>
+<pre><code>&gt;= 1.0.0 &lt; 1.4.2 # valid
+&gt;= 1.0.0 &lt;= 1.0.0 # valid
+&lt; 1 &gt; 0 # invalid: less-than specified before greater-than
+&gt; 1 &lt; 0 # invalid: impossible constraint (satisfies no versions)
+</code></pre>
+<a class="header" href="#caret-constraints" id="caret-constraints"><h4>Caret constraints</h4></a>
+<p><strong>Caret constraints</strong> in elba function the same as in other package managers. To quote <a href="https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#caret-requirements">Cargo's documentation</a>:</p>
+<blockquote>
+<p>Caret requirements allow SemVer compatible updates to a specified version. An update is allowed if the new version number does not modify the left-most non-zero digit in the major, minor, patch grouping.</p>
+</blockquote>
+<p>Here are some examples of caret constraints (also taken from Cargo's documentation):</p>
+<pre><code>^1.2.3 := &gt;= 1.2.3 &lt; 2.0.0
+^1.2   := &gt;= 1.2.0 &lt; 2.0.0
+^1     := &gt;= 1.0.0 &lt; 2.0.0
+^0.2.3 := &gt;= 0.2.3 &lt; 0.3.0
+^0.2   := &gt;= 0.2.0 &lt; 0.3.0
+^0.0.3 := &gt;= 0.0.3 &lt; 0.0.4
+^0.0   := &gt;= 0.0.0 &lt; 0.1.0
+^0     := &gt;= 0.0.0 &lt; 1.0.0
+</code></pre>
+<p>A version without a sigil or inequality is assumed to be a caret constraint.</p>
+<a class="header" href="#tilde-constraints" id="tilde-constraints"><h4>Tilde constraints</h4></a>
+<p><strong>Tilde constraints</strong> are slightly stricted than caret constraints. If a tilde constraint specifies a major and minor version, only changes in the patch version are allowed. If only a major version is specified, changes in the minor and patch versions are allowed.</p>
+<pre><code>~1.2.3 := &gt;= 1.2.3 &lt; 1.3.0
+~1.2   := &gt;= 1.2.0 &lt; 1.3.0
+~1     := &gt;= 1.0.0 &lt; 2.0.0
+~0.2.3 := &gt;= 0.2.3 &lt; 0.3.0
+~0.2   := &gt;= 0.2.0 &lt; 0.3.0
+~0.0.3 := &gt;= 0.0.3 &lt; 0.1.0
+~0.0   := &gt;= 0.0.0 &lt; 0.1.0
+~0     := &gt;= 0.0.0 &lt; 1.0.0
+</code></pre>
+<a class="header" href="#the-any-constraint" id="the-any-constraint"><h4>The <code>any</code> constraint</h4></a>
+<p>If a package doesn't care about what version of a package it uses (which it really should; it's impossible to guarantee infinite perpetual forwards compatibility with a package), the <code>any</code> constraint can be used, which satisfies every version.</p>
+<a class="header" href="#combining-constraints-with-unions" id="combining-constraints-with-unions"><h4>Combining constraints with unions</h4></a>
+<p>Multiple constraints can be combined to form a larger constraint by placing a comma in between each constraint, like so: <code>1.0.0, 2.0.0, &gt;= 3.1.3 &lt;= 3.1.3</code>. This constraint represents the <strong>union</strong> between its three component constraints, and it requires that the version has either a major version <code>1</code> or <code>2</code>, or that it's equal to <code>3.1.3</code>.</p>
+<a class="header" href="#dependency-resolution" id="dependency-resolution"><h3>Dependency Resolution</h3></a>
+<p>Dependency resolution for packages is an extremely hard problem (possibly/probably NP-complete). In order to figure out which versions of a package should be used, elba uses the <a href="https://github.com/dart-lang/pub/blob/master/doc/solver.md">Pubgrub algorithm</a> to do its dependency resolution.</p>
+<p>While all of the gory details of how the algorithm works are available both at that design document and the <a href="https://www.dartlang.org/tools/pub/versioning">Pub documentation</a> (where Pubgrub was first implemented), the main consequence of this decision is that <strong>only one version of a package can be used at a time.</strong> If separate packages depend on different incompatible versions of the same package, elba will return an error during dependency resolution and will refuse to continue until the conflict is solved.</p>
+<p>On the one hand, this aspect of the dependency resolution system has its fair share of drawbacks:</p>
+<ul>
+<li>&quot;Dependency hell&quot; becomes much harder to avoid, since every dependent package is limited to one and only one version</li>
+<li>Getting an ecosystem to upgrade major versions of a package can be much more challenging, as the entire ecosystem is locked to the &quot;stragglers&quot; stuck on previous versions</li>
+</ul>
+<p>However, it does have its advantages:</p>
+<ul>
+<li>Because there will be only one version of a package present at all times, any data structures or functions provided by that package can be used freely across between dependencies without fear of incompatibile data structures due to version differences</li>
+<li>Restricting users to one version of a package simplifies module name conflicts</li>
+</ul>
+<p>Additionally, one benefit that elba gains from using the Pubgrub algorithm is that elba can provide extremely clear error reporting to help pinpoint and fix the conflict in question. For example, given a dependency tree that looks like this:</p>
+<ul>
+<li><code>conflict_simple/root|1.0.0</code> depends on <code>conflict_simple/foo ^1.0.0</code> and <code>conflict_simple/baz ^1.0.0</code>.</li>
+<li><code>conflict_simple/foo|1.0.0</code> depends on <code>conflict_simple/bar ^2.0.0</code>.</li>
+<li><code>conflict_simple/bar|2.0.0</code> depends on <code>conflict_simple/baz ^3.0.0</code>.</li>
+<li><code>conflict_simple/baz|1.0.0</code> and <code>3.0.0</code> have no dependencies.</li>
+<li>All these packages are located at the index <code>index+dir+/index/</code>.</li>
+</ul>
+<p>elba will print the following output when trying to build it:</p>
+<pre><code class="language-sh">$ elba build
+# snip
+[err] version solving has failed
+
+Because conflict_simple/bar@index+dir+/index/ any depends on
+conflict_simple/baz@index+dir+/index/ &gt;=3.0.0 &lt;4.0.0,
+conflict_simple/baz@index+dir+/index/ &lt;!3.0.0, &gt;=!4.0.0 is impossible.
+And because conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 depends
+on conflict_simple/baz@index+dir+/index/ &gt;=1.0.0 &lt;2.0.0,
+conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
+</code></pre>
+<p>Nice!</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../reference/indices.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../reference/cache.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a href="../reference/indices.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a href="../reference/cache.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

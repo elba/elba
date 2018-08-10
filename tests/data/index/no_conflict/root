@@ -1,1 +1,0 @@
-{ "name": "no_conflict/root", "version": "1.0.0", "dependencies": [{ "name": "no_conflict/foo", "index": "index+dir+data/index/", "req": "1.0.0" }], "yanked": false, "location": "dir+test" }

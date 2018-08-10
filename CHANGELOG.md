@@ -1,7 +1,0 @@
-# Changelog
-
-## Unreleased
-
-### Added
-
-- elba :)

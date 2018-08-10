@@ -1,1 +1,0 @@
-{ "name": "conflict_simple/root", "version": "1.0.0", "dependencies": [{ "name": "conflict_simple/foo", "index": "index+dir+data/index/", "req": "1.0.0" }, { "name": "conflict_simple/baz", "index": "index+dir+data/index/", "req": "1.0.0" }], "yanked": false, "location": "dir+test" }

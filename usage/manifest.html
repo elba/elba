@@ -1,0 +1,294 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Manifest - The elba Guide</title>
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
+        <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body class="light">
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">var path_to_root = "../";</script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { } 
+            if (theme === null || theme === undefined) { theme = 'light'; }
+            document.body.className = theme;
+            document.querySelector('html').className = theme + ' js';
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html" class="active"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="../faq.html">FAQ</a></li></ol>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar" class="menu-bar">
+                    <div id="menu-bar-sticky-container">
+                        <div class="left-buttons">
+                            <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                                <i class="fa fa-bars"></i>
+                            </button>
+                            <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                                <i class="fa fa-paint-brush"></i>
+                            </button>
+                            <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                                <li role="none"><button role="menuitem" class="theme" id="light">Light <span class="default">(default)</span></button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                                <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            </ul>
+                            
+                            <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                                <i class="fa fa-search"></i>
+                            </button>
+                            
+                        </div>
+
+                        <h1 class="menu-title">The elba Guide</h1> 
+
+                        <div class="right-buttons">
+                            <a href="../print.html" title="Print this book" aria-label="Print this book">
+                                <i id="print-button" class="fa fa-print"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <a class="header" href="#the-manifest" id="the-manifest"><h2>The Manifest</h2></a>
+<p>In order to keep track of package metadata like the name of a package and what targets should be built for that particular package, elba uses an <code>elba.toml</code> manifest file. This file is divided into several different sections which each provide information to elba about the package in question.</p>
+<a class="header" href="#package" id="package"><h3><code>[package]</code></h3></a>
+<p>The first and most important section of the manifest is the <code>[package]</code> section, which lists all of the metadata about the package. A complete example of a <code>[package]</code> section is shown below:</p>
+<pre><code class="language-toml">[package]
+name = &quot;jsmith/elba&quot;
+version = &quot;0.1.0&quot;
+authors = [&quot;John Smith &lt;dcao@example.com&gt;&quot;]
+license = &quot;MIT&quot;
+</code></pre>
+<p>The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name must be valid Unicode, and the version must follow <a href="https://semver.org/">Semantic Version guidelines</a>. Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format <code>name &lt;email&gt;</code> (this is just a helpful convention to follow). The license field can be omitted entirely.</p>
+<blockquote>
+<a class="header" href="#why-namespacing" id="why-namespacing"><h4>Why namespacing?</h4></a>
+<p>Having to supply a namespace to all package names might seem like unnecessary work, but it has its benefits; this design decision to require all package names to be namespaced was borne out of observations of other package ecosystems where the lack of namespaces lead to significant problems down the line. In particular, namespaced packages provide the following benefits:</p>
+<ul>
+<li>
+<p>Packages which should belong to a single &quot;group&quot; or are a part of a single ecosystem can easily be grouped together, rather than using ad-hoc kinda-sorta-namespacing by prefixing all related packages with some name, which any untrusted package uploader can do</p>
+</li>
+<li>
+<p>Name-squatting becomes less of an issue; instead of one global <code>http</code> package in a package index, there are now separate <code>jsmith/http</code> or <code>whatever/http</code> packages</p>
+</li>
+<li>
+<p>Namespacing doesn't stop people from coming up with &quot;creative&quot; names; you can still create a package called <code>jsmith/unicorns_and_butterflies</code> if you'd like.</p>
+</li>
+</ul>
+</blockquote>
+<a class="header" href="#dependencies-and-dev_dependencies" id="dependencies-and-dev_dependencies"><h3><code>[dependencies]</code> and <code>[dev_dependencies]</code></h3></a>
+<p>These sections of the manifest are mostly self-explanatory; they're a place where you can specify the dependencies that your package needs. All packages in the <code>[dependencies]</code> section will be loaded for every target of the package, while the packages in the <code>[dev_dependencies]</code> section will only be loaded for test targets.</p>
+<p>elba dependencies can originate from one of three places: a package index (think RubyGems or crates.io), in which the package is identified by its version and package index (defaulting to the first package index specified in the <a href="./configuration.html">config file</a>; a git repository, in which the package is identified by the url of the git repo and a git ref name (defaulting to &quot;master&quot;); and a directory tree, in which the package is identified by its path.</p>
+<p>An example of these sections and all the types of dependencies is shown below:</p>
+<pre><code class="language-toml"># deps used for all targets
+[dependencies]
+&quot;index/version&quot; = &quot;0.1.5&quot; # uses the default index (i.e. the first specified one in configuration)
+&quot;index/explicit&quot; = { version = &quot;0.1.5&quot;, index = &quot;index+dir+../index&quot; } # uses the index specified
+&quot;directory/only&quot; = { path = &quot;../awesome&quot; } # uses the package in the path specified
+
+# deps only used for the test targets
+[dev_dependencies]
+&quot;git/master&quot; = { git = &quot;https://github.com/doesnt/exist&quot; } # uses the master branch
+&quot;git/explicit&quot; = { git = &quot;https://github.com/doesnt/exist&quot;, branch = &quot;beta&quot; } # &quot;branch&quot; can be an arbitrary git ref: a tag, commit, etc.
+</code></pre>
+<p>elba's syntax for versioning has <a href="../reference/dependencies.html">several idiosyncrasies of its own</a>, but the tl;dr version is that elba will always pick a version of that package which is greater than or equal to and semver compatible with the version specified.</p>
+<p>For more information about package indices, see the <a href="../reference/indices.html">relevant reference page</a>.</p>
+<a class="header" href="#targets" id="targets"><h3><code>[targets]</code></h3></a>
+<p>In order to know which files to build and how to build them, elba manifest files also must specify a <code>[targets]</code> section. There are three types of targets which elba can build:</p>
+<ul>
+<li>
+<p>A <strong>library target</strong> is exactly what it sounds like: a built library of ibc files which can be used and imported by other elba packages. Each package can only export a single library target; attempting to specify multiple library targets will result in a manifest parsing error. The syntax for a library target is as follows:</p>
+<pre><code class="language-toml">[targets.lib]
+# The path to the library
+path = &quot;src&quot;
+# The list of files which should be exported and made available for public use
+mods = [
+  &quot;Awesome.A&quot;, # the file src/Awesome/A.idr
+  &quot;Control.Zygohistomorphic.Prepromorphisms&quot;, # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
+]
+</code></pre>
+<p>The <code>path</code> key should be a <strong>sub-path</strong> of the package; it cannot reference parent or absolute directories of the package. During the build process, all of the files under the <code>path</code> sub-path will be used to build the library and export the Idris bytecode files corresponding to the items in <code>mods</code>.</p>
+</li>
+<li>
+<p>A <strong>binary target</strong> is a binary which should be generated based on a Main module. Packages can have as many binary targets as they please; by default, all binary targets are built/installed in an <code>elba build</code> or <code>elba install</code> invocation, but this can be changed with the <code>--bin</code> flag. The syntax for a binary target is as follows:</p>
+<pre><code class="language-toml"># The name of the output binary
+name = &quot;whatever&quot;
+# The path to the Main module
+main = &quot;src/bin/Whatever.idr&quot;
+</code></pre>
+<p>During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory <code>src/bin</code> will be made available. Again, the path listed under <code>main</code> must be a sub-path of the package directory.</p>
+</li>
+<li>
+<p>A <strong>test target</strong> shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return <strong>exit code 0 on success</strong> and <strong>any other exit code on failure</strong>. The distinguishing features of a test target are as follows:</p>
+<ul>
+<li>Test targets <strong>require the presence of a library target</strong>.</li>
+<li>Test targets have access to (i.e. can import from) <strong>all dev dependencies</strong> along with <strong>the package's own library target</strong>.</li>
+<li>Test targets can be automatically built and run in one shot using the command <code>elba test</code>.</li>
+</ul>
+<p>You'll note that the syntax for specifying a test target is remarkably similar to that for specifying a binary target:</p>
+<pre><code class="language-toml"># The name of the output test binary
+name = &quot;test-a&quot;
+# The path to the test's Main module
+main = &quot;tests/TestA.idr&quot;
+</code></pre>
+</li>
+</ul>
+<p>An elba package <strong>must</strong> specify either a lib target or a bin target, or else the manifest will be rejected as invalid.</p>
+<p>For local packages, after building, all binaries will be output to the <code>target/bin</code> folder, and any library will be output to the <code>target/lib</code> folder. Note that while you can use a codegen backend with binaries, you currently cannot with libraries (i.e. what would normally be accomplished with the <code>--interface</code> flag). This is a deficiency that will be fixed in a future release.</p>
+<a class="header" href="#workspace" id="workspace"><h3><code>[workspace]</code></h3></a>
+<p>The last section in the manifest is the workspace section, used to indicate subprojects in the current directory. At the moment, the only use for this field is to indicate to elba the location of a package in a subdirectory (for example, with if a git repo has a package located in some subdirectory). Adding a package to the local workspace <em>does not</em> automatically add it as a local dependency of the package, nor does it cause the workspace packages to be automatically built when the root package is built. To add local directories as dependencies, they must manually be specified in either the <code>[dependencies]</code> or <code>[dev_dependencies]</code> sections.</p>
+<p>Note that the directory of every package must be a <strong>sub-path</strong>; it cannot refer to an absolute directory or a directory above the root package.</p>
+<p>An example workspace section is shown below:</p>
+<pre><code class="language-toml">[workspace]
+&quot;name/one&quot; = &quot;pkgs/one&quot;
+&quot;other/pkg&quot; = &quot;wherever/youd/like&quot;
+</code></pre>
+<a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
+<p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../usage/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../usage/installing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a href="../usage/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a href="../usage/installing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

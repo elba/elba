@@ -1,2 +1,0 @@
-{ "name": "conflict_res_partial/shared", "version": "1.0.0", "dependencies": [{ "name": "conflict_res_partial/target", "index": "index+dir+data/index/", "req": "1.0.0" }], "yanked": false, "location": "dir+test" }
-{ "name": "conflict_res_partial/shared", "version": "2.0.0", "dependencies": [], "yanked": false, "location": "dir+test" }
