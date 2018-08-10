@@ -121,11 +121,18 @@ pub fn compile_lib(
             path.with_extension("idr")
         }).collect::<Vec<_>>();
 
+    let mut args = vec![];
+    if let Ok(val) = env::var("IDRIS_OPTS") {
+        args.extend(val.split(' ').map(|x| x.to_owned()));
+    }
+    args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));
+
     let invocation = CompileInvocation {
         src: &src_path,
         deps,
         targets: &targets,
         build: &layout.build.join("lib"),
+        args: &args,
     };
 
     let comp_res = invocation.exec(bcx)?;
@@ -159,6 +166,7 @@ pub fn compile_lib(
             output: source.meta().name().name(),
             layout: &layout,
             is_artifact: true,
+            args: &args,
         };
 
         gen_res = Some(codegen_invoke.exec(&bcx)?);
@@ -187,11 +195,18 @@ pub fn compile_bin(
     // This is the relative target path
     let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
 
+    let mut args = vec![];
+    if let Ok(val) = env::var("IDRIS_OPTS") {
+        args.extend(val.split(' ').map(|x| x.to_owned()));
+    }
+    args.extend(bin_target.idris_opts.iter().map(|x| x.to_owned()));
+
     let compile_invoke = CompileInvocation {
         src: &src_path,
         deps,
         targets: &[target_path.clone()],
         build: &layout.build.join("bin"),
+        args: &args,
     };
 
     let res = compile_invoke.exec(bcx)?;
@@ -210,6 +225,7 @@ pub fn compile_bin(
         output: &*name.to_string_lossy(),
         layout: &layout,
         is_artifact: false,
+        args: &args,
     };
 
     // The output exectable will always go in target/bin

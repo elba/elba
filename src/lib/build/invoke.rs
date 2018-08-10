@@ -4,7 +4,6 @@ use build::context::BuildContext;
 use itertools::Itertools;
 use retrieve::cache::{Binary, OutputLayout};
 use std::{
-    env,
     path::{Path, PathBuf},
     process::Output,
 };
@@ -17,6 +16,7 @@ pub struct CompileInvocation<'a> {
     pub deps: &'a [&'a Binary],
     pub targets: &'a [PathBuf],
     pub build: &'a Path,
+    pub args: &'a [String],
 }
 
 impl<'a> CompileInvocation<'a> {
@@ -34,11 +34,7 @@ impl<'a> CompileInvocation<'a> {
             process.arg("-i").arg(binary.target.path());
         }
 
-        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
-        // conflicting flags will be ignored (idris chooses the earliest flags first)
-        if let Ok(val) = env::var("IDRIS_OPTS") {
-            process.args(val.split(' ').collect::<Vec<_>>());
-        }
+        process.args(self.args);
 
         // Add compile units: the individual files that we want to "export" and make available
         for target in self.targets {
@@ -64,6 +60,7 @@ pub struct CodegenInvocation<'a> {
     pub layout: &'a OutputLayout,
     /// Whether the output should be treated as a binary (false) or artifact files (true)
     pub is_artifact: bool,
+    pub args: &'a [String],
 }
 
 impl<'a> CodegenInvocation<'a> {
@@ -99,11 +96,7 @@ impl<'a> CodegenInvocation<'a> {
                 .arg(bcx.backend.opts.iter().join(" "));
         }
 
-        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
-        // conflicting flags will be ignored (idris chooses the earliest flags first)
-        if let Ok(val) = env::var("IDRIS_OPTS") {
-            process.args(val.split(' ').collect::<Vec<_>>());
-        }
+        process.args(self.args);
 
         for bin in self.binary {
             process.arg(bin);

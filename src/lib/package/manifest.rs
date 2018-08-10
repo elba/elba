@@ -172,6 +172,8 @@ pub struct Targets {
 pub struct LibTarget {
     pub path: SubPath,
     pub mods: Vec<String>,
+    #[serde(default)]
+    pub idris_opts: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -179,6 +181,8 @@ pub struct BinTarget {
     pub name: String,
     // For binaries and tests, this should point to a file with a Main module.
     pub main: SubPath,
+    #[serde(default)]
+    pub idris_opts: Vec<String>,
 }
 
 #[cfg(test)]
@@ -213,6 +217,7 @@ mods = [
     "Control.Monad.Yeet",
     "RingDing.Test"
 ]
+idris_opts = ["--warnpartial", "--warnreach"]
 "#;
 
         assert!(Manifest::from_str(manifest).is_ok());
