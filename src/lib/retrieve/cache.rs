@@ -190,17 +190,17 @@ impl Cache {
         // We use a file .bins in the bin directory to keep track of installed bins
         let mut dot_f = fs::OpenOptions::new()
             .create(true)
-            .read(true)
             .write(true)
+            .read(true)
             .open(self.layout.bin.join(".bins"))
             .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
 
-        let mut dot = String::new();
+        let mut dot_c = String::new();
         dot_f
-            .read_to_string(&mut dot)
+            .read_to_string(&mut dot_c)
             .with_context(|e| format_err!("could not read .bins file:\n{}", e))?;
 
-        let mut dot: IndexMap<String, String> = toml::from_str(&dot)
+        let mut dot: IndexMap<String, String> = toml::from_str(&dot_c)
             .with_context(|e| format_err!("could not deserialize .bins file:\n{}", e))?;
 
         for (path, sum) in bins {
@@ -221,9 +221,14 @@ impl Cache {
             );
         }
 
-        dot_f
-            .write_all(toml::to_string(&dot).unwrap().as_bytes())
-            .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
+        drop(dot_f);
+        fs::remove_file(self.layout.bin.join(".bins"))
+            .with_context(|e| format_err!("could not clear existing .bins file:\n{}", e))?;
+
+        fs::write(
+            self.layout.bin.join(".bins"),
+            toml::to_string(&dot).unwrap().as_bytes(),
+        ).with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
 
         Ok(())
     }
@@ -279,7 +284,6 @@ impl Cache {
         if self.layout.bin.join(".bins").exists() {
             let mut s = String::new();
             let mut f = fs::OpenOptions::new()
-                .write(true)
                 .read(true)
                 .open(self.layout.bin.join(".bins"))
                 .with_context(|e| format_err!("could not open .bins file:\n{}", e))?;
@@ -290,7 +294,7 @@ impl Cache {
             let dot: IndexMap<String, String> = toml::from_str(&s)
                 .with_context(|e| format_err!("could not deserialize .bins file:\n{}", e))?;
 
-            let (dot, discard): (IndexMap<_, _>, IndexMap<_, _>) =
+            let (discard, dot): (IndexMap<_, _>, IndexMap<_, _>) =
                 dot.into_iter().partition(|(bin, sum)| {
                     (bins.is_empty() || bins.contains(&bin.as_str())) && contains(sum, query)
                 });
@@ -301,8 +305,14 @@ impl Cache {
                 c += 1;
             }
 
-            f.write(toml::to_string(&dot).unwrap().as_bytes())
-                .with_context(|e| format_err!("couldn't write to .bins file:\n{}", e))?;
+            drop(f);
+            fs::remove_file(self.layout.bin.join(".bins"))
+                .with_context(|e| format_err!("could not clear existing .bins file:\n{}", e))?;
+
+            fs::write(
+                self.layout.bin.join(".bins"),
+                toml::to_string(&dot).unwrap().as_bytes(),
+            ).with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
         }
 
         Ok(c)

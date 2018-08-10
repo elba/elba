@@ -1,23 +1,16 @@
 use retrieve::cache::Cache;
 use std::{path::PathBuf, process::Command};
+use util::config::Backend;
 
 // TODO: triple target
 #[derive(Debug)]
 pub struct BuildContext<'a> {
-    pub backend: &'a BuildBackend,
+    pub backend: &'a Backend,
     pub compiler: Compiler,
     /// The global cache to use.
     pub cache: &'a Cache,
     pub threads: u8,
     pub config: BuildConfig,
-}
-
-#[derive(Debug)]
-pub struct BuildBackend {
-    pub portable: bool,
-    pub runner: Option<String>,
-    pub name: String,
-    pub opts: Vec<String>,
 }
 
 // TODO: Verbosity, totality checking

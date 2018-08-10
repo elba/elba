@@ -9,8 +9,10 @@ mod test;
 mod uninstall;
 
 use clap::{App, ArgMatches};
-use elba::build::context::BuildBackend;
-use elba::util::{config::Config, errors::Res};
+use elba::util::{
+    config::{Backend, Config},
+    errors::Res,
+};
 use failure::{Error, ResultExt};
 use itertools::Itertools;
 use slog::{Discard, Logger};
@@ -84,31 +86,33 @@ pub fn logger(_c: &mut Config) -> Logger {
     Logger::root(Discard, o!())
 }
 
-pub fn match_backends(c: &mut Config, args: &ArgMatches) -> BuildBackend {
-    let name = if args.is_present("backend") {
-        args.value_of_lossy("backend").unwrap().into_owned()
-    } else if args.is_present("portable-backend") {
-        args.value_of_lossy("portable-backend")
-            .unwrap()
-            .into_owned()
-    } else {
-        c.default_backend.name.to_owned()
-    };
+pub fn match_backends(c: &mut Config, args: &ArgMatches) -> Backend {
+    let mut backend = args
+        .value_of_lossy("backend")
+        .and_then(|x| {
+            let x = x.into_owned();
+            c.get_backend(&x)
+        }).unwrap_or_else(|| c.default_backend());
 
-    let portable = if args.is_present("backend") {
-        false
-    } else if args.is_present("portable-backend") {
-        true
-    } else {
-        c.default_backend.portable
-    };
-
-    BuildBackend {
-        portable,
-        runner: c.backend.get(&name).map(|x| x.runner.clone()),
-        name,
-        opts: args.values_of_lossy("cg-opts").unwrap_or_else(|| vec![]),
+    // We do this because we want to preserve the name of the backend, even if it wasn't in the
+    // config
+    if let Some(x) = args.value_of_lossy("backend") {
+        backend.name = x.into_owned();
     }
+
+    backend.portable = if args.is_present("portable") {
+        true
+    } else if args.is_present("non-portable") {
+        false
+    } else {
+        backend.portable
+    };
+
+    if let Some(x) = args.values_of_lossy("be-opts") {
+        backend.opts = x;
+    }
+
+    backend
 }
 
 pub fn match_threads(c: &mut Config, args: &ArgMatches) -> u8 {
@@ -161,13 +165,15 @@ mod args {
                 .takes_value(true)
                 .number_of_values(1)
                 .help("Specifies the codegen backend to use during code generation"),
-            Arg::with_name("portable-backend")
-                .long("portable-backend")
-                .takes_value(true)
-                .number_of_values(1)
-                .help("Specifies the portable codegen backend to use during code generation"),
-            Arg::with_name("cg-opts")
-                .long("cg-opts")
+            Arg::with_name("portable")
+                .long("portable")
+                .help("Treat the codegen backend as if it were portable"),
+            Arg::with_name("non-portable")
+                .long("non-portable")
+                .conflicts_with("portable")
+                .help("Treat the codegen backend as if it were non-portable"),
+            Arg::with_name("be-opts")
+                .long("be-opts")
                 .takes_value(true)
                 .min_values(1)
                 .help("Options to pass to the codegen backend"),

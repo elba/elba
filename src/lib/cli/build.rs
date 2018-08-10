@@ -1,5 +1,5 @@
 use build::{
-    context::{BuildBackend, BuildConfig, BuildContext, Compiler},
+    context::{BuildConfig, BuildContext, Compiler},
     job::{Job, JobQueue},
     Target, Targets,
 };
@@ -28,7 +28,7 @@ use std::{
     str::FromStr,
 };
 use toml;
-use util::{errors::Res, graph::Graph, lock::DirLock};
+use util::{config::Backend, errors::Res, graph::Graph, lock::DirLock};
 
 pub struct BuildCtx {
     pub indices: Vec<DirectRes>,
@@ -41,7 +41,7 @@ pub fn test(
     ctx: &BuildCtx,
     project: &Path,
     targets: &[&str],
-    backend: &BuildBackend,
+    backend: &Backend,
     test_threads: u32,
 ) -> Res<String> {
     let mut contents = String::new();
@@ -193,7 +193,7 @@ pub fn install(
     ctx: &BuildCtx,
     name: Result<Spec, PathBuf>,
     targets: &[&str],
-    backend: &BuildBackend,
+    backend: &Backend,
     force: bool,
 ) -> Res<String> {
     let f = |cache: &Cache, mut retriever: Retriever, solve| -> Res<String> {
@@ -263,7 +263,7 @@ pub fn repl(
     ctx: &BuildCtx,
     project: &Path,
     targets: &(bool, Option<Vec<&str>>),
-    backend: &BuildBackend,
+    backend: &Backend,
 ) -> Res<String> {
     let mut contents = String::new();
     let mut manifest = fs::File::open(project.join("elba.toml"))
@@ -374,7 +374,7 @@ pub fn build(
     ctx: &BuildCtx,
     project: &Path,
     targets: &(bool, bool, Option<Vec<&str>>, Option<Vec<&str>>),
-    backend: &BuildBackend,
+    backend: &Backend,
 ) -> Res<String> {
     let mut contents = String::new();
     let mut manifest = fs::File::open(project.join("elba.toml"))

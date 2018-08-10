@@ -36,24 +36,7 @@ pub struct Config {
     #[serde(default)]
     pub indices: Vec<DirectRes>,
     #[serde(default)]
-    pub default_backend: DefaultBackend,
-    #[serde(default)]
-    pub backend: IndexMap<String, Backend>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct DefaultBackend {
-    pub name: String,
-    pub portable: bool,
-}
-
-impl Default for DefaultBackend {
-    fn default() -> Self {
-        DefaultBackend {
-            name: "c".to_string(),
-            portable: false,
-        }
-    }
+    pub backend: Vec<Backend>,
 }
 
 impl Config {
@@ -97,6 +80,21 @@ impl Config {
         self.term.color = c;
         self
     }
+
+    pub fn default_backend(&self) -> Backend {
+        self.backend
+            .iter()
+            .find(|x| x.default)
+            .map(|x| x.clone())
+            .unwrap_or_else(|| Backend::default())
+    }
+
+    pub fn get_backend(&self, name: &str) -> Option<Backend> {
+        self.backend
+            .iter()
+            .find(|x| x.name == name)
+            .map(|x| x.clone())
+    }
 }
 
 impl Default for Config {
@@ -107,8 +105,7 @@ impl Default for Config {
             alias: default_aliases(),
             directories: Directories::default(),
             indices: Vec::default(),
-            default_backend: DefaultBackend::default(),
-            backend: IndexMap::new(),
+            backend: Vec::new(),
         }
     }
 }
@@ -156,8 +153,25 @@ impl Default for Directories {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Backend {
-    pub runner: String,
+    pub name: String,
+    pub default: bool,
+    pub portable: bool,
+    pub runner: Option<String>,
     pub opts: Vec<String>,
+    pub extension: Option<String>,
+}
+
+impl Default for Backend {
+    fn default() -> Self {
+        Backend {
+            name: "c".to_string(),
+            default: false,
+            portable: false,
+            runner: None,
+            opts: Vec::default(),
+            extension: None,
+        }
+    }
 }

@@ -165,7 +165,6 @@ pub fn compile_lib(
     Ok(())
 }
 
-// TODO: Return compilation result(path, meta or anything else)
 pub fn compile_bin(
     source: &Source,
     target: Target,
@@ -197,9 +196,16 @@ pub fn compile_bin(
 
     let target_bin = target_path.with_extension("ibc");
 
+    let name = if let Some(ex) = &bcx.backend.extension {
+        let p: PathBuf = bin_target.name.into();
+        p.with_extension(ex)
+    } else {
+        bin_target.name.into()
+    };
+
     let codegen_invoke = CodegenInvocation {
         binary: &[layout.build.join("bin").join(&target_bin)],
-        output: &bin_target.name,
+        output: &*name.to_string_lossy(),
         layout: &layout,
         is_artifact: false,
     };
@@ -207,5 +213,13 @@ pub fn compile_bin(
     // The output exectable will always go in target/bin
     codegen_invoke.exec(bcx)?;
 
-    Ok(layout.bin.join(bin_target.name.clone()))
+    let out = layout.bin.join(name);
+
+    if out.exists() {
+        Ok(out)
+    } else if out.with_extension("exe").exists() {
+        Ok(out.with_extension("exe"))
+    } else {
+        bail!("couldn't locate codegen output file: {}", out.display())
+    }
 }
