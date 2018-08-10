@@ -7,7 +7,7 @@ pub mod job;
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
 use failure::ResultExt;
 use retrieve::cache::{Binary, OutputLayout, Source};
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, process::Output};
 use util::{clear_dir, errors::Res, generate_ipkg};
 
 /// A type of Target that should be built
@@ -103,7 +103,7 @@ pub fn compile_lib(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<()> {
+) -> Res<(Output, Option<Output>)> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
             "package {} doesn't contain a lib target",
@@ -128,7 +128,8 @@ pub fn compile_lib(
         build: &layout.build.join("lib"),
     };
 
-    invocation.exec(bcx)?;
+    let comp_res = invocation.exec(bcx)?;
+    let mut gen_res = None;
 
     clear_dir(&layout.lib)?;
 
@@ -160,10 +161,10 @@ pub fn compile_lib(
             is_artifact: true,
         };
 
-        codegen_invoke.exec(&bcx)?;
+        gen_res = Some(codegen_invoke.exec(&bcx)?);
     }
 
-    Ok(())
+    Ok((comp_res, gen_res))
 }
 
 pub fn compile_bin(
@@ -172,7 +173,7 @@ pub fn compile_bin(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<PathBuf> {
+) -> Res<(Output, PathBuf)> {
     let bin_target = match target {
         Target::Bin(ix) => source.meta().targets.bin[ix].clone(),
         Target::Test(ix) => source.meta().targets.test[ix].clone(),
@@ -193,7 +194,7 @@ pub fn compile_bin(
         build: &layout.build.join("bin"),
     };
 
-    compile_invoke.exec(bcx)?;
+    let res = compile_invoke.exec(bcx)?;
 
     let target_bin = target_path.with_extension("ibc");
 
@@ -217,9 +218,9 @@ pub fn compile_bin(
     let out = layout.bin.join(name);
 
     if out.exists() {
-        Ok(out)
+        Ok((res, out))
     } else if out.with_extension("exe").exists() {
-        Ok(out.with_extension("exe"))
+        Ok((res, out.with_extension("exe")))
     } else {
         bail!("couldn't locate codegen output file: {}", out.display())
     }
@@ -230,7 +231,7 @@ pub fn compile_doc(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<()> {
+) -> Res<Output> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
             "package {} doesn't contain a lib target, which is needed to build docs",
@@ -292,5 +293,5 @@ pub fn compile_doc(
         )
     })?;
 
-    Ok(())
+    Ok(res)
 }

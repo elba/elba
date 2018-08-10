@@ -10,6 +10,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fs, io::Write, path::Path};
 use std::{
     path::{Component, PathBuf},
+    process::Output,
     str::FromStr,
 };
 use util::errors::{Error, Res};
@@ -124,4 +125,17 @@ modules = {}
     "#,
         name, src_dir, opts, mods
     )
+}
+
+pub fn fmt_output(c: &Output) -> String {
+    let mut res = String::new();
+    if !c.stderr.is_empty() {
+        res.push_str(format!("[stderr]\n{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
+    }
+    if !c.stdout.is_empty() {
+        res.push_str(format!("[stdout]\n{}\n", String::from_utf8_lossy(&c.stdout)).as_ref());
+    }
+    // Remove the ending newline if it exists
+    res.pop();
+    res
 }

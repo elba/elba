@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::Output,
 };
-use util::{clear_dir, copy_dir, errors::Res};
+use util::{clear_dir, copy_dir, errors::Res, fmt_output};
 
 // CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
@@ -48,12 +48,7 @@ impl<'a> CompileInvocation<'a> {
         // The moment of truth:
         let res = process.output()?;
         if !res.status.success() {
-            bail!(
-                "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
-                process,
-                String::from_utf8_lossy(&res.stderr),
-                String::from_utf8_lossy(&res.stdout)
-            )
+            bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
         }
 
         Ok(res)
@@ -72,7 +67,7 @@ pub struct CodegenInvocation<'a> {
 }
 
 impl<'a> CodegenInvocation<'a> {
-    pub fn exec(self, bcx: &BuildContext) -> Res<()> {
+    pub fn exec(self, bcx: &BuildContext) -> Res<Output> {
         // Invoke the compiler.
         // TODO: Canonicalize the build path?
         let mut process = bcx.compiler.process();
@@ -118,14 +113,9 @@ impl<'a> CodegenInvocation<'a> {
         // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
         // function in the file, so we check if stdout is empty instead
         if !res.stdout.is_empty() {
-            bail!(
-                "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
-                process,
-                String::from_utf8_lossy(&res.stderr),
-                String::from_utf8_lossy(&res.stdout)
-            )
+            bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
         }
 
-        Ok(())
+        Ok(res)
     }
 }

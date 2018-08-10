@@ -9,7 +9,7 @@ use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
 use std::iter::FromIterator;
 use std::{collections::HashSet, path::PathBuf};
-use util::{clear_dir, errors::Res, graph::Graph, lock::DirLock};
+use util::{clear_dir, errors::Res, fmt_output, graph::Graph, lock::DirLock};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -157,6 +157,8 @@ impl JobQueue {
                             &build_hash.0[0..8]
                         ));
 
+                        let pb = &pb;
+
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
                                 let tmp;
@@ -177,7 +179,7 @@ impl JobQueue {
                                 for t in ts {
                                     match t {
                                         Target::Lib(cg) => {
-                                            compile_lib(&source, cg, &deps, &layout, bcx)
+                                            let (cmp, cdg) = compile_lib(&source, cg, &deps, &layout, bcx)
                                                 .with_context(|e| {
                                                     format!(
                                                         "{:>7} Couldn't build library target for {}\n{}",
@@ -187,18 +189,23 @@ impl JobQueue {
                                                     )
                                                 })?;
 
-                                            res = if job_index != NodeIndex::new(0) {
+                                            res = if job_index == NodeIndex::new(0) && root_ol.is_some() {
+                                                pb.println(fmt_output(&cmp));
+                                                if let Some(cdg) = cdg {
+                                                    pb.println(fmt_output(&cdg));
+                                                }
+
+                                                let target = DirLock::acquire(&layout.lib)?;
+                                                Some(Binary { target })
+                                            } else {
                                                 Some(
                                                     bcx.cache
                                                         .store_build(&layout.lib, &build_hash)?,
                                                 )
-                                            } else {
-                                                let target = DirLock::acquire(&layout.lib)?;
-                                                Some(Binary { target })
                                             }
                                         }
                                         Target::Bin(ix) => {
-                                            let bin_out = compile_bin(
+                                            let (out, path) = compile_bin(
                                                 &source,
                                                 Target::Bin(ix),
                                                 &deps,
@@ -214,7 +221,11 @@ impl JobQueue {
                                                 )
                                             })?;
 
-                                            bins.push((bin_out, source.summary()))
+                                            bins.push((path, source.summary()));
+
+                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
+                                                pb.println(fmt_output(&out));
+                                            }
                                         }
                                         Target::Test(ix) => {
                                             let mut deps = deps.clone();
@@ -224,7 +235,7 @@ impl JobQueue {
                                                 Binary { target }
                                             };
                                             deps.push(&root_lib);
-                                            compile_bin(
+                                            let (out, _) = compile_bin(
                                                 &source,
                                                 Target::Test(ix),
                                                 &deps,
@@ -240,11 +251,15 @@ impl JobQueue {
                                                 )
                                             })?;
 
+                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
+                                                pb.println(fmt_output(&out));
+                                            }
+
                                             // For now, only the root package can do tests, so we
                                             // don't worry about storing the binary anywhere.
                                         }
                                         Target::Doc => {
-                                            compile_doc(
+                                            let out = compile_doc(
                                                 &source,
                                                 &deps,
                                                 &layout,
@@ -257,6 +272,10 @@ impl JobQueue {
                                                     e
                                                 )
                                             })?;
+
+                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
+                                                pb.println(fmt_output(&out));
+                                            }
                                         }
                                     }
                                 }
@@ -317,7 +336,6 @@ impl JobQueue {
                             self.graph[child].work = Work::None;
                         }
                     }
-                    // TODO: log error?
                     Err(err) => {
                         pb.finish_and_clear();
                         println!("{}", err);
