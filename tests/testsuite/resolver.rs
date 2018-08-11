@@ -1,4 +1,4 @@
-use super::util::{index, CACHE};
+use super::util::{CACHE, INDEX_DIR};
 use elba::{
     index::Indices,
     package::{
@@ -14,30 +14,21 @@ use std::str::FromStr;
 
 macro_rules! sum {
     ($a:tt, $b:tt) => {{
+        let index = DirectRes::Dir {
+            path: INDEX_DIR.path().to_owned(),
+        };
         let root_name = Name::from_str($a).unwrap();
-        let root_pkg = PackageId::new(
-            root_name,
-            Resolution::Index(IndexRes::from_str("index+dir+data/index/").unwrap()),
-        );
+        let root_pkg = PackageId::new(root_name, Resolution::Index(IndexRes { res: index }));
         Summary::new(root_pkg, Version::parse($b).unwrap())
     }};
 }
 
-// Even though we could use &CACHE.get_indices, we don't here.
-//
-// Cache assumes that for an Index located on disk, the public-facing DirectRes and the local path
-// perfectly match, which is a reasonable real-world assumption. However, we can't do the env! trick
-// in the indices themselves, where you HAVE to specify the index of a package's dependencies,
-// which would mean that I'd end up having to hard-code my personal directory tree :v
-//
-// One reasonable solution would be to change index.toml such that index dependencies are specified
-// in IndexMap form, and indices would be referred to in dependencies by their "short" name. A method
-// dependencies() would turn short names into proper `DirectRes` structs. By doing this, we could
-// do the env! trick within just the index.toml file.
 fn indices() -> Indices {
-    let v = vec![index()];
+    let index = DirectRes::Dir {
+        path: INDEX_DIR.path().to_owned(),
+    };
 
-    Indices::new(v)
+    CACHE.get_indices(&[index])
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {

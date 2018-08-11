@@ -66,6 +66,8 @@ In order to know which files to build and how to build them, elba manifest files
     "Awesome.A", # the file src/Awesome/A.idr
     "Control.Zygohistomorphic.Prepromorphisms", # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
   ]
+  # Optional flags to pass to the compiler
+  idris_opts = ["--warnpartial"]
   ```
 
   The `path` key should be a **sub-path** of the package; it cannot reference parent or absolute directories of the package. During the build process, all of the files under the `path` sub-path will be used to build the library and export the Idris bytecode files corresponding to the items in `mods`.
@@ -77,6 +79,8 @@ In order to know which files to build and how to build them, elba manifest files
   name = "whatever"
   # The path to the Main module
   main = "src/bin/Whatever.idr"
+  # Optional flags to pass to the compiler
+  idris_opts = ["--warnpartial"]
   ```
 
   During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory `src/bin` will be made available. Again, the path listed under `main` must be a sub-path of the package directory.
@@ -94,6 +98,8 @@ In order to know which files to build and how to build them, elba manifest files
   name = "test-a"
   # The path to the test's Main module
   main = "tests/TestA.idr"
+  # Optional flags to pass to the compiler
+  idris_opts = ["--warnpartial"]
   ```
 
 An elba package **must** specify either a lib target or a bin target, or else the manifest will be rejected as invalid.

@@ -39,19 +39,22 @@ In the `elba.toml` file, when a package requirement is declared with a certain v
   # for this package, elba will use the index located on-disk at `/one`.
   ```
 
+Note that if a declared dependency uses an index that isn't specified in the configuration, the package will fail to build during dependency resolution with a "package not found" error.
+
 ### `index.toml`
 
 A package index is (when extracted, for tarballs) a directory tree of metadata files. All package indices must have a configuration file at the root of this directory tree named `index.toml`, and specify the following keys:
 
 ```toml
 [index]
-dependencies = []
 secure = false
+
+[index.dependencies]
 ```
 
 The `secure` key tells elba whether to treat the index like a secure package index. At the moment, this flag does nothing, but in the future, this flag may be used to enable compatibility with [The Update Framework](https://theupdateframework.github.io/). For forwards compatibility, package index maintainers should set this key to `false`.
 
-The `dependencies` key is a list of index resolutions for external indices which need to be downloaded in order for the index's packages to resolve their dependencies correctly. All of the other indices which packages in this index need should be specified in this list.
+The `dependencies` key is a mapping from the "name" of an index to its index resolution. The name can be whatever you want, but that name will be how the index will be referred to within metadata files. Every other index which the packages of this index need to build properly must be specified in this field, or else package building will fail during dependency resolution.
 
 ### Metadata structure
 
@@ -78,8 +81,12 @@ Each line of the metadata file for a package should be a complete JSON object co
   "dependencies": [
     {
       "name": "no_conflict/foo",
-      "index": "index+dir+data/index/",
       "req": "1.0.0"
+    },
+    {
+      "name": "awesome/bar",
+      "index": "best_index",
+      "req": ">= 0.1.0"
     }
   ],
   "yanked": false,
@@ -87,4 +94,6 @@ Each line of the metadata file for a package should be a complete JSON object co
 }
 ```
 
-The `name` and `version` fields should be self-explanatory. The `dependencies` section should be a list of objects with fields `name`, `index` (the resolution of the index of the dependency), and `req` (the version constraint of the dependency). The `yanked` field allows for "yanking" of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the `location` field indicates the direct resolution of the package in question.
+The `name` and `version` fields should be self-explanatory. The `dependencies` section should be a list of objects with fields `name`, `index`, and `req`. `name` is self-explanatory, and `req` is just the version constraint of that particular dependency. The value in `index` should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.
+
+The `yanked` field allows for "yanking" of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the `location` field indicates the direct resolution of the package in question.

@@ -1,7 +1,7 @@
 //! Configuration for Indices.
 
 use failure::{Error, ResultExt};
-use indexmap::IndexSet;
+use indexmap::IndexMap;
 use package::resolution::IndexRes;
 use std::str::FromStr;
 use toml;
@@ -25,14 +25,14 @@ impl FromStr for IndexConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct IndexConfInner {
     pub secure: bool,
-    pub dependencies: IndexSet<IndexRes>,
+    pub dependencies: IndexMap<String, IndexRes>,
 }
 
 impl Default for IndexConfInner {
     fn default() -> Self {
         IndexConfInner {
             secure: false,
-            dependencies: indexset!(),
+            dependencies: indexmap!(),
         }
     }
 }

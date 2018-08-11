@@ -553,7 +553,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     let root = {
         let cur = env::current_dir()
             .with_context(|e| format_err!("unable to get current directory: {}", e))?;
-        let pid = PackageId::new(manifest.name().clone(), DirectRes::Dir { url: cur }.into());
+        let pid = PackageId::new(manifest.name().clone(), DirectRes::Dir { path: cur }.into());
         Summary::new(pid, manifest.version().clone())
     };
 

@@ -10,9 +10,10 @@ pub use self::cache::{Cache, Source};
 use console::style;
 use failure::{Error, ResultExt};
 use index::Indices;
+use indexmap::IndexMap;
 use indicatif::{ProgressBar, ProgressStyle};
 use package::{
-    resolution::{IndexRes, Resolution},
+    resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
@@ -36,6 +37,7 @@ pub struct Retriever<'cache> {
     lockfile: Graph<Summary>,
     pub logger: Logger,
     pub def_index: IndexRes,
+    sources: IndexMap<PackageId, IndexMap<DirectRes, Source>>,
 }
 
 impl<'cache> Retriever<'cache> {
@@ -58,6 +60,7 @@ impl<'cache> Retriever<'cache> {
             lockfile,
             logger,
             def_index,
+            sources: indexmap!(),
         }
     }
 
@@ -80,15 +83,19 @@ impl<'cache> Retriever<'cache> {
                     Resolution::Index(_) => &self.indices.select(sum).unwrap().location,
                 };
 
-                let source = self
-                    .cache
-                    .checkout_source(sum.id(), loc)
-                    .context(format_err!("unable to retrieve package {}", sum))?;
-
-                prg += 1;
-                pb.set_position(prg);
-
-                Ok(source)
+                if let Some(s) = self.sources.get_mut(sum.id()).and_then(|x| x.remove(loc)) {
+                    prg += 1;
+                    pb.set_position(prg);
+                    Ok(s)
+                } else {
+                    let source = self
+                        .cache
+                        .checkout_source(sum.id(), loc)
+                        .context(format_err!("unable to retrieve package {}", sum))?;
+                    prg += 1;
+                    pb.set_position(prg);
+                    Ok(source)
+                }
             },
             |_| Ok(()),
         )?;
@@ -129,7 +136,8 @@ impl<'cache> Retriever<'cache> {
                 };
 
                 if let Some(dir) = dir {
-                    if let Ok(src) = self.cache.checkout_source(pkg, dir) {
+                    let dir = dir.clone();
+                    if let Ok(src) = self.direct_checkout(pkg, &dir) {
                         return Ok(src.meta().version().clone());
                     }
                 }
@@ -137,12 +145,7 @@ impl<'cache> Retriever<'cache> {
         }
 
         if let Resolution::Direct(loc) = pkg.resolution() {
-            return Ok(self
-                .cache
-                .checkout_source(pkg, loc)?
-                .meta()
-                .version()
-                .clone());
+            return Ok(self.direct_checkout(pkg, loc)?.meta().version().clone());
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
@@ -185,13 +188,14 @@ impl<'cache> Retriever<'cache> {
             return Ok(res);
         }
 
+        let def_index = self.def_index.clone();
+
         // If this is a DirectRes dep, we ask the cache for info.
         if let Resolution::Direct(loc) = pkg.resolution() {
             let deps = self
-                .cache
-                .checkout_source(pkg.id(), loc)?
+                .direct_checkout(pkg.id(), loc)?
                 .meta()
-                .deps(&self.def_index, false);
+                .deps(&def_index, false);
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(
@@ -293,5 +297,20 @@ impl<'cache> Retriever<'cache> {
 
     pub fn root(&self) -> &Summary {
         &self.root
+    }
+
+    pub fn direct_checkout(&mut self, pkg: &PackageId, loc: &DirectRes) -> Res<&Source> {
+        let reses = self
+            .sources
+            .entry(pkg.clone())
+            .or_insert_with(IndexMap::new);
+        if reses.contains_key(loc) {
+            Ok(&reses[loc])
+        } else {
+            let s = self.cache.checkout_source(&pkg, &loc)?;
+
+            reses.insert(loc.clone(), s);
+            Ok(&reses[loc])
+        }
     }
 }

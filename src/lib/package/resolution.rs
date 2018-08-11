@@ -1,15 +1,20 @@
 use super::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
-use git2::Repository;
+use git2::{ObjectType, Repository};
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
 use tar::Archive;
 use url::Url;
-use util::errors::ErrorKind;
-use util::{hexify_hash, lock::DirLock};
+use util::{
+    clear_dir,
+    errors::ErrorKind,
+    git::{clone, fetch, reset, update_submodules},
+    hexify_hash,
+    lock::DirLock,
+};
 
 /// The possible places from which a package can be resolved.
 ///
@@ -77,7 +82,7 @@ pub enum DirectRes {
     /// Git: the package originated from a git repository.
     Git { repo: Url, tag: String },
     /// Dir: the package is on disk in a folder directory.
-    Dir { url: PathBuf },
+    Dir { path: PathBuf },
     /// Tar: the package is an archive stored somewhere.
     ///
     /// Tarballs are the only direct resolution which is allowed to have a checksum; this doesn't
@@ -147,20 +152,33 @@ impl DirectRes {
                 }
                 _ => Err(Error::from(ErrorKind::CannotDownload)),
             },
-            DirectRes::Git { repo, tag } => {
+            DirectRes::Git { repo: url, tag } => {
                 // If we find a directory which already has a repo, we just check out the correct
                 // version of it. Whether or not a new dir is created isn't our job, that's for the
                 // Cache. If the Cache points to a directory that already exists, it means that the
                 // branch data or w/e is irrelevant.
-                let repo = if target.path().is_dir() {
-                    Repository::open(target.path()).context(ErrorKind::CannotDownload)?
-                // TODO: Update submodules...
-                // TODO: Fetch from remote...
-                } else {
-                    let url = repo.as_str();
-                    Repository::clone_recurse(url, target.path())
-                        .context(ErrorKind::CannotDownload)?
+                let repo = Repository::open(target.path());
+
+                let mut repo = match repo {
+                    Ok(r) => r,
+                    Err(_) => {
+                        clear_dir(target.path())?;
+                        clone(url, target.path()).with_context(|e| {
+                            format_err!("couldn't fetch git repo {}:\n{}", url, e)
+                        })?
+                    }
                 };
+
+                // Get everything!!
+                let refspec = "refs/heads/*:refs/heads/*";
+                fetch(&mut repo, &url, refspec)
+                    .with_context(|e| format_err!("couldn't fetch git repo {}:\n{}", url, e))?;
+                let head = repo.head()?.resolve()?.peel(ObjectType::Any)?;
+                reset(&repo, &head)
+                    .with_context(|e| format_err!("couldn't fetch git repo {}:\n{}", url, e))?;
+                update_submodules(&repo).with_context(|e| {
+                    format_err!("couldn't update submodules for git repo {}:\n{}", url, e)
+                })?;
 
                 let branch = tag;
 
@@ -172,7 +190,7 @@ impl DirectRes {
 
                 Ok(())
             }
-            DirectRes::Dir { url: _url } => {
+            DirectRes::Dir { path: _path } => {
                 // If this package is located on disk, we don't have to do anything...
                 Ok(())
             }
@@ -186,22 +204,22 @@ impl FromStr for DirectRes {
     fn from_str(url: &str) -> Result<Self, Self::Err> {
         let mut parts = url.splitn(2, '+');
         let utype = parts.next().unwrap();
-        let url = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
+        let rest = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
 
         match utype {
             "git" => {
-                let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                let mut url = Url::parse(rest).context(ErrorKind::InvalidSourceUrl)?;
                 let tag = url.fragment().unwrap_or_else(|| "master").to_owned();
 
                 url.set_fragment(None);
                 Ok(DirectRes::Git { repo: url, tag })
             }
             "dir" => {
-                let url = PathBuf::from(url);
-                Ok(DirectRes::Dir { url })
+                let path = PathBuf::from(rest);
+                Ok(DirectRes::Dir { path })
             }
             "tar" => {
-                let mut url = Url::parse(url).context(ErrorKind::InvalidSourceUrl)?;
+                let mut url = Url::parse(rest).context(ErrorKind::InvalidSourceUrl)?;
                 if url.scheme() != "http" && url.scheme() != "https" && url.scheme() != "file" {
                     return Err(ErrorKind::InvalidSourceUrl)?;
                 }
@@ -218,7 +236,7 @@ impl fmt::Display for DirectRes {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DirectRes::Git { repo, tag } => write!(f, "git+{}#{}", repo, tag),
-            DirectRes::Dir { url } => write!(f, "dir+{}", url.display()),
+            DirectRes::Dir { path } => write!(f, "dir+{}", path.display()),
             DirectRes::Tar { url, cksum } => {
                 let url = url.as_str();
                 write!(

@@ -145,7 +145,7 @@ impl DepReq {
                 (pi, con)
             }
             DepReq::Local { path } => {
-                let res = DirectRes::Dir { url: path };
+                let res = DirectRes::Dir { path };
                 let pi = PackageId::new(n, res.into());
                 (pi, Constraint::any())
             }

@@ -140,15 +140,20 @@ impl Cache {
     /// Check if package is downloaded and in the cache. If so, returns the path of source of the cached
     /// package.
     fn check_source(&self, loc: &DirectRes) -> Option<PathBuf> {
-        if let DirectRes::Dir { url } = loc {
-            return Some(url.clone());
-        }
-
-        let path = self.layout.src.join(Self::get_source_dir(loc));
-        if path.exists() {
-            Some(path)
-        } else {
-            None
+        match loc {
+            DirectRes::Dir { path } => Some(path.clone()),
+            // Note: we will always assume that a git repository is out of date, because, well,
+            // it could be! The Retriever keeps track of if we've updated a git repository during
+            // this invocation
+            DirectRes::Git { .. } => None,
+            _ => {
+                let path = self.layout.src.join(Self::get_source_dir(loc));
+                if path.exists() {
+                    Some(path)
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -357,8 +362,8 @@ impl Cache {
                 continue;
             }
             // We special-case a local dir index because `dir` won't exist for it.
-            if let DirectRes::Dir { url } = &index {
-                let lock = if let Ok(dir) = DirLock::acquire(url) {
+            if let DirectRes::Dir { path } = &index {
+                let lock = if let Ok(dir) = DirLock::acquire(path) {
                     dir
                 } else {
                     continue;
@@ -366,7 +371,7 @@ impl Cache {
 
                 let ix = Index::from_disk(index.clone(), lock);
                 if let Ok(ix) = ix {
-                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                    for dependent in ix.depends().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
                     seen.push(index);
@@ -386,7 +391,7 @@ impl Cache {
             if dir.path().exists() {
                 let ix = Index::from_disk(index.clone(), dir);
                 if let Ok(ix) = ix {
-                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                    for dependent in ix.depends().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
                     seen.push(index);
@@ -398,7 +403,7 @@ impl Cache {
             if index.retrieve(&self.client, &dir).is_ok() {
                 let ix = Index::from_disk(index.clone(), dir);
                 if let Ok(ix) = ix {
-                    for dependent in ix.depends().iter().cloned().map(|i| i.res) {
+                    for dependent in ix.depends().cloned().map(|i| i.res) {
                         q.push_back(dependent);
                     }
                     seen.push(index);

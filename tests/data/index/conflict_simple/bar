@@ -1,1 +1,1 @@
-{ "name": "conflict_simple/bar", "version": "2.0.0", "dependencies": [{ "name": "conflict_simple/baz", "index": "index+dir+data/index/", "req": "3.0.0" }], "yanked": false, "location": "dir+test" }
+{ "name": "conflict_simple/bar", "version": "2.0.0", "dependencies": [{ "name": "conflict_simple/baz", "req": "3.0.0" }], "yanked": false, "location": "dir+test" }

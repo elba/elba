@@ -26,7 +26,7 @@ mod config;
 
 use self::config::IndexConfig;
 use failure::{Error, ResultExt};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::Constraint,
@@ -46,13 +46,14 @@ use util::{
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct Dep {
+pub struct Dep<T> {
     pub name: Name,
-    // TODO: Ideally, instead of having the index be an IndexRes, we just let it be a String
-    // corresponding to a key in the Index's config which points to an actual IndexRes.
-    pub index: IndexRes,
+    pub index: T,
     pub req: Constraint,
 }
+
+pub type ResolvedDep = Dep<IndexRes>;
+pub type TomlDep = Dep<Option<String>>;
 
 #[derive(Debug)]
 pub struct Indices {
@@ -61,7 +62,7 @@ pub struct Indices {
     /// It is assumed that all dependent indices have been resolved, and that this mapping contains
     /// every index mentioned or depended on.
     indices: IndexMap<IndexRes, Index>,
-    cache: IndexMap<PackageId, IndexMap<Version, IndexEntry>>,
+    cache: IndexMap<PackageId, IndexMap<Version, ResolvedEntry>>,
 }
 
 impl Indices {
@@ -98,7 +99,7 @@ impl Indices {
         Err(ErrorKind::PackageNotFound)?
     }
 
-    pub fn select(&mut self, pkg: &Summary) -> Res<&IndexEntry> {
+    pub fn select(&mut self, pkg: &Summary) -> Res<&ResolvedEntry> {
         let entry = self
             .entries(pkg.id())?
             .get(pkg.version())
@@ -114,7 +115,7 @@ impl Indices {
         }
     }
 
-    pub fn entries(&mut self, pkg: &PackageId) -> Res<&IndexMap<Version, IndexEntry>> {
+    pub fn entries(&mut self, pkg: &PackageId) -> Res<&IndexMap<Version, ResolvedEntry>> {
         if self.cache.contains_key(pkg) {
             return Ok(&self.cache[pkg]);
         }
@@ -138,17 +139,17 @@ impl Indices {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct IndexEntry {
+pub struct IndexEntry<T> {
     pub name: Name,
     pub version: Version,
-    pub dependencies: Vec<Dep>,
+    pub dependencies: Vec<Dep<T>>,
     pub yanked: bool,
     pub location: DirectRes,
 }
 
-// TODO: Dealing with where to download the Index, using the Config to get that info.
-// TODO: user-friendly index names? (this decouples the index from its url; we'd need a function to
-// turn these user-friendly names into explicitly ones)
+pub type ResolvedEntry = IndexEntry<IndexRes>;
+pub type TomlEntry = IndexEntry<Option<String>>;
+
 /// Struct `Index` defines a single index.
 ///
 /// Indices must be sharded by group name.
@@ -177,7 +178,7 @@ impl Index {
         Ok(Index { id, path, config })
     }
 
-    pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, IndexEntry>> {
+    pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, ResolvedEntry>> {
         let mut res = indexmap!();
         let path = self.path.path().join(name.as_str());
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
@@ -185,7 +186,31 @@ impl Index {
 
         for line in r.lines() {
             let line = line.context(ErrorKind::InvalidIndex)?;
-            let entry: IndexEntry = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
+            let entry: TomlEntry = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
+
+            let dependencies = entry
+                .dependencies
+                .into_iter()
+                .map(|x| {
+                    let index = x
+                        .index
+                        .and_then(|ix| self.config.index.dependencies.get(&ix))
+                        .cloned()
+                        .unwrap_or_else(|| self.id.clone());
+                    Dep {
+                        index,
+                        name: x.name,
+                        req: x.req,
+                    }
+                }).collect::<Vec<_>>();
+
+            let entry: ResolvedEntry = IndexEntry {
+                name: entry.name,
+                version: entry.version,
+                dependencies,
+                yanked: entry.yanked,
+                location: entry.location,
+            };
 
             res.insert(entry.version.clone(), entry);
         }
@@ -193,7 +218,7 @@ impl Index {
         Ok(res)
     }
 
-    pub fn depends(&self) -> &IndexSet<IndexRes> {
-        &self.config.index.dependencies
+    pub fn depends(&self) -> impl Iterator<Item = &IndexRes> {
+        self.config.index.dependencies.iter().map(|x| x.1)
     }
 }

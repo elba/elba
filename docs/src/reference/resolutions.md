@@ -42,6 +42,7 @@ In order to refer to these types of direct resolutions, elba has its own simple 
     git+https://github.com/example/doesnt-exist#master # use the master branch
     git+https://github.com/example/doesnt-exist#v1.0.0 # use the "v1.0.0" tag
     git+https://github.com/example/doesnt-exist#a4e13343 # use the commit "a4e13343"
+    git+ssh://git@github.com/example/doesnt-exist # using ssh instead of https
     ```
 
 - For an index resolution, the resolution string must start with the identifier `index+` and include the direct resolution of the origin of the index:
@@ -50,5 +51,5 @@ In order to refer to these types of direct resolutions, elba has its own simple 
   # These are all valid
   index+tar+http://example.com/asdf.tar.gz
   index+dir+../asdf/whatever/subfolder
-  index+git+https://github.com/example/doesnt-exist#a4e13343
+  index+git+ssh://git@github.com/example/doesnt-exist#a4e13343
   ```
