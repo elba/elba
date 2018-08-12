@@ -9,18 +9,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
-
-        <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="book.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
-        <!-- Highlight.js Stylesheets -->
+        <link rel="shortcut icon" href="favicon.png">
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+
         <link rel="stylesheet" href="highlight.css">
         <link rel="stylesheet" href="tomorrow-night.css">
         <link rel="stylesheet" href="ayu-highlight.css">
@@ -29,11 +26,9 @@
         
 
         
+
     </head>
     <body class="light">
-        <!-- Provide site root to javascript -->
-        <script type="text/javascript">var path_to_root = "";</script>
-
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script type="text/javascript">
             try {
@@ -72,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="intro.html">Intro</a></li><li><a href="getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="faq.html">FAQ</a></li></ol>
+            <ol class="chapter"><li class="affix"><a href="intro.html">Intro</a></li><li><a href="getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -144,6 +139,15 @@
 <p>By the end of this chapter, you should have a basic elba installation up-and-running, as well as a general overview of how to use elba for day-to-day Idris development.</p>
 <a class="header" href="#installation" id="installation"><h2>Installation</h2></a>
 <p>The easiest and most convenient way of installing elba is to use the pre-built binaries for elba, which can be downloaded from <a href="https://github.com/dcao/elba/releases">GitHub Releases</a>. To install this way, just download the corresponding archive for your platform, extract the executable somewhere in your PATH, add <code>~/.elba/bin</code> to your PATH in order to execute elba-installed packages, and you're done!</p>
+<blockquote>
+<a class="header" href="#note--gnu-vs--musl" id="note--gnu-vs--musl"><h4>Note: <code>-gnu</code> vs <code>-musl</code></h4></a>
+<p>For Linux platforms, there are two varieties of binaries available: one
+suffixed with <code>-gnu</code> and the other suffixed with <code>-musl</code>. The <code>-gnu</code> binary is
+dynamically linked to the system libc, while the <code>-musl</code> binary is statically
+linked using musl.</p>
+<p>For most users, the <code>-gnu</code> binary should work fine, but if it doesn't, try
+using the <code>-musl</code> binary.</p>
+</blockquote>
 <a class="header" href="#installing-with-cargo" id="installing-with-cargo"><h3>Installing with Cargo</h3></a>
 <p>Because elba is written in Rust, it is available as an installable crate from <a href="https://crates.io">crates.io</a>. In order to install elba this way, you should have a copy of the Rust toolchain installed on your computer first. The process for this is explained on <a href="https://www.rust-lang.org/en-US/install.html">the Rust website</a>. Note that during installation, when prompted for which version of Rust should be installed, you should choose the <strong>nightly version</strong> of Rust. elba depends on certain features which can only be enabled in the nightly build of Rust.</p>
 <p>Once you have Rust installed, installing elba is pretty self-explanatory:</p>
@@ -235,7 +239,7 @@ version = &quot;0.1.0&quot;
 authors = [&quot;John Smith &lt;dcao@example.com&gt;&quot;]
 license = &quot;MIT&quot;
 </code></pre>
-<p>The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name must be valid Unicode, and the version must follow <a href="https://semver.org/">Semantic Version guidelines</a>. Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format <code>name &lt;email&gt;</code> (this is just a helpful convention to follow). The license field can be omitted entirely.</p>
+<p>The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name can only contain alphanumeric characters, hyphens, and underscores. Internally, elba ignores case and treats hyphens and underscores equally when deciding if two names are identical. The version must follow <a href="https://semver.org/">Semantic Version guidelines</a>. Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format <code>name &lt;email&gt;</code> (this is just a helpful convention to follow). The license field can be omitted entirely.</p>
 <blockquote>
 <a class="header" href="#why-namespacing" id="why-namespacing"><h4>Why namespacing?</h4></a>
 <p>Having to supply a namespace to all package names might seem like unnecessary work, but it has its benefits; this design decision to require all package names to be namespaced was borne out of observations of other package ecosystems where the lack of namespaces lead to significant problems down the line. In particular, namespaced packages provide the following benefits:</p>
@@ -281,6 +285,8 @@ mods = [
   &quot;Awesome.A&quot;, # the file src/Awesome/A.idr
   &quot;Control.Zygohistomorphic.Prepromorphisms&quot;, # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
 ]
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>The <code>path</code> key should be a <strong>sub-path</strong> of the package; it cannot reference parent or absolute directories of the package. During the build process, all of the files under the <code>path</code> sub-path will be used to build the library and export the Idris bytecode files corresponding to the items in <code>mods</code>.</p>
 </li>
@@ -290,6 +296,8 @@ mods = [
 name = &quot;whatever&quot;
 # The path to the Main module
 main = &quot;src/bin/Whatever.idr&quot;
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory <code>src/bin</code> will be made available. Again, the path listed under <code>main</code> must be a sub-path of the package directory.</p>
 </li>
@@ -305,11 +313,13 @@ main = &quot;src/bin/Whatever.idr&quot;
 name = &quot;test-a&quot;
 # The path to the test's Main module
 main = &quot;tests/TestA.idr&quot;
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 </li>
 </ul>
 <p>An elba package <strong>must</strong> specify either a lib target or a bin target, or else the manifest will be rejected as invalid.</p>
-<p>For local packages, after building, all binaries will be output to the <code>target/bin</code> folder, and any library will be output to the <code>target/lib</code> folder. Note that while you can use a codegen backend with binaries, you currently cannot with libraries (i.e. what would normally be accomplished with the <code>--interface</code> flag). This is a deficiency that will be fixed in a future release.</p>
+<p>For local packages, after building, all binaries will be output to the <code>target/bin</code> folder, and any library will be output to the <code>target/lib</code> folder. Additionally, for libraries, if you pass the <code>--lib-cg</code> flag, elba will use the codegen backend specified (or the C backend by default) and any export lists specified in the exported files of the library to create output files under <code>target/artifacts/&lt;codegen name&gt;</code> (for more information on export lists and the like, see <a href="https://github.com/idris-lang/Idris-dev/tree/master/test/ffi006">this test case in the Idris compiler</a>).</p>
 <a class="header" href="#workspace" id="workspace"><h3><code>[workspace]</code></h3></a>
 <p>The last section in the manifest is the workspace section, used to indicate subprojects in the current directory. At the moment, the only use for this field is to indicate to elba the location of a package in a subdirectory (for example, with if a git repo has a package located in some subdirectory). Adding a package to the local workspace <em>does not</em> automatically add it as a local dependency of the package, nor does it cause the workspace packages to be automatically built when the root package is built. To add local directories as dependencies, they must manually be specified in either the <code>[dependencies]</code> or <code>[dev_dependencies]</code> sections.</p>
 <p>Note that the directory of every package must be a <strong>sub-path</strong>; it cannot refer to an absolute directory or a directory above the root package.</p>
@@ -318,6 +328,7 @@ main = &quot;tests/TestA.idr&quot;
 &quot;name/one&quot; = &quot;pkgs/one&quot;
 &quot;other/pkg&quot; = &quot;wherever/youd/like&quot;
 </code></pre>
+<p>Note that a a <code>[workspace]</code> section can stand alone and be parsed as a valid manifest if there is no package in the root directory.</p>
 <a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
 <p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
 <a class="header" href="#installing-a-package" id="installing-a-package"><h2>Installing a Package</h2></a>
@@ -338,12 +349,29 @@ main = &quot;tests/TestA.idr&quot;
 <li>The version of the package</li>
 </ul>
 <p>The following are examples of valid <code>elba install</code> invocations:</p>
-<pre><code class="language-sh">$ elba install jsmith/one # install the latest version of `jsmith/one` from the default index
-$ elba install &quot;jsmith/one|1.0.0&quot; # install version 1.0.0 of `jsmith/one` from the default index
-$ elba install &quot;jsmith/one@index+tar+https://example.com/index.tar.gz&quot; # install the latest version of `jsmith/one` from the index specified
-$ elba install &quot;jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0&quot; # install version 1.0.0 of `jsmith/one` from the index specified
+<pre><code class="language-sh"># installs the latest version of `jsmith/one` from the default index:
+$ elba install &quot;jsmith/one&quot;
+# installs version 1.0.0 of `jsmith/one` from the default index:
+$ elba install &quot;jsmith/one|1.0.0&quot;
+# installs the latest version of `jsmith/one` from the index specified:
+$ elba install &quot;jsmith/one@index+tar+https://example.com/index.tar.gz&quot;
+# installs version 1.0.0 of `jsmith/one` from the index specified:
+$ elba install &quot;jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0&quot;
 </code></pre>
 <p>As with installing a local package, if you want to replace any old binaries in the global bin directory, use the <code>--force</code> flag, and if you want to choose which binaries to install, use the <code>--bin</code> flag.</p>
+<a class="header" href="#uninstalling-a-package" id="uninstalling-a-package"><h3>Uninstalling a package</h3></a>
+<p>Uninstalling a package is much the same process as installing: just pass a spec
+to the <code>elba uninstall</code> invocation. Note that one key different here is that
+<code>elba uninstall</code> will eagerly try to uninstall as much as it can given the spec:</p>
+<pre><code class="language-sh"># uninstalls every version of every package named `jsmith/one` regardless of index:
+$ elba uninstall &quot;jsmith/one&quot;
+# uninstalls version 1.0.0 of every package named `jsmith/one` regardless of index:
+$ elba uninstall &quot;jsmith/one|1.0.0&quot;
+# uninstalls every version of `jsmith/one` originating from this index:
+$ elba uninstall &quot;jsmith/one@index+tar+https://example.com/index.tar.gz&quot;
+# uninstalls version 1.0.0 of `jsmith/one` originating from this index:
+$ elba uninstall &quot;jsmith/one@index+tar+https://example.com/index.tar.gz|1.0.0&quot;
+</code></pre>
 <a class="header" href="#custom-subcommands" id="custom-subcommands"><h2>Custom Subcommands</h2></a>
 <p>To support extensibility in the future, elba supports running custom subcommands if it is passed a subcommand which doesn't exist. All arguments which were passed to elba will be instead passed to the subcommand:</p>
 <pre><code class="language-sh">$ elba installnt # executes `elba-installnt`
@@ -367,10 +395,6 @@ $HOME/.elba/config
 <p>A complete default elba configuration file is listed below. Any options which are not assigned to will carry the default value instead.</p>
 <pre><code class="language-toml">indices = []
 
-[default_codegen]
-name = &quot;c&quot;
-portable = &quot;false&quot;
-
 [term]
 verbosity = &quot;verbose&quot;
 color = &quot;true&quot;
@@ -382,6 +406,12 @@ t = &quot;test&quot;
 
 [directories]
 cache = &quot;$HOME/.elba&quot;
+
+[[backend]]
+name = &quot;c&quot;
+default = true
+portable = false
+opts = []
 </code></pre>
 <blockquote>
 <a class="header" href="#using-environment-variables" id="using-environment-variables"><h4>Using environment variables</h4></a>
@@ -390,8 +420,6 @@ cache = &quot;$HOME/.elba&quot;
 <a class="header" href="#indices" id="indices"><h4><code>indices</code></h4></a>
 <p>This key specifies all of the indices that should be made available to packages being built. Any dependent indices of these indices will also be retrieved. The first index specified in this list will be used as the default index for packages which don't specify an index. This key should be a list of index urls; for more information on those, see the chapter on <a href="../reference/indices.html">Indices</a>.</p>
 <p>At the moment, the default indices list is empty, but in the future, if we make an official elba package index, the first item in this list will become that official index by default.</p>
-<a class="header" href="#default_codegen" id="default_codegen"><h4><code>[default_codegen]</code></h4></a>
-<p>This section defines options for the default codegen backend, including its name and whether it's portable or not.</p>
 <a class="header" href="#profile" id="profile"><h4><code>[profile]</code></h4></a>
 <p>This section specifies the default author information that should be provided upon creating or initializing a new elba project. By default, this section has no value, so new projects are made without an author.</p>
 <pre><code class="language-toml">[profile]
@@ -411,14 +439,32 @@ email = &quot;jsmith@example.com&quot;
 </code></pre>
 <a class="header" href="#directories" id="directories"><h4><code>[directories]</code></h4></a>
 <p>This section only contains one key: <code>cache</code>, for the location where the global cache should be placed. This controls not only the location of elba's temporary build directories but also the location of the global bin directory.</p>
-<a class="header" href="#codegen" id="codegen"><h4><code>[codegen]</code></h4></a>
-<p>This section also contains no values by default, and can be used to specify extra information about a codegen backend, like what command to use when running binaries generated with that backend, and any extra options to pass to the backend.</p>
-<pre><code class="language-toml"># an example:
-[codegen.node]
-# we want to run node binaries with &quot;node __&quot;:
-runner = &quot;node&quot;
-# and we want to pass the option &quot;--potatoes&quot; to the code generator:
-opts = [&quot;--potatoes&quot;]
+<a class="header" href="#backend" id="backend"><h4><code>[[backend]]</code></h4></a>
+<p>This section specifies information about codegen backends. By default,
+information about one default codegen is provided: the C backend. These settings
+are used whenever a codegen backend is unspecified or a codegen backend is
+specified but doesn't have any information on it available in the configuration.
+A example full <code>[[backend]]</code> section is provided below:</p>
+<pre><code class="language-toml">[[backend]]
+# The name of the backend, passed to the --codegen or --portable-codegen
+# compiler option
+name = &quot;awesome&quot;
+# Whether this should be treated as a new default codegen backend, instead of
+# the c one provided by default. Note that if multiple backends have default set
+# to true, the backend mentioned first will be used as the default
+default = true
+# Whether or not this backend is portable
+portable = false
+# The command to use to run executables generated by this codegen backend
+# If omitted, the executable will just be run by itself
+runner = &quot;awesomec&quot;
+# The extension to use for executables generated by this codegen backend
+# elba will pass the name of the binary/test target with this extension set to
+# the -o flag of the Idris compiler
+# If unset, no extension-setting will happen
+extension = &quot;awe&quot;
+# Options to be passed to the codegen backend
+opts = []
 </code></pre>
 <a class="header" href="#reference" id="reference"><h1>Reference</h1></a>
 <p>The reference section covers the nitty-gritty details of how elba is implemented and the specifics behind certain features. By the end of this chapter, you should have a solid understanding of the specific workings and details of elba features.</p>
@@ -461,6 +507,7 @@ git+https://github.com/example/doesnt-exist
 git+https://github.com/example/doesnt-exist#master # use the master branch
 git+https://github.com/example/doesnt-exist#v1.0.0 # use the &quot;v1.0.0&quot; tag
 git+https://github.com/example/doesnt-exist#a4e13343 # use the commit &quot;a4e13343&quot;
+git+ssh://git@github.com/example/doesnt-exist # using ssh instead of https
 </code></pre>
 </li>
 </ul>
@@ -470,7 +517,7 @@ git+https://github.com/example/doesnt-exist#a4e13343 # use the commit &quot;a4e1
 <pre><code class="language-sh"># These are all valid
 index+tar+http://example.com/asdf.tar.gz
 index+dir+../asdf/whatever/subfolder
-index+git+https://github.com/example/doesnt-exist#a4e13343
+index+git+ssh://git@github.com/example/doesnt-exist#a4e13343
 </code></pre>
 </li>
 </ul>
@@ -514,14 +561,16 @@ indices = [
 </code></pre>
 </li>
 </ul>
+<p>Note that if a declared dependency uses an index that isn't specified in the configuration, the package will fail to build during dependency resolution with a &quot;package not found&quot; error.</p>
 <a class="header" href="#indextoml" id="indextoml"><h3><code>index.toml</code></h3></a>
 <p>A package index is (when extracted, for tarballs) a directory tree of metadata files. All package indices must have a configuration file at the root of this directory tree named <code>index.toml</code>, and specify the following keys:</p>
 <pre><code class="language-toml">[index]
-dependencies = []
 secure = false
+
+[index.dependencies]
 </code></pre>
 <p>The <code>secure</code> key tells elba whether to treat the index like a secure package index. At the moment, this flag does nothing, but in the future, this flag may be used to enable compatibility with <a href="https://theupdateframework.github.io/">The Update Framework</a>. For forwards compatibility, package index maintainers should set this key to <code>false</code>.</p>
-<p>The <code>dependencies</code> key is a list of index resolutions for external indices which need to be downloaded in order for the index's packages to resolve their dependencies correctly. All of the other indices which packages in this index need should be specified in this list.</p>
+<p>The <code>dependencies</code> key is a mapping from the &quot;name&quot; of an index to its index resolution. The name can be whatever you want, but that name will be how the index will be referred to within metadata files. Every other index which the packages of this index need to build properly must be specified in this field, or else package building will fail during dependency resolution.</p>
 <a class="header" href="#metadata-structure" id="metadata-structure"><h3>Metadata structure</h3></a>
 <p>Package indices must follow a fairly strict folder and file structure in order for elba to interpret them correctly. The top-level folders should be groups, and underneath the folder for each group should be a metadata file corresponding to a package. The name of that file should be the second portion of the package's name:</p>
 <pre><code class="language-sh"># an example index:
@@ -541,15 +590,20 @@ secure = false
   &quot;dependencies&quot;: [
     {
       &quot;name&quot;: &quot;no_conflict/foo&quot;,
-      &quot;index&quot;: &quot;index+dir+data/index/&quot;,
       &quot;req&quot;: &quot;1.0.0&quot;
+    },
+    {
+      &quot;name&quot;: &quot;awesome/bar&quot;,
+      &quot;index&quot;: &quot;best_index&quot;,
+      &quot;req&quot;: &quot;&gt;= 0.1.0&quot;
     }
   ],
   &quot;yanked&quot;: false,
   &quot;location&quot;: &quot;dir+test&quot;
 }
 </code></pre>
-<p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code> (the resolution of the index of the dependency), and <code>req</code> (the version constraint of the dependency). The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
+<p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code>, and <code>req</code>. <code>name</code> is self-explanatory, and <code>req</code> is just the version constraint of that particular dependency. The value in <code>index</code> should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.</p>
+<p>The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
 <a class="header" href="#dependencies" id="dependencies"><h2>Dependencies</h2></a>
 <p>The most important job of a package manager is building dependencies of a package. Packages in elba can depend on other packages in external <a href="./indices.html">indices</a>, a local file directory, or a git repository.</p>
 <a class="header" href="#versions" id="versions"><h3>Versions</h3></a>
@@ -647,7 +701,6 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
 <p>elba uses a global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
 <pre><code class="language-sh">~/.elba/cache or wherever
 |
-|-- artifacts
 |-- bin
 |   +-- .bins
 |-- build
@@ -663,8 +716,6 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
     |-- a78bu877c78deadbeef...
     +-- # snip
 </code></pre>
-<a class="header" href="#artifacts" id="artifacts"><h3><code>artifacts</code></h3></a>
-<p>The artifacts folder <em>would be</em> where the output of codegen'd libraries would be stored... but since this is impossible at the moment, elba doesn't use this folder for anything.</p>
 <a class="header" href="#bin" id="bin"><h3><code>bin</code></h3></a>
 <p>This folder stores all of the installed binaries of elba packages, and should be added to the path. Additionally, an extra file <code>.bins</code> lives inside this directory, which maps from installed binaries to their corresponding package. This directory <strong>should not</strong> be touched by the user in any way.</p>
 <a class="header" href="#build" id="build"><h3><code>build</code></h3></a>
@@ -685,7 +736,6 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
 <pre><code class="language-sh">$ elba clean
 </code></pre>
 <p>Doing so clears the <code>artifacts</code>, <code>build</code>, <code>indices</code>, <code>src</code>, and <code>tmp</code> directories.</p>
-<a class="header" href="#faq" id="faq"><h1>FAQ</h1></a>
 
                     </main>
 
@@ -714,6 +764,12 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
 
         
 
+        
+        <script src="searchindex.js" type="text/javascript" charset="utf-8"></script>
+        <script>
+            var path_to_root = "";
+        </script>
+        
         
         <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>

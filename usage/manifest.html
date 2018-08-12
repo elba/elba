@@ -9,18 +9,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="shortcut icon" href="../favicon.png">
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
-        <link rel="stylesheet" href="../css/print.css" media="print">
-
-        <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../book.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
-        <!-- Highlight.js Stylesheets -->
+        <link rel="shortcut icon" href="favicon.png">
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+
         <link rel="stylesheet" href="../highlight.css">
         <link rel="stylesheet" href="../tomorrow-night.css">
         <link rel="stylesheet" href="../ayu-highlight.css">
@@ -29,11 +26,9 @@
         
 
         
+
     </head>
     <body class="light">
-        <!-- Provide site root to javascript -->
-        <script type="text/javascript">var path_to_root = "../";</script>
-
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script type="text/javascript">
             try {
@@ -72,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html" class="active"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="../faq.html">FAQ</a></li></ol>
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html" class="active"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -146,7 +141,7 @@ version = &quot;0.1.0&quot;
 authors = [&quot;John Smith &lt;dcao@example.com&gt;&quot;]
 license = &quot;MIT&quot;
 </code></pre>
-<p>The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name must be valid Unicode, and the version must follow <a href="https://semver.org/">Semantic Version guidelines</a>. Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format <code>name &lt;email&gt;</code> (this is just a helpful convention to follow). The license field can be omitted entirely.</p>
+<p>The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name can only contain alphanumeric characters, hyphens, and underscores. Internally, elba ignores case and treats hyphens and underscores equally when deciding if two names are identical. The version must follow <a href="https://semver.org/">Semantic Version guidelines</a>. Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format <code>name &lt;email&gt;</code> (this is just a helpful convention to follow). The license field can be omitted entirely.</p>
 <blockquote>
 <a class="header" href="#why-namespacing" id="why-namespacing"><h4>Why namespacing?</h4></a>
 <p>Having to supply a namespace to all package names might seem like unnecessary work, but it has its benefits; this design decision to require all package names to be namespaced was borne out of observations of other package ecosystems where the lack of namespaces lead to significant problems down the line. In particular, namespaced packages provide the following benefits:</p>
@@ -192,6 +187,8 @@ mods = [
   &quot;Awesome.A&quot;, # the file src/Awesome/A.idr
   &quot;Control.Zygohistomorphic.Prepromorphisms&quot;, # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
 ]
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>The <code>path</code> key should be a <strong>sub-path</strong> of the package; it cannot reference parent or absolute directories of the package. During the build process, all of the files under the <code>path</code> sub-path will be used to build the library and export the Idris bytecode files corresponding to the items in <code>mods</code>.</p>
 </li>
@@ -201,6 +198,8 @@ mods = [
 name = &quot;whatever&quot;
 # The path to the Main module
 main = &quot;src/bin/Whatever.idr&quot;
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory <code>src/bin</code> will be made available. Again, the path listed under <code>main</code> must be a sub-path of the package directory.</p>
 </li>
@@ -216,11 +215,13 @@ main = &quot;src/bin/Whatever.idr&quot;
 name = &quot;test-a&quot;
 # The path to the test's Main module
 main = &quot;tests/TestA.idr&quot;
+# Optional flags to pass to the compiler
+idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 </li>
 </ul>
 <p>An elba package <strong>must</strong> specify either a lib target or a bin target, or else the manifest will be rejected as invalid.</p>
-<p>For local packages, after building, all binaries will be output to the <code>target/bin</code> folder, and any library will be output to the <code>target/lib</code> folder. Note that while you can use a codegen backend with binaries, you currently cannot with libraries (i.e. what would normally be accomplished with the <code>--interface</code> flag). This is a deficiency that will be fixed in a future release.</p>
+<p>For local packages, after building, all binaries will be output to the <code>target/bin</code> folder, and any library will be output to the <code>target/lib</code> folder. Additionally, for libraries, if you pass the <code>--lib-cg</code> flag, elba will use the codegen backend specified (or the C backend by default) and any export lists specified in the exported files of the library to create output files under <code>target/artifacts/&lt;codegen name&gt;</code> (for more information on export lists and the like, see <a href="https://github.com/idris-lang/Idris-dev/tree/master/test/ffi006">this test case in the Idris compiler</a>).</p>
 <a class="header" href="#workspace" id="workspace"><h3><code>[workspace]</code></h3></a>
 <p>The last section in the manifest is the workspace section, used to indicate subprojects in the current directory. At the moment, the only use for this field is to indicate to elba the location of a package in a subdirectory (for example, with if a git repo has a package located in some subdirectory). Adding a package to the local workspace <em>does not</em> automatically add it as a local dependency of the package, nor does it cause the workspace packages to be automatically built when the root package is built. To add local directories as dependencies, they must manually be specified in either the <code>[dependencies]</code> or <code>[dev_dependencies]</code> sections.</p>
 <p>Note that the directory of every package must be a <strong>sub-path</strong>; it cannot refer to an absolute directory or a directory above the root package.</p>
@@ -229,6 +230,7 @@ main = &quot;tests/TestA.idr&quot;
 &quot;name/one&quot; = &quot;pkgs/one&quot;
 &quot;other/pkg&quot; = &quot;wherever/youd/like&quot;
 </code></pre>
+<p>Note that a a <code>[workspace]</code> section can stand alone and be parsed as a valid manifest if there is no package in the root directory.</p>
 <a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
 <p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
 
@@ -275,6 +277,12 @@ main = &quot;tests/TestA.idr&quot;
 
         
 
+        
+        <script src="../searchindex.js" type="text/javascript" charset="utf-8"></script>
+        <script>
+            var path_to_root = "../";
+        </script>
+        
         
         <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>

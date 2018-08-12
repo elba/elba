@@ -9,18 +9,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="shortcut icon" href="../favicon.png">
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
-        <link rel="stylesheet" href="../css/print.css" media="print">
-
-        <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../book.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
-        <!-- Highlight.js Stylesheets -->
+        <link rel="shortcut icon" href="favicon.png">
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+
         <link rel="stylesheet" href="../highlight.css">
         <link rel="stylesheet" href="../tomorrow-night.css">
         <link rel="stylesheet" href="../ayu-highlight.css">
@@ -29,11 +26,9 @@
         
 
         
+
     </head>
     <body class="light">
-        <!-- Provide site root to javascript -->
-        <script type="text/javascript">var path_to_root = "../";</script>
-
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script type="text/javascript">
             try {
@@ -72,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html" class="active"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="../faq.html">FAQ</a></li></ol>
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html" class="active"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -176,14 +171,16 @@ indices = [
 </code></pre>
 </li>
 </ul>
+<p>Note that if a declared dependency uses an index that isn't specified in the configuration, the package will fail to build during dependency resolution with a &quot;package not found&quot; error.</p>
 <a class="header" href="#indextoml" id="indextoml"><h3><code>index.toml</code></h3></a>
 <p>A package index is (when extracted, for tarballs) a directory tree of metadata files. All package indices must have a configuration file at the root of this directory tree named <code>index.toml</code>, and specify the following keys:</p>
 <pre><code class="language-toml">[index]
-dependencies = []
 secure = false
+
+[index.dependencies]
 </code></pre>
 <p>The <code>secure</code> key tells elba whether to treat the index like a secure package index. At the moment, this flag does nothing, but in the future, this flag may be used to enable compatibility with <a href="https://theupdateframework.github.io/">The Update Framework</a>. For forwards compatibility, package index maintainers should set this key to <code>false</code>.</p>
-<p>The <code>dependencies</code> key is a list of index resolutions for external indices which need to be downloaded in order for the index's packages to resolve their dependencies correctly. All of the other indices which packages in this index need should be specified in this list.</p>
+<p>The <code>dependencies</code> key is a mapping from the &quot;name&quot; of an index to its index resolution. The name can be whatever you want, but that name will be how the index will be referred to within metadata files. Every other index which the packages of this index need to build properly must be specified in this field, or else package building will fail during dependency resolution.</p>
 <a class="header" href="#metadata-structure" id="metadata-structure"><h3>Metadata structure</h3></a>
 <p>Package indices must follow a fairly strict folder and file structure in order for elba to interpret them correctly. The top-level folders should be groups, and underneath the folder for each group should be a metadata file corresponding to a package. The name of that file should be the second portion of the package's name:</p>
 <pre><code class="language-sh"># an example index:
@@ -203,15 +200,20 @@ secure = false
   &quot;dependencies&quot;: [
     {
       &quot;name&quot;: &quot;no_conflict/foo&quot;,
-      &quot;index&quot;: &quot;index+dir+data/index/&quot;,
       &quot;req&quot;: &quot;1.0.0&quot;
+    },
+    {
+      &quot;name&quot;: &quot;awesome/bar&quot;,
+      &quot;index&quot;: &quot;best_index&quot;,
+      &quot;req&quot;: &quot;&gt;= 0.1.0&quot;
     }
   ],
   &quot;yanked&quot;: false,
   &quot;location&quot;: &quot;dir+test&quot;
 }
 </code></pre>
-<p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code> (the resolution of the index of the dependency), and <code>req</code> (the version constraint of the dependency). The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
+<p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code>, and <code>req</code>. <code>name</code> is self-explanatory, and <code>req</code> is just the version constraint of that particular dependency. The value in <code>index</code> should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.</p>
+<p>The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
 
                     </main>
 
@@ -256,6 +258,12 @@ secure = false
 
         
 
+        
+        <script src="../searchindex.js" type="text/javascript" charset="utf-8"></script>
+        <script>
+            var path_to_root = "../";
+        </script>
+        
         
         <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>

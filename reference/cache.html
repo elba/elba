@@ -9,18 +9,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="shortcut icon" href="../favicon.png">
-        <link rel="stylesheet" href="../css/variables.css">
-        <link rel="stylesheet" href="../css/general.css">
-        <link rel="stylesheet" href="../css/chrome.css">
-        <link rel="stylesheet" href="../css/print.css" media="print">
-
-        <!-- Fonts -->
-        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../book.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
-        <!-- Highlight.js Stylesheets -->
+        <link rel="shortcut icon" href="favicon.png">
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+
         <link rel="stylesheet" href="../highlight.css">
         <link rel="stylesheet" href="../tomorrow-night.css">
         <link rel="stylesheet" href="../ayu-highlight.css">
@@ -29,11 +26,9 @@
         
 
         
+
     </head>
     <body class="light">
-        <!-- Provide site root to javascript -->
-        <script type="text/javascript">var path_to_root = "../";</script>
-
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script type="text/javascript">
             try {
@@ -72,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html" class="active"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li><li><a href="../faq.html">FAQ</a></li></ol>
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html" class="active"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -140,7 +135,6 @@
 <p>elba uses a global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
 <pre><code class="language-sh">~/.elba/cache or wherever
 |
-|-- artifacts
 |-- bin
 |   +-- .bins
 |-- build
@@ -156,8 +150,6 @@
     |-- a78bu877c78deadbeef...
     +-- # snip
 </code></pre>
-<a class="header" href="#artifacts" id="artifacts"><h3><code>artifacts</code></h3></a>
-<p>The artifacts folder <em>would be</em> where the output of codegen'd libraries would be stored... but since this is impossible at the moment, elba doesn't use this folder for anything.</p>
 <a class="header" href="#bin" id="bin"><h3><code>bin</code></h3></a>
 <p>This folder stores all of the installed binaries of elba packages, and should be added to the path. Additionally, an extra file <code>.bins</code> lives inside this directory, which maps from installed binaries to their corresponding package. This directory <strong>should not</strong> be touched by the user in any way.</p>
 <a class="header" href="#build" id="build"><h3><code>build</code></h3></a>
@@ -190,10 +182,6 @@
                         
 
                         
-                            <a rel="next" href="../faq.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
-                        
 
                         <div style="clear: both"></div>
                     </nav>
@@ -208,10 +196,6 @@
                 
 
                 
-                    <a href="../faq.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
-                
             </nav>
 
         </div>
@@ -222,6 +206,12 @@
 
         
 
+        
+        <script src="../searchindex.js" type="text/javascript" charset="utf-8"></script>
+        <script>
+            var path_to_root = "../";
+        </script>
+        
         
         <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
