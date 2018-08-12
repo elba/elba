@@ -104,6 +104,7 @@ pub struct PackageInfo {
     pub name: Name,
     pub version: Version,
     pub authors: Vec<String>,
+    pub description: Option<String>,
     pub license: Option<String>,
 }
 
@@ -246,6 +247,7 @@ license = 'MIT'
 [package]
 name = 'ring_ding/test'
 version = '1.0.0'
+description = "a cool package"
 authors = ['me']
 license = 'MIT'
 

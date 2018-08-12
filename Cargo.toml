@@ -1,8 +1,18 @@
 [package]
 name = "elba"
-version = "0.1.0"
+description = "elba is a package manager for Idris"
 authors = ["David Cao <dcao@protonmail.com>"]
+version = "0.1.0"
 license = "MIT"
+
+# crates.io stuff
+homepage = "https://github.com/dcao/elba"
+documentation = "https://docs.rs/elba"
+repository = "https://github.com/dcao/elba"
+readme = "README.md"
+
+keywords = ["idris", "package-manager"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = "2"
@@ -16,7 +26,9 @@ flate2 = "1.0"
 fs2 = "0.4"
 git2 = "0.7"
 indexmap = { version = "1", features = ["serde-1"] }
-indicatif = { git = "https://github.com/mitsuhiko/indicatif.git" }
+# The current version of indicatif doesn't let us print above the progress bar
+# We'll add this dep back in once it does
+# indicatif = "0.9"
 Inflector = "0.11"
 itertools = "0.7"
 nom = "4.0"

@@ -6,7 +6,6 @@ use build::{
 use console::style;
 use crossbeam::queue::MsQueue;
 use failure::ResultExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use package::{
     lockfile::LockfileToml,
     manifest::Manifest,
@@ -28,7 +27,7 @@ use std::{
     str::FromStr,
 };
 use toml;
-use util::{config::Backend, errors::Res, graph::Graph, lock::DirLock};
+use util::{config::Backend, errors::Res, fmt_output, graph::Graph, lock::DirLock};
 
 // TODO: In all commands, pick a better compiler than `Compiler::default()`
 
@@ -112,39 +111,39 @@ pub fn test(
                 }
             }).collect::<Vec<_>>();
 
-        let pb = ProgressBar::new(root.len() as u64);
-        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
+        // Until pb.println gets added, we can't use progress bars
+        // let pb = ProgressBar::new(root.len() as u64);
+        // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
         let results = &MsQueue::new();
         let mut pool = Pool::new(test_threads);
 
         pool.scoped(|scope| {
-            let mut prg = 0;
-
+            // let mut prg = 0;
             for test in &root {
                 let bin_dir = &bin_dir;
-                let pb = &pb;
+                // let pb = &pb;
                 scope.execute(move || {
-                    pb.println(format!("{:>7} {}", style("[tst]").blue(), &test.name));
+                    println!("{:>7} {}", style("[tst]").blue(), &test.name);
                     let out = if let Some(r) = &backend.runner {
                         Command::new(r).arg(bin_dir.join(&test.name)).output()
                     } else {
                         Command::new(bin_dir.join(&test.name)).output()
                     };
                     if out.is_err() {
-                        pb.println(format!(
+                        println!(
                             "{:>7} Test binary {} could not be executed",
                             style("[err]").red().bold(),
                             bin_dir.join(&test.name).display(),
-                        ));
+                        );
                     }
                     results.push(out.map(|x| (&test.name, x)));
-                    prg += 1;
-                    pb.set_position(prg);
+                    // prg += 1;
+                    // pb.set_position(prg);
                 });
             }
 
-            pb.finish_and_clear();
+            // pb.finish_and_clear();
         });
 
         println!();
@@ -162,11 +161,10 @@ pub fn test(
                         },
                         test
                     );
+
+                    println!("{}", fmt_output(&out));
+
                     if !out.status.success() {
-                        println!("{}", style("[stdout]").dim());
-                        println!("{}", String::from_utf8_lossy(&out.stdout));
-                        println!("{}", style("[stderr]").dim());
-                        println!("{}", String::from_utf8_lossy(&out.stderr));
                         errs += 1;
                     }
                 }

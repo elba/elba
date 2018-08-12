@@ -21,7 +21,8 @@ pub fn cli() -> App<'static, 'static> {
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let name = &*args.value_of_lossy("name").unwrap();
-    let name = Name::from_str(name).context(format_err!("the name `{}` is invalid.", name))?;
+    let name = Name::from_str(name)
+        .with_context(|e| format_err!("the name `{}` is invalid: {}", name, e))?;
     let bin = !args.is_present("lib");
     let author = if let Some(profile) = &c.profile {
         Some((profile.name.clone(), profile.email.clone()))

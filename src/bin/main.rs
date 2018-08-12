@@ -4,7 +4,7 @@ extern crate console;
 extern crate elba;
 #[macro_use]
 extern crate failure;
-extern crate indicatif;
+// extern crate indicatif;
 extern crate itertools;
 extern crate toml;
 #[macro_use]
@@ -78,7 +78,11 @@ fn expand_aliases(
                 return expand_aliases(config, args);
             }
             (Some(_), Some(_)) => {
-                println!("{} Builtin command shadows alias {}", style("[wrn]").yellow().bold(), cmd);
+                println!(
+                    "{} Builtin command shadows alias {}",
+                    style("[wrn]").yellow().bold(),
+                    cmd
+                );
             }
             (_, None) => {}
         }

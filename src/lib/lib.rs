@@ -13,7 +13,7 @@ extern crate fs2;
 extern crate git2;
 #[macro_use]
 extern crate indexmap;
-extern crate indicatif;
+// extern crate indicatif;
 extern crate inflector;
 extern crate itertools;
 #[macro_use]

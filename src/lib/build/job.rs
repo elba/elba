@@ -2,7 +2,6 @@ use super::{compile_bin, compile_doc, compile_lib, context::BuildContext, Target
 use console::style;
 use crossbeam::queue::MsQueue;
 use failure::ResultExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use petgraph::graph::NodeIndex;
 use retrieve::cache::OutputLayout;
 use retrieve::cache::{Binary, BuildHash, Source};
@@ -118,15 +117,16 @@ impl JobQueue {
         // We also store the locations and summaries of our binaries
         let bins = &MsQueue::new();
 
-        let mut prg = 0;
-        let pb = ProgressBar::new(
-            self.graph
-                .inner
-                .node_indices()
-                .filter(|&index| self.graph[index].work.is_dirty())
-                .count() as u64,
-        );
-        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
+        // let mut prg = 0;
+        // Until pb.println is added, we can't use a progress bar
+        // let pb = ProgressBar::new(
+        //     self.graph
+        //         .inner
+        //         .node_indices()
+        //         .filter(|&index| self.graph[index].work.is_dirty())
+        //         .count() as u64,
+        // );
+        // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
         loop {
             // break if the job queue is complete
@@ -149,14 +149,14 @@ impl JobQueue {
 
                         let ts = self.graph[job_index].targets.0.to_vec();
 
-                        pb.println(format!(
+                        println!(
                             "{:>7} {} [{}..]",
                             style("[bld]").blue(),
                             source.summary(),
                             &build_hash.0[0..8]
-                        ));
+                        );
 
-                        let pb = &pb;
+                        // let pb = &pb;
 
                         scoped.execute(move || {
                             let op = || -> Res<Option<Binary>> {
@@ -189,9 +189,15 @@ impl JobQueue {
                                                 })?;
 
                                             res = if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                pb.println(fmt_output(&cmp));
+                                                let cmp_out = fmt_output(&cmp);
+                                                if !cmp_out.is_empty() {
+                                                    println!("{}", cmp_out);
+                                                }
                                                 if let Some(cdg) = cdg {
-                                                    pb.println(fmt_output(&cdg));
+                                                    let cdg_out = fmt_output(&cdg);
+                                                    if !cdg_out.is_empty() {
+                                                        println!("{}", cdg_out);
+                                                    }
                                                 }
 
                                                 let target = DirLock::acquire(&layout.lib)?;
@@ -223,7 +229,10 @@ impl JobQueue {
                                             bins.push((path, source.summary()));
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                pb.println(fmt_output(&out));
+                                                let out_str = fmt_output(&out);
+                                                if !out_str.is_empty() {
+                                                    println!("{}", out_str);
+                                                }
                                             }
                                         }
                                         Target::Test(ix) => {
@@ -251,7 +260,10 @@ impl JobQueue {
                                             })?;
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                pb.println(fmt_output(&out));
+                                                let out_str = fmt_output(&out);
+                                                if !out_str.is_empty() {
+                                                    println!("{}", out_str);
+                                                }
                                             }
 
                                             // For now, only the root package can do tests, so we
@@ -273,7 +285,10 @@ impl JobQueue {
                                             })?;
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                pb.println(fmt_output(&out));
+                                                let out_str = fmt_output(&out);
+                                                if !out_str.is_empty() {
+                                                    println!("{}", fmt_output(&out));
+                                                }
                                             }
                                         }
                                     }
@@ -292,9 +307,8 @@ impl JobQueue {
             while let Some((job_index, job_res)) = done.try_pop() {
                 match job_res {
                     Ok(binary) => {
-                        prg += 1;
-                        pb.set_position(prg);
-
+                        // prg += 1;
+                        // pb.set_position(prg);
                         if let Some(b) = binary {
                             // If we got a compiled library out of it, set the binary
                             self.graph[job_index].work = Work::Fresh(b)
@@ -336,7 +350,7 @@ impl JobQueue {
                         }
                     }
                     Err(err) => {
-                        pb.finish_and_clear();
+                        // pb.finish_and_clear();
                         println!("{}", err);
                         bail!("one or more packages couldn't be built")
                     }

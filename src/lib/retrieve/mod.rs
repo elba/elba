@@ -11,7 +11,6 @@ use console::style;
 use failure::{Error, ResultExt};
 use index::Indices;
 use indexmap::IndexMap;
-use indicatif::{ProgressBar, ProgressStyle};
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
@@ -69,13 +68,14 @@ impl<'cache> Retriever<'cache> {
     /// This downloads all the packages into the cache. If we wanted to parallelize downloads
     /// later, this is where we'd deal with all the Tokio stuff.
     pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
-        let mut prg = 0;
-        let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
-        pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
+        // let mut prg = 0;
+        // Until pb.println gets added, we can't use progress bars
+        // let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
+        // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
         let sources = solve.map(
             |_, sum| {
-                pb.println(format!("{:>7} {}", style("[rtv]").blue(), sum.to_string()));
+                println!("{:>7} {}", style("[rtv]").blue(), sum.to_string());
 
                 let loc = match sum.resolution() {
                     Resolution::Direct(direct) => direct,
@@ -83,23 +83,23 @@ impl<'cache> Retriever<'cache> {
                 };
 
                 if let Some(s) = self.sources.get_mut(sum.id()).and_then(|x| x.remove(loc)) {
-                    prg += 1;
-                    pb.set_position(prg);
+                    // prg += 1;
+                    // pb.set_position(prg);
                     Ok(s)
                 } else {
                     let source = self
                         .cache
                         .checkout_source(sum.id(), loc)
                         .context(format_err!("unable to retrieve package {}", sum))?;
-                    prg += 1;
-                    pb.set_position(prg);
+                    // prg += 1;
+                    // pb.set_position(prg);
                     Ok(source)
                 }
             },
             |_| Ok(()),
         )?;
 
-        pb.finish_and_clear();
+        // pb.finish_and_clear();
         println!(
             "{:>7} Packages cached in {}",
             style("[inf]").dim(),

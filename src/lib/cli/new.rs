@@ -59,10 +59,11 @@ mods = [
         )
     };
 
-    fs::write(
-        &ctx.path.join("elba.toml"),
-        format!(
-            r#"[package]
+    if !ctx.path.join("elba.toml").exists() {
+        fs::write(
+            &ctx.path.join("elba.toml"),
+            format!(
+                r#"[package]
 name = "{}"
 version = "0.1.0"
 authors = [{}]
@@ -70,40 +71,49 @@ authors = [{}]
 [dependencies]
 
 {}"#,
-            name, author, target
-        ).as_bytes(),
-    )?;
+                name, author, target
+            ).as_bytes(),
+        )?;
+    } else {
+        bail!("elba project already exists in this directory")
+    }
 
-    if !ctx.bin {
-        fs::create_dir_all(path.join(format!("src/{}", name.group().to_pascal_case())))
-            .context(format_err!("could not create dir {}", path.display()))?;
+    fs::create_dir_all(path.join(format!("src/{}", name.name().to_pascal_case())))
+        .context(format_err!("could not create dir {}", path.display()))?;
+
+    let lib_path = path.join(format!("src/{}.idr", name.name().to_pascal_case()));
+
+    if !ctx.bin && !lib_path.exists() {
         fs::write(
-            &path.join(format!(
-                "src/{}/{}.idr",
-                name.group().to_pascal_case(),
-                name.name().to_pascal_case()
-            )),
+            lib_path,
             format!(
-                r#"module {}.{}
+                r#"module {}
 
 hello : IO ()
 hello = do
   print "Hello, world!"
 "#,
-                name.group().to_pascal_case(),
                 name.name().to_pascal_case()
             ).as_bytes(),
         )?;
-    } else {
-        fs::create_dir_all(path.join("src"))
-            .context(format_err!("could not create dir {}", path.display()))?;
+    } else if !path.join("src/Main.idr").exists() {
         fs::write(
-            &path.join("src/Main.idr"),
+            path.join("src/Main.idr"),
             r#"module Main
 
 main : IO ()
 main = do
   print "Hello, world!"
+"#,
+        )?;
+    }
+
+    if !path.join(".gitignore").exists() {
+        fs::write(
+            path.join(".gitignore"),
+            r#"/target
+*.ibc
+*.o
 "#,
         )?;
     }
