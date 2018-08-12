@@ -65,7 +65,6 @@ pub struct CodegenInvocation<'a> {
 impl<'a> CodegenInvocation<'a> {
     pub fn exec(self, bcx: &BuildContext) -> Res<Output> {
         // Invoke the compiler.
-        // TODO: Canonicalize the build path?
         let mut process = bcx.compiler.process();
         let cwd;
 

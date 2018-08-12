@@ -8,7 +8,7 @@ pub mod lock;
 
 use failure::ResultExt;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fs, io::Write, path::Path};
+use std::{fs, path::Path};
 use std::{
     path::{Component, PathBuf},
     process::Output,
@@ -67,19 +67,6 @@ impl<'de> Deserialize<'de> for SubPath {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
-}
-
-// TODO: create_dir_all too?
-pub fn write(path: &Path, contents: &[u8]) -> Res<()> {
-    let f: Res<()> = {
-        let mut f = fs::File::create(path)?;
-        f.write_all(contents)?;
-        Ok(())
-    };
-
-    f.context(format_err!("failed to write `{}`", path.display()))?;
-
-    Ok(())
 }
 
 pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {

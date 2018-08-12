@@ -91,8 +91,7 @@ impl JobQueue {
     }
 
     pub fn exec(mut self, bcx: &BuildContext) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
-        // TODO: How many threads do we want?
-        let threads = 1;
+        let threads = bcx.threads;
         let mut thread_pool = Pool::new(threads);
 
         let root_ol = &self.root_ol;

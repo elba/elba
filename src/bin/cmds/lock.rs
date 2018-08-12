@@ -11,7 +11,7 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("lock").about("Generates an elba.lock according to the manifest")
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, _args: &ArgMatches) -> Res<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;

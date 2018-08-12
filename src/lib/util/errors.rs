@@ -13,10 +13,6 @@ pub enum ErrorKind {
     InvalidLockfile,
     #[fail(display = "invalid source url")]
     InvalidSourceUrl,
-    #[fail(display = "invalid package id")]
-    InvalidPackageId,
-    #[fail(display = "invalid constraint")]
-    InvalidConstraint,
     #[fail(display = "invalid index structure")]
     InvalidIndex,
     #[fail(display = "package doesn't exist in index")]
@@ -29,8 +25,6 @@ pub enum ErrorKind {
     CannotDownload,
     #[fail(display = "checksum error")]
     Checksum,
-    #[fail(display = "resource is locked")]
-    Locked,
     #[doc(hidden)]
     #[fail(display = "if you see this error, everything is wrong")]
     __Nonexhaustive,

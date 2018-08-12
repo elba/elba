@@ -2,7 +2,7 @@ use failure::ResultExt;
 use inflector::Inflector;
 use package::Name;
 use std::{fs, path::PathBuf};
-use util::{errors::Res, write};
+use util::errors::Res;
 
 pub struct NewCtx {
     pub path: PathBuf,
@@ -59,7 +59,7 @@ mods = [
         )
     };
 
-    write(
+    fs::write(
         &ctx.path.join("elba.toml"),
         format!(
             r#"[package]
@@ -77,7 +77,7 @@ authors = [{}]
     if !ctx.bin {
         fs::create_dir_all(path.join(format!("src/{}", name.group().to_pascal_case())))
             .context(format_err!("could not create dir {}", path.display()))?;
-        write(
+        fs::write(
             &path.join(format!(
                 "src/{}/{}.idr",
                 name.group().to_pascal_case(),
@@ -97,9 +97,9 @@ hello = do
     } else {
         fs::create_dir_all(path.join("src"))
             .context(format_err!("could not create dir {}", path.display()))?;
-        write(
+        fs::write(
             &path.join("src/Main.idr"),
-            br#"module Main
+            r#"module Main
 
 main : IO ()
 main = do

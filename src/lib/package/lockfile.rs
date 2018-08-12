@@ -34,7 +34,6 @@ impl FromStr for LockfileToml {
     }
 }
 
-// TODO: Is here a good place for these?
 impl Into<LockfileToml> for Graph<Summary> {
     fn into(self) -> LockfileToml {
         let root = &self[NodeIndex::new(0)];

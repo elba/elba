@@ -9,7 +9,7 @@ pub struct BuildContext<'a> {
     pub compiler: Compiler,
     /// The global cache to use.
     pub cache: &'a Cache,
-    pub threads: u8,
+    pub threads: u32,
     pub config: BuildConfig,
 }
 
@@ -18,7 +18,6 @@ pub struct BuildContext<'a> {
 pub struct BuildConfig {}
 
 /// Information on the compiler executable
-// TODO: Support args and envs
 #[derive(Debug)]
 pub struct Compiler {
     /// The location of the exe
@@ -27,7 +26,6 @@ pub struct Compiler {
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    // TODO: Actually look up the compiler instead of the hard-coded string.
     pub fn new() -> Compiler {
         Compiler::default()
     }

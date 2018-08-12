@@ -363,9 +363,6 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     }
 
     // 3: Decision making
-    // TODO: Make sure we're not missing anything; we ignore "unknown source" errors - those are
-    //       treated like the package has no versions available, and we don't turn constraints
-    //       which exclude one version into "any" constraints.
     fn choose_pkg_version(&mut self) -> Option<PackageId> {
         let mut unsatisfied = self
             .derivations
@@ -455,7 +452,6 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     // 4: Error reporting
     // cause things go bad
     fn pp_error(&self, root_icix: usize) -> String {
-        // TODO: We can build a proper Graph<usize /* ix of incompat */, ()> now
         let mut s = String::new();
         let mut linum: IndexMap<usize, u16> = indexmap!();
         let mut cur_linum = 1;

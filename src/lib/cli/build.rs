@@ -30,11 +30,13 @@ use std::{
 use toml;
 use util::{config::Backend, errors::Res, graph::Graph, lock::DirLock};
 
+// TODO: In all commands, pick a better compiler than `Compiler::default()`
+
 pub struct BuildCtx {
     pub indices: Vec<DirectRes>,
     pub global_cache: PathBuf,
     pub logger: Logger,
-    pub threads: u8,
+    pub threads: u32,
 }
 
 pub fn test(
@@ -70,7 +72,6 @@ pub fn test(
 
         let ctx = BuildContext {
             backend,
-            // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
             cache,
@@ -225,7 +226,6 @@ pub fn install(
 
         let ctx = BuildContext {
             backend,
-            // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
             cache,
@@ -310,7 +310,6 @@ pub fn repl(
 
         let ctx = BuildContext {
             backend,
-            // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
             cache,
@@ -404,7 +403,6 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
         let ctx = BuildContext {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
-            // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
             cache,
@@ -494,7 +492,6 @@ pub fn build(
 
         let ctx = BuildContext {
             backend,
-            // TODO: pick a better compiler pls
             compiler: Compiler::default(),
             config: BuildConfig {},
             cache,

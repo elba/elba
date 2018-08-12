@@ -24,7 +24,6 @@ use util::errors::{ErrorKind, Res};
 use util::graph::Graph;
 
 // TODO: Patching
-// TODO: Multiple root packages so we can support workspaces
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
 #[derive(Debug)]
@@ -174,7 +173,6 @@ impl<'cache> Retriever<'cache> {
         }
     }
 
-    // TODO: Incompat cache
     /// Returns a `Vec<Incompatibility>` corresponding to the package's dependencies.
     pub fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility>, Error> {
         if pkg == &self.root {

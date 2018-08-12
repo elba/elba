@@ -17,8 +17,6 @@ use std::{
 };
 use util::errors::{ErrorKind, Res};
 
-// TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
-//       name of a package?
 /// Struct `Name` represents the name of a package. All packages in elba are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -122,6 +120,8 @@ impl Hash for NameInner {
     }
 }
 
+// TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
+//       name of a package?
 impl FromStr for Name {
     type Err = Error;
 
@@ -129,7 +129,9 @@ impl FromStr for Name {
         let v: Vec<&str> = s.split('/').collect();
 
         if v.len() != 2 {
-            return Err(ErrorKind::InvalidPackageId)?;
+            return Err(format_err!(
+                "name must have group and name separated by '/'"
+            ))?;
         }
 
         let (group, name) = (v[0].to_owned(), v[1].to_owned());
@@ -200,7 +202,9 @@ impl FromStr for PackageId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut s = s.splitn(2, '@');
         let name = s.next().unwrap();
-        let url = s.next().ok_or_else(|| ErrorKind::InvalidPackageId)?;
+        let url = s.next().ok_or_else(|| {
+            format_err!("package id must have name and resolution, separated by '@'")
+        })?;
 
         let name = Name::from_str(name)?;
         let resolution = Resolution::from_str(url)?;

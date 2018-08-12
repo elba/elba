@@ -56,7 +56,6 @@ impl Config {
         )?;
 
         if let Ok(cwd) = cwd {
-            // TODO: I just wanted to reverse the order that the ancestors were merged :v
             for parent in cwd.ancestors().collect::<Vec<_>>().iter().rev() {
                 c.merge(
                     config::File::from(parent.join(".elba/config"))

@@ -164,7 +164,6 @@ pub struct Targets {
     pub test: Vec<BinTarget>,
 }
 
-// TODO: Prevent non-relative paths
 #[derive(Deserialize, Debug, Clone)]
 pub struct LibTarget {
     pub path: SubPath,

@@ -118,7 +118,7 @@ pub fn match_backends(c: &mut Config, args: &ArgMatches) -> Backend {
     backend
 }
 
-pub fn match_threads(c: &mut Config, args: &ArgMatches) -> u8 {
+pub fn match_threads(_c: &mut Config, args: &ArgMatches) -> u32 {
     args.value_of("build-threads")
         .and_then(|s| s.parse().ok())
         .unwrap_or(1)

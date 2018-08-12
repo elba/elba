@@ -1,6 +1,3 @@
-// TODO: remove this once we start actually developing the CLI tool
-#![allow(unused_variables, dead_code)]
-
 #[macro_use]
 extern crate clap;
 extern crate console;
@@ -81,7 +78,7 @@ fn expand_aliases(
                 return expand_aliases(config, args);
             }
             (Some(_), Some(_)) => {
-                // TODO: A warning here would be nice
+                println!("{} Builtin command shadows alias {}", style("[wrn]").yellow().bold(), cmd);
             }
             (_, None) => {}
         }
@@ -128,8 +125,6 @@ fn go() -> Result<String, Error> {
     res
 }
 
-// TODO: Actually pretty-print the error, using the `Shell` struct.
-// See cargo::exit_with_error and main.rs in the cargo bin.
 fn main() {
     let start = Instant::now();
     let res = go();

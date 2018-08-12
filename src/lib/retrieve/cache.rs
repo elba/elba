@@ -350,7 +350,6 @@ impl Cache {
         }
     }
 
-    // TODO: We do a lot of silent erroring. Is that good?
     pub fn get_indices(&self, index_reses: &[DirectRes]) -> Indices {
         let mut indices = vec![];
         let mut seen = vec![];
@@ -363,10 +362,17 @@ impl Cache {
             }
             // We special-case a local dir index because `dir` won't exist for it.
             if let DirectRes::Dir { path } = &index {
-                let lock = if let Ok(dir) = DirLock::acquire(path) {
-                    dir
-                } else {
-                    continue;
+                let lock = match DirLock::acquire(path) {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        println!(
+                            "{:>7} Couldn't lock dir index {}: {}",
+                            style("[wrn]").yellow().bold(),
+                            path.display(),
+                            e
+                        );
+                        continue;
+                    }
                 };
 
                 let ix = Index::from_disk(index.clone(), lock);
@@ -380,34 +386,59 @@ impl Cache {
                 continue;
             }
 
-            let dir = if let Ok(dir) =
-                DirLock::acquire(&self.layout.indices.join(Self::get_index_dir(&index)))
-            {
-                dir
-            } else {
-                continue;
+            let index_path = self.layout.indices.join(Self::get_index_dir(&index));
+            let dir = match DirLock::acquire(&index_path) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    println!(
+                        "{:>7} Couldn't lock cached index {}: {}",
+                        style("[wrn]").yellow().bold(),
+                        index,
+                        e
+                    );
+                    continue;
+                }
             };
 
             if dir.path().exists() {
-                let ix = Index::from_disk(index.clone(), dir);
-                if let Ok(ix) = ix {
-                    for dependent in ix.depends().cloned().map(|i| i.res) {
-                        q.push_back(dependent);
+                match Index::from_disk(index.clone(), dir) {
+                    Ok(ix) => {
+                        for dependent in ix.depends().cloned().map(|i| i.res) {
+                            q.push_back(dependent);
+                        }
+                        seen.push(index);
+                        indices.push(ix);
                     }
-                    seen.push(index);
-                    indices.push(ix);
+                    Err(e) => {
+                        println!(
+                            "{:>7} Invalid/corrupt cached index {}: {}",
+                            style("[wrn]").yellow().bold(),
+                            index,
+                            e
+                        );
+                    }
                 }
                 continue;
             }
 
-            if index.retrieve(&self.client, &dir).is_ok() {
-                let ix = Index::from_disk(index.clone(), dir);
-                if let Ok(ix) = ix {
-                    for dependent in ix.depends().cloned().map(|i| i.res) {
-                        q.push_back(dependent);
+            match index.retrieve(&self.client, &dir) {
+                Ok(_) => {
+                    let ix = Index::from_disk(index.clone(), dir);
+                    if let Ok(ix) = ix {
+                        for dependent in ix.depends().cloned().map(|i| i.res) {
+                            q.push_back(dependent);
+                        }
+                        seen.push(index);
+                        indices.push(ix);
                     }
-                    seen.push(index);
-                    indices.push(ix);
+                }
+                Err(e) => {
+                    println!(
+                        "{:>7} Couldn't retrieve cache {}: {}",
+                        style("[wrn]").yellow().bold(),
+                        index,
+                        e
+                    );
                 }
             }
         }
@@ -523,7 +554,6 @@ impl OutputLayout {
 pub struct Source {
     // Note: the reason we have to deal with this Arc is because in the JobQueue, there's no way of
     // moving Sources out of the queue, hence the need to clone the references to the Source.
-    // TODO: Get rid of this Arc somehow
     inner: Arc<SourceInner>,
 }
 
@@ -561,7 +591,6 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    // TODO: Ignore `target/` folder!!!
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 

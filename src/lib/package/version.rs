@@ -32,7 +32,6 @@ use nom::types::CompleteStr;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{cmp, fmt, str::FromStr};
-use util::errors::ErrorKind;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Relation {
@@ -329,12 +328,10 @@ impl FromStr for Range {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: Don't lose all error info
-        // We throw away the original error because of 'static lifetime bs...
         let p = parse::range(CompleteStr(s))
             .map(|o| o.1)
-            .map_err(|_| ErrorKind::InvalidConstraint)?
-            .ok_or_else(|| ErrorKind::InvalidConstraint)?;
+            .map_err(|_| format_err!("invalid constraint syntax"))?
+            .ok_or_else(|| format_err!("invalid constraint"))?;
 
         Ok(p)
     }
@@ -702,12 +699,10 @@ impl FromStr for Constraint {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // TODO: Don't lose all error info
-        // We throw away the original error because of 'static lifetime bs...
         let p = parse::constraint(CompleteStr(s))
             .map(|o| o.1)
-            .map_err(|_| ErrorKind::InvalidConstraint)?
-            .ok_or_else(|| ErrorKind::InvalidConstraint)?;
+            .map_err(|_| format_err!("invalid constraint syntax"))?
+            .ok_or_else(|| format_err!("invalid constraint"))?;
 
         Ok(p)
     }

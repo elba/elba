@@ -9,7 +9,7 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("clean").about("Cleans the global cache")
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, _args: &ArgMatches) -> Res<String> {
     let p = &c.directories.cache;
     if p.exists() {
         let layout = Layout::new(&p)?;

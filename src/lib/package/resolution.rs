@@ -93,7 +93,7 @@ pub enum DirectRes {
 }
 
 impl DirectRes {
-    // TODO: argument progress: impl Fn(u8) (u8 = 0-100)
+    // TODO: argument progress: impl Fn(u8) where 0 <= u8 <= 100
     pub fn retrieve(&self, client: &Client, target: &DirLock) -> Result<(), Error> {
         match self {
             DirectRes::Tar { url, cksum } => match url.scheme() {

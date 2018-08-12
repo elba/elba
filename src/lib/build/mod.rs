@@ -190,7 +190,6 @@ pub fn compile_bin(
 
     // This is the full target path
     let target_path = source.path().join(bin_target.main.0).with_extension("idr");
-    // TODO: Check this in manifest?
     let src_path = target_path.parent().unwrap();
     // This is the relative target path
     let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
