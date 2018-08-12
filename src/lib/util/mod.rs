@@ -85,6 +85,7 @@ pub fn write(path: &Path, contents: &[u8]) -> Res<()> {
 pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     let walker = WalkDir::new(from)
         .into_iter()
+        .filter_entry(|x| x.path() != to)
         .filter(|x| x.is_ok() && valid_file(x.as_ref().unwrap()));
     for entry in walker {
         let entry = entry.unwrap();

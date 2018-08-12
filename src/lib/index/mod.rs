@@ -180,7 +180,7 @@ impl Index {
 
     pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, ResolvedEntry>> {
         let mut res = indexmap!();
-        let path = self.path.path().join(name.as_str());
+        let path = self.path.path().join(name.as_normalized());
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
         let r = io::BufReader::new(&file);
 

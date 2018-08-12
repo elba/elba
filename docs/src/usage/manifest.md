@@ -14,7 +14,7 @@ authors = ["John Smith <dcao@example.com>"]
 license = "MIT"
 ```
 
-The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name must be valid Unicode, and the version must follow [Semantic Version guidelines](https://semver.org/). Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format `name <email>` (this is just a helpful convention to follow). The license field can be omitted entirely.
+The namespaced name and version are the two most important parts of this specification. The name must contain a group (i.e. a namespace) and a name, separated by a slash, or else the manifest will fail to parse. Additionally, the name can only contain alphanumeric characters, hyphens, and underscores. Internally, elba ignores case and treats hyphens and underscores equally when deciding if two names are identical. The version must follow [Semantic Version guidelines](https://semver.org/). Additionally, the package section contains fields to indicate the authors of the package and the license which the code falls under. The authors section can be left blank, and each author should follow the format `name <email>` (this is just a helpful convention to follow). The license field can be omitted entirely.
 
 > #### Why namespacing?
 >

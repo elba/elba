@@ -30,9 +30,6 @@ use util::SubPath;
 // its only dependency, throw it in the global cache, and add this to the import dir of the root
 // package instead of the original.
 //
-// I guess this also means that each package should declare their (root) module(s), so that we
-// can identify conflicts ahead of time without having to guess that it's always gonna be Group.Name
-//
 // With this in place, we can safely avoid module namespace conflicts.
 
 #[derive(Deserialize, Debug, Clone)]

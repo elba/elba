@@ -9,13 +9,16 @@ use self::resolution::Resolution;
 use failure::Error;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, str::FromStr, sync::Arc};
-use util::errors::ErrorKind;
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+    str::FromStr,
+    sync::Arc,
+};
+use util::errors::{ErrorKind, Res};
 
 // TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
 //       name of a package?
-// TODO: Legal characters?
-// TODO: Treat hyphens and underscores the same?
 /// Struct `Name` represents the name of a package. All packages in elba are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -23,27 +26,69 @@ pub struct Name {
     inner: Arc<NameInner>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialOrd, Ord)]
 struct NameInner {
-    /// The serialized form of a name: "group/name"
+    /// The serialized form of a name, as specified by the user
     serialization: String,
+    /// The normalized form of a name for use in internal comparisons to see if two names are the
+    /// same.
+    ///
+    /// This is separated from the serialization because the serialization is a convenience to
+    /// avoid repeatedly reformatting the string when using the full group/name; it preserves
+    /// all case and hyphens/underscores. The normalization, on the other hand, changes
+    /// all underscores to hyphens and lowercases everything for more consistent comparison.
+    ///
+    /// Basically, we let the user preserve whatever pretty-pretty formatting they want, but
+    /// internally, elba doesn't care.
+    normalization: String,
     group: String,
     name: String,
 }
 
 impl Name {
-    pub fn new(group: String, name: String) -> Self {
+    pub fn new(group: String, name: String) -> Res<Self> {
+        let group_valid = group
+            .chars()
+            .all(|x| x.is_alphanumeric() || x == '_' || x == '-');
+        if !group_valid {
+            bail!("group can only contain letters, numbers, _, and -")
+        }
+        let name_valid = name
+            .chars()
+            .all(|x| x.is_alphanumeric() || x == '_' || x == '-');
+        if !name_valid {
+            bail!("name can only contain letters, numbers, _, and -")
+        }
+
         let mut s = String::with_capacity(group.len() + 2 + name.len());
         s.push_str(&group);
         s.push('/');
         s.push_str(&name);
-        Name {
+
+        let mut n = String::with_capacity(group.len() + 2 + name.len());
+        n.push_str(
+            &group
+                .to_ascii_lowercase()
+                .drain(..)
+                .map(|c| if c == '_' { '-' } else { c })
+                .collect::<String>(),
+        );
+        n.push('/');
+        n.push_str(
+            &name
+                .to_ascii_lowercase()
+                .drain(..)
+                .map(|c| if c == '_' { '-' } else { c })
+                .collect::<String>(),
+        );
+        Ok(Name {
             inner: Arc::new(NameInner {
                 serialization: s,
+                normalization: n,
                 group,
                 name,
             }),
-        }
+        })
     }
 
     pub fn group(&self) -> &str {
@@ -58,8 +103,22 @@ impl Name {
         &self.inner.serialization
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.inner.serialization.as_bytes()
+    pub fn as_normalized(&self) -> &str {
+        &self.inner.normalization
+    }
+}
+
+impl PartialEq for NameInner {
+    fn eq(&self, other: &NameInner) -> bool {
+        self.normalization == other.normalization
+    }
+}
+
+impl Eq for NameInner {}
+
+impl Hash for NameInner {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.normalization.hash(state);
     }
 }
 
@@ -75,7 +134,7 @@ impl FromStr for Name {
 
         let (group, name) = (v[0].to_owned(), v[1].to_owned());
 
-        Ok(Name::new(group, name))
+        Name::new(group, name)
     }
 }
 

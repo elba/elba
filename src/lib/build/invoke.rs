@@ -23,7 +23,6 @@ impl<'a> CompileInvocation<'a> {
     pub fn exec(&self, bcx: &BuildContext) -> Res<Output> {
         clear_dir(&self.build)?;
         copy_dir(&self.src, &self.build)?;
-
         // invoke compiler
         let mut process = bcx.compiler.process();
         process.current_dir(&self.build).arg("--check");

@@ -214,8 +214,8 @@ impl JobQueue {
                                             ).with_context(|e| {
                                                 format!(
                                                     "{:>7} Couldn't build binary {} for {}\n{}",
-                                                    ix,
                                                     style("[err]").red().bold(),
+                                                    ix,
                                                     source.summary(),
                                                     e
                                                 )
@@ -244,8 +244,8 @@ impl JobQueue {
                                             ).with_context(|e| {
                                                 format!(
                                                     "{:>7} Couldn't build test {} for {}\n{}",
-                                                    ix,
                                                     style("[err]").red().bold(),
+                                                    ix,
                                                     source.summary(),
                                                     e
                                                 )

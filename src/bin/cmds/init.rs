@@ -27,7 +27,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .ok_or_else(|| format_err!("can't make a project in a root directory"))?
         .to_string_lossy()
         .into_owned();
-    let name = Name::new(name.clone(), name);
+    let name = Name::new(name.clone(), name)?;
     let bin = !args.is_present("lib");
     let author = if let Some(profile) = &c.profile {
         Some((profile.name.clone(), profile.email.clone()))
