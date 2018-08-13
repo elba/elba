@@ -273,10 +273,12 @@ pub fn repl(
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
+    let mut imports = vec![];
     let mut paths = vec![];
 
     if let Some(lib) = manifest.targets.lib {
         if targets.1.is_none() || targets.0 {
+            imports.push(lib.path.0.clone());
             paths.extend(lib.mods.iter().map(|mod_name| {
                 let np: PathBuf = mod_name.replace(".", "/").into();
                 lib.path.0.join(np).with_extension("idr")
@@ -287,9 +289,23 @@ pub fn repl(
     for bin in manifest.targets.bin {
         if let Some(v) = targets.1.as_ref() {
             if v.contains(&bin.name.as_ref()) {
+                imports.push(
+                    bin.main
+                        .0
+                        .parent()
+                        .unwrap_or_else(|| Path::new("."))
+                        .to_path_buf(),
+                );
                 paths.push(bin.main.0.clone());
             }
         } else if !targets.0 {
+            imports.push(
+                bin.main
+                    .0
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .to_path_buf(),
+            );
             paths.push(bin.main.0.clone());
         }
     }
@@ -334,13 +350,14 @@ pub fn repl(
         println!("{} Launching the repl...", style("[5/5]").dim().bold());
         println!();
         let mut process = ctx.compiler.process();
-        // TODO: Do we want to straight up add the import paths of the lib/bin/etc? Or stay with the
-        // current strategy of including only {exported files for libs}/{main files for bins}?
-        // Include dependencies
         for binary in deps {
             // We assume that the binary has already been compiled
             process.arg("-i").arg(binary);
         }
+        for path in &imports {
+            process.arg("-i").arg(path);
+        }
+
         // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
         // conflicting flags will be ignored (idris chooses the earliest flags first)
         if let Ok(val) = env::var("IDRIS_OPTS") {
@@ -350,6 +367,7 @@ pub fn repl(
         for target in &paths {
             process.arg(target);
         }
+
         // The moment of truth:
         process
             .spawn()
