@@ -13,8 +13,6 @@ pub enum ErrorKind {
     InvalidLockfile,
     #[fail(display = "invalid source url")]
     InvalidSourceUrl,
-    #[fail(display = "invalid index structure")]
-    InvalidIndex,
     #[fail(display = "package doesn't exist in index")]
     PackageNotFound,
     #[fail(display = "conflict resolution failure")]

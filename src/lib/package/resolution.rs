@@ -116,7 +116,7 @@ impl DirectRes {
                         let archive = GzDecoder::new(archive);
                         let mut archive = Archive::new(archive);
 
-                        fs::create_dir(target.path())?;
+                        clear_dir(target.path())?;
 
                         archive
                             .unpack(target.path())

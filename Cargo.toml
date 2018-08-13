@@ -2,13 +2,13 @@
 name = "elba"
 description = "elba is a package manager for Idris"
 authors = ["David Cao <dcao@protonmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 
 # crates.io stuff
-homepage = "https://github.com/dcao/elba"
+homepage = "https://github.com/elba/elba"
 documentation = "https://docs.rs/elba"
-repository = "https://github.com/dcao/elba"
+repository = "https://github.com/elba/elba"
 readme = "README.md"
 
 keywords = ["idris", "package-manager"]

@@ -21,10 +21,12 @@ Additionally, whenever elba executes an Idris invocation, elba will pass all of 
 A complete default elba configuration file is listed below. Any options which are not assigned to will carry the default value instead.
 
 ```toml
-indices = []
+indices = [
+    "git+https://github.com/elba/elba"
+]
 
 [term]
-verbosity = "verbose"
+verbosity = "normal"
 color = "true"
 
 [alias]
@@ -50,7 +52,7 @@ opts = []
 
 This key specifies all of the indices that should be made available to packages being built. Any dependent indices of these indices will also be retrieved. The first index specified in this list will be used as the default index for packages which don't specify an index. This key should be a list of index urls; for more information on those, see the chapter on [Indices](../reference/indices.md).
 
-At the moment, the default indices list is empty, but in the future, if we make an official elba package index, the first item in this list will become that official index by default.
+By default, the first and only index available to elba is the [official package index](https://github.com/elba/index).
 
 #### `[profile]`
 

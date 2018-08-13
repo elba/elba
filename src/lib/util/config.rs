@@ -11,6 +11,7 @@ use directories::BaseDirs;
 use indexmap::IndexMap;
 use package::resolution::DirectRes;
 use std::{env, path::PathBuf};
+use url::Url;
 
 /// The requested verbosity of output
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
@@ -31,9 +32,7 @@ pub struct Config {
     pub alias: IndexMap<String, String>,
     #[serde(default)]
     pub directories: Directories,
-    // First index = default.
-    // In future, default for "indices" should be only the official index...
-    #[serde(default)]
+    #[serde(default = "default_indices")]
     pub indices: Vec<DirectRes>,
     #[serde(default)]
     pub backend: Vec<Backend>,
@@ -112,6 +111,12 @@ fn default_aliases() -> IndexMap<String, String> {
         "b".to_owned() => "build".to_owned(),
         "t".to_owned() => "test".to_owned(),
     )
+}
+
+fn default_indices() -> Vec<DirectRes> {
+    let repo = Url::parse("https://github.com/elba/index").unwrap();
+    let tag = "master".to_string();
+    vec![DirectRes::Git { repo, tag }]
 }
 
 #[derive(Debug, Deserialize, Serialize)]

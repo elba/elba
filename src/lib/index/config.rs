@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 use package::resolution::IndexRes;
 use std::str::FromStr;
 use toml;
-use util::errors::ErrorKind;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct IndexConfig {
@@ -17,7 +16,7 @@ impl FromStr for IndexConfig {
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         toml::from_str(raw)
-            .context(ErrorKind::InvalidIndex)
+            .context(format_err!("invalid index config"))
             .map_err(Error::from)
     }
 }

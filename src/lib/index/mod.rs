@@ -168,12 +168,13 @@ impl Index {
     pub fn from_disk(res: DirectRes, path: DirLock) -> Res<Self> {
         let id = IndexRes { res };
         let pn = path.path().join("index.toml");
-        let file = fs::File::open(pn).context(ErrorKind::InvalidIndex)?;
+        let file = fs::File::open(&pn)
+            .with_context(|e| format_err!("couldn't open index config {}: {}", pn.display(), e))?;
         let mut file = BufReader::new(file);
         let mut contents = String::new();
         file.read_to_string(&mut contents)
-            .context(ErrorKind::InvalidIndex)?;
-        let config = IndexConfig::from_str(&contents).context(ErrorKind::InvalidIndex)?;
+            .with_context(|e| format_err!("couldn't read index config {}: {}", pn.display(), e))?;
+        let config = IndexConfig::from_str(&contents)?;
 
         Ok(Index { id, path, config })
     }
@@ -184,9 +185,12 @@ impl Index {
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
         let r = io::BufReader::new(&file);
 
-        for line in r.lines() {
-            let line = line.context(ErrorKind::InvalidIndex)?;
-            let entry: TomlEntry = serde_json::from_str(&line).context(ErrorKind::InvalidIndex)?;
+        for (lix, line) in r.lines().enumerate() {
+            let entry: TomlEntry = serde_json::from_str(&line?).context(format_err!(
+                "index entry {} for package {} is invalid",
+                lix + 1,
+                name
+            ))?;
 
             let dependencies = entry
                 .dependencies

@@ -400,36 +400,26 @@ impl Cache {
                 }
             };
 
-            if dir.path().exists() {
-                match Index::from_disk(index.clone(), dir) {
-                    Ok(ix) => {
-                        for dependent in ix.depends().cloned().map(|i| i.res) {
-                            q.push_back(dependent);
-                        }
-                        seen.push(index);
-                        indices.push(ix);
-                    }
-                    Err(e) => {
-                        println!(
-                            "{:>7} Invalid/corrupt cached index {}: {}",
-                            style("[wrn]").yellow().bold(),
-                            index,
-                            e
-                        );
-                    }
-                }
-                continue;
-            }
-
+            // We unconditionally re-retrieve indices.
             match index.retrieve(&self.client, &dir) {
                 Ok(_) => {
                     let ix = Index::from_disk(index.clone(), dir);
-                    if let Ok(ix) = ix {
-                        for dependent in ix.depends().cloned().map(|i| i.res) {
-                            q.push_back(dependent);
+                    match ix {
+                        Ok(ix) => {
+                            for dependent in ix.depends().cloned().map(|i| i.res) {
+                                q.push_back(dependent);
+                            }
+                            seen.push(index);
+                            indices.push(ix);
                         }
-                        seen.push(index);
-                        indices.push(ix);
+                        Err(e) => {
+                            println!(
+                                "{:>7} Invalid/corrupt index {}: {}",
+                                style("[wrn]").yellow().bold(),
+                                index,
+                                e
+                            );
+                        }
                     }
                 }
                 Err(e) => {
@@ -597,8 +587,7 @@ impl Source {
         let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
         let mut file = BufReader::new(file);
         let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .context(ErrorKind::InvalidIndex)?;
+        file.read_to_string(&mut contents)?;
 
         if let Some(x) = Manifest::workspace(&contents) {
             if let Some(p) = x.get(pkg.name()) {

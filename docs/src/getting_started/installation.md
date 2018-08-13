@@ -1,6 +1,6 @@
 ## Installation
 
-The easiest and most convenient way of installing elba is to use the pre-built binaries for elba, which can be downloaded from [GitHub Releases](https://github.com/dcao/elba/releases). To install this way, just download the corresponding archive for your platform, extract the executable somewhere in your PATH, add `~/.elba/bin` to your PATH in order to execute elba-installed packages, and you're done!
+The easiest and most convenient way of installing elba is to use the pre-built binaries for elba, which can be downloaded from [GitHub Releases](https://github.com/elba/elba/releases). To install this way, just download the corresponding archive for your platform, extract the executable somewhere in your PATH, add `~/.elba/bin` to your PATH in order to execute elba-installed packages, and you're done!
 
 > #### Note: `-gnu` vs `-musl`
 >
@@ -30,7 +30,7 @@ Remember to add `~/.elba/bin` to your PATH to be able to run elba-installed pack
 Building elba from source is much the same process as installing it using cargo; the only difference is that instead of using a stable, versioned-crate available from crates.io, elba's source code is used directly. You'll still need to have the nightly version of the Rust toolchain installed (see the above section for more details). After that's done, download elba's source code and install it:
 
 ```sh
-$ git clone https://github.com/dcao/elba
+$ git clone https://github.com/elba/elba
 $ cargo install --release
 $ elba # should work!
 ```
