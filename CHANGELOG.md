@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4
+
+This release of elba fixes a bug with package initialization.
+
+### Changed
+
+- When creating a new library project, elba now adds the correct
+  module by default.
+
 ## 0.1.3
 
 This release of elba changes how it deals with tests.

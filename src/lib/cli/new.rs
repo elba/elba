@@ -50,11 +50,10 @@ main = "src/Main.idr"
             r#"[targets.lib]
 path = "src/"
 mods = [
-    "{}.{}"
+    "{}"
 ]
 
 "#,
-            name.group().to_pascal_case(),
             name.name().to_pascal_case(),
         )
     };

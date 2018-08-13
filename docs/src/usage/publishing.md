@@ -4,7 +4,7 @@ At the moment, elba has neither a fancy online portal for managing packages nor 
 
 The repo's README has more information on what to do if you want to publish a package to the default index and what's allowed and not allowed, but the summary of how to publish a package is this:
 
-  1. Read The elba Guide, especially the parts about [names in elba](./manifest.md) and [package indices](../reference/indices.md).
+  1. Read The elba Guide, especially the parts about [names in elba](./manifest.md), [resolutions in elba](../reference/resolutions.md), and [package indices](../reference/indices.md).
 
   2. Fork the index and modify it as needed.
 
