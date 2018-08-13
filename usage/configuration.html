@@ -67,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html" class="active"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/publishing.html"><strong aria-hidden="true">2.2.</strong> Publishing to the Default Index</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.3.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.4.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html" class="active"><strong aria-hidden="true">2.5.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -145,10 +145,12 @@ $HOME/.elba/config
 <p>Additionally, whenever elba executes an Idris invocation, elba will pass all of the arguments in the environment variable <code>IDRIS_OPTS</code> to the compiler. In any case where the <code>IDRIS_OPTS</code> args conflict with elba's own flags (i.e. if the user specifies the flag <code>--ide-mode</code> but elba specifies <code>--check</code>), elba will override the user-specified flag.</p>
 <a class="header" href="#config-format" id="config-format"><h3>Config Format</h3></a>
 <p>A complete default elba configuration file is listed below. Any options which are not assigned to will carry the default value instead.</p>
-<pre><code class="language-toml">indices = []
+<pre><code class="language-toml">indices = [
+    &quot;git+https://github.com/elba/elba&quot;
+]
 
 [term]
-verbosity = &quot;verbose&quot;
+verbosity = &quot;normal&quot;
 color = &quot;true&quot;
 
 [alias]
@@ -171,7 +173,7 @@ opts = []
 </blockquote>
 <a class="header" href="#indices" id="indices"><h4><code>indices</code></h4></a>
 <p>This key specifies all of the indices that should be made available to packages being built. Any dependent indices of these indices will also be retrieved. The first index specified in this list will be used as the default index for packages which don't specify an index. This key should be a list of index urls; for more information on those, see the chapter on <a href="../reference/indices.html">Indices</a>.</p>
-<p>At the moment, the default indices list is empty, but in the future, if we make an official elba package index, the first item in this list will become that official index by default.</p>
+<p>By default, the first and only index available to elba is the <a href="https://github.com/elba/index">official package index</a>.</p>
 <a class="header" href="#profile" id="profile"><h4><code>[profile]</code></h4></a>
 <p>This section specifies the default author information that should be provided upon creating or initializing a new elba project. By default, this section has no value, so new projects are made without an author.</p>
 <pre><code class="language-toml">[profile]

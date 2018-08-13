@@ -67,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="intro.html">Intro</a></li><li><a href="getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="usage/installing.html"><strong aria-hidden="true">2.2.</strong> Installing a Package</a></li><li><a href="usage/custom_subcommands.html"><strong aria-hidden="true">2.3.</strong> Custom Subcommands</a></li><li><a href="usage/configuration.html"><strong aria-hidden="true">2.4.</strong> Configuration</a></li></ol></li><li><a href="reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
+            <ol class="chapter"><li class="affix"><a href="intro.html">Intro</a></li><li><a href="getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="usage/publishing.html"><strong aria-hidden="true">2.2.</strong> Publishing to the Default Index</a></li><li><a href="usage/installing.html"><strong aria-hidden="true">2.3.</strong> Installing a Package</a></li><li><a href="usage/custom_subcommands.html"><strong aria-hidden="true">2.4.</strong> Custom Subcommands</a></li><li><a href="usage/configuration.html"><strong aria-hidden="true">2.5.</strong> Configuration</a></li></ol></li><li><a href="reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -133,12 +133,12 @@
                     <main>
                         <a class="header" href="#the-elba-guide" id="the-elba-guide"><h1>The elba Guide</h1></a>
 <p><code>elba</code> is a package manager for the Idris programming language. This book aims to be a mostly comprehensive guide on actually using it.</p>
-<p>This book can be edited on <a href="https://github.com/dcao/elba/tree/master/docs">GitHub</a>.</p>
+<p>This book can be edited on <a href="https://github.com/elba/elba/tree/master/docs">GitHub</a>.</p>
 <a class="header" href="#getting-started" id="getting-started"><h1>Getting Started</h1></a>
 <p>This section is for getting up-to-speed with elba as fast as possible, covering getting elba installed on your machine in the first place and making a new project.</p>
 <p>By the end of this chapter, you should have a basic elba installation up-and-running, as well as a general overview of how to use elba for day-to-day Idris development.</p>
 <a class="header" href="#installation" id="installation"><h2>Installation</h2></a>
-<p>The easiest and most convenient way of installing elba is to use the pre-built binaries for elba, which can be downloaded from <a href="https://github.com/dcao/elba/releases">GitHub Releases</a>. To install this way, just download the corresponding archive for your platform, extract the executable somewhere in your PATH, add <code>~/.elba/bin</code> to your PATH in order to execute elba-installed packages, and you're done!</p>
+<p>The easiest and most convenient way of installing elba is to use the pre-built binaries for elba, which can be downloaded from <a href="https://github.com/elba/elba/releases">GitHub Releases</a>. To install this way, just download the corresponding archive for your platform, extract the executable somewhere in your PATH, add <code>~/.elba/bin</code> to your PATH in order to execute elba-installed packages, and you're done!</p>
 <blockquote>
 <a class="header" href="#note--gnu-vs--musl" id="note--gnu-vs--musl"><h4>Note: <code>-gnu</code> vs <code>-musl</code></h4></a>
 <p>For Linux platforms, there are two varieties of binaries available: one
@@ -157,7 +157,7 @@ $ elba # should work!
 <p>Remember to add <code>~/.elba/bin</code> to your PATH to be able to run elba-installed packages.</p>
 <a class="header" href="#building-elba" id="building-elba"><h3>Building elba</h3></a>
 <p>Building elba from source is much the same process as installing it using cargo; the only difference is that instead of using a stable, versioned-crate available from crates.io, elba's source code is used directly. You'll still need to have the nightly version of the Rust toolchain installed (see the above section for more details). After that's done, download elba's source code and install it:</p>
-<pre><code class="language-sh">$ git clone https://github.com/dcao/elba
+<pre><code class="language-sh">$ git clone https://github.com/elba/elba
 $ cargo install --release
 $ elba # should work!
 </code></pre>
@@ -211,7 +211,7 @@ main = &quot;src/Awesome/B.idr&quot;
 </code></pre>
 </li>
 <li>
-<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library (at the moment, tests require a library target to be present).</p>
+<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library.</p>
 </li>
 </ul>
 <a class="header" href="#building-a-package" id="building-a-package"><h3>Building a package</h3></a>
@@ -305,9 +305,17 @@ idris_opts = [&quot;--warnpartial&quot;]
 <li>
 <p>A <strong>test target</strong> shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return <strong>exit code 0 on success</strong> and <strong>any other exit code on failure</strong>. The distinguishing features of a test target are as follows:</p>
 <ul>
-<li>Test targets <strong>require the presence of a library target</strong>.</li>
-<li>Test targets have access to (i.e. can import from) <strong>all dev dependencies</strong> along with <strong>the package's own library target</strong>.</li>
-<li>Test targets can be automatically built and run in one shot using the command <code>elba test</code>.</li>
+<li>
+<p>Test targets <strong>require the presence of a library target</strong>.</p>
+</li>
+<li>
+<p>Test targets have access to (i.e. can import from) <strong>all dev dependencies</strong> along with <strong>the package's own library target</strong>.</p>
+<p>This means that if you want to test a library target, you don't have to do anything special, just import your library like you normally would.</p>
+<p>If you want to test a binary, you can still do this, since a test will be built with all of the files in the same directory as the test's Main module, so if you put your test's Main module in the folder as a binary target, you can import everything that your binary target can from within the test.</p>
+</li>
+<li>
+<p>Test targets can be automatically built and run in one shot using the command <code>elba test</code>.</p>
+</li>
 </ul>
 <p>You'll note that the syntax for specifying a test target is remarkably similar to that for specifying a binary target:</p>
 <pre><code class="language-toml"># The name of the output test binary
@@ -332,6 +340,21 @@ idris_opts = [&quot;--warnpartial&quot;]
 <p>Note that a a <code>[workspace]</code> section can stand alone and be parsed as a valid manifest if there is no package in the root directory.</p>
 <a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
 <p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
+<a class="header" href="#publishing-to-the-default-index" id="publishing-to-the-default-index"><h2>Publishing to the Default Index</h2></a>
+<p>At the moment, elba has neither a fancy online portal for managing packages nor the proper CLI commands for publishing to a package repository. This will come in time, but for now, you'll have to directly interact with <a href="https://github.com/elba/index">the GitHub repo of the official index</a>.</p>
+<p>The repo's README has more information on what to do if you want to publish a package to the default index and what's allowed and not allowed, but the summary of how to publish a package is this:</p>
+<ol>
+<li>
+<p>Read The elba Guide, especially the parts about <a href="./manifest.html">names in elba</a> and <a href="../reference/indices.html">package indices</a>.</p>
+</li>
+<li>
+<p>Fork the index and modify it as needed.</p>
+</li>
+<li>
+<p>Submit a pull request back in the original repo (<code>elba/index</code>).</p>
+</li>
+</ol>
+<p>Hopefully in the future we'll have a better story for package publishing, but for now, it is what it is.</p>
 <a class="header" href="#installing-a-package" id="installing-a-package"><h2>Installing a Package</h2></a>
 <p>elba can build and install the binary targets of packages into a global directory (this directory is the <code>bin</code> subfolder under the folder of the global cache; under normal circumstances, this should be located at <code>~/.elba/bin</code>). In order for these executables to be run from anywhere, you should this global bin folder to your <code>PATH</code>.</p>
 <a class="header" href="#installing-a-local-package" id="installing-a-local-package"><h3>Installing a local package</h3></a>
@@ -394,10 +417,12 @@ $HOME/.elba/config
 <p>Additionally, whenever elba executes an Idris invocation, elba will pass all of the arguments in the environment variable <code>IDRIS_OPTS</code> to the compiler. In any case where the <code>IDRIS_OPTS</code> args conflict with elba's own flags (i.e. if the user specifies the flag <code>--ide-mode</code> but elba specifies <code>--check</code>), elba will override the user-specified flag.</p>
 <a class="header" href="#config-format" id="config-format"><h3>Config Format</h3></a>
 <p>A complete default elba configuration file is listed below. Any options which are not assigned to will carry the default value instead.</p>
-<pre><code class="language-toml">indices = []
+<pre><code class="language-toml">indices = [
+    &quot;git+https://github.com/elba/elba&quot;
+]
 
 [term]
-verbosity = &quot;verbose&quot;
+verbosity = &quot;normal&quot;
 color = &quot;true&quot;
 
 [alias]
@@ -420,7 +445,7 @@ opts = []
 </blockquote>
 <a class="header" href="#indices" id="indices"><h4><code>indices</code></h4></a>
 <p>This key specifies all of the indices that should be made available to packages being built. Any dependent indices of these indices will also be retrieved. The first index specified in this list will be used as the default index for packages which don't specify an index. This key should be a list of index urls; for more information on those, see the chapter on <a href="../reference/indices.html">Indices</a>.</p>
-<p>At the moment, the default indices list is empty, but in the future, if we make an official elba package index, the first item in this list will become that official index by default.</p>
+<p>By default, the first and only index available to elba is the <a href="https://github.com/elba/index">official package index</a>.</p>
 <a class="header" href="#profile" id="profile"><h4><code>[profile]</code></h4></a>
 <p>This section specifies the default author information that should be provided upon creating or initializing a new elba project. By default, this section has no value, so new projects are made without an author.</p>
 <pre><code class="language-toml">[profile]

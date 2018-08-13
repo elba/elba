@@ -3,24 +3,24 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Intro - The elba Guide</title>
+        <title>Publishing to the Default Index - The elba Guide</title>
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="stylesheet" href="book.css">
+        <link rel="stylesheet" href="../book.css">
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800" rel="stylesheet" type="text/css">
         <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:500" rel="stylesheet" type="text/css">
 
         <link rel="shortcut icon" href="favicon.png">
 
         <!-- Font Awesome -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
 
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
         
@@ -67,7 +67,7 @@
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
-            <ol class="chapter"><li class="affix"><a href="intro.html" class="active">Intro</a></li><li><a href="getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="usage/publishing.html"><strong aria-hidden="true">2.2.</strong> Publishing to the Default Index</a></li><li><a href="usage/installing.html"><strong aria-hidden="true">2.3.</strong> Installing a Package</a></li><li><a href="usage/custom_subcommands.html"><strong aria-hidden="true">2.4.</strong> Custom Subcommands</a></li><li><a href="usage/configuration.html"><strong aria-hidden="true">2.5.</strong> Configuration</a></li></ol></li><li><a href="reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
+            <ol class="chapter"><li class="affix"><a href="../intro.html">Intro</a></li><li><a href="../getting_started/index.html"><strong aria-hidden="true">1.</strong> Getting Started</a></li><li><ol class="section"><li><a href="../getting_started/installation.html"><strong aria-hidden="true">1.1.</strong> Installation</a></li><li><a href="../getting_started/quick_start.html"><strong aria-hidden="true">1.2.</strong> Quick Start</a></li></ol></li><li><a href="../usage/index.html"><strong aria-hidden="true">2.</strong> Usage</a></li><li><ol class="section"><li><a href="../usage/manifest.html"><strong aria-hidden="true">2.1.</strong> The Manifest</a></li><li><a href="../usage/publishing.html" class="active"><strong aria-hidden="true">2.2.</strong> Publishing to the Default Index</a></li><li><a href="../usage/installing.html"><strong aria-hidden="true">2.3.</strong> Installing a Package</a></li><li><a href="../usage/custom_subcommands.html"><strong aria-hidden="true">2.4.</strong> Custom Subcommands</a></li><li><a href="../usage/configuration.html"><strong aria-hidden="true">2.5.</strong> Configuration</a></li></ol></li><li><a href="../reference/index.html"><strong aria-hidden="true">3.</strong> Reference</a></li><li><ol class="section"><li><a href="../reference/resolutions.html"><strong aria-hidden="true">3.1.</strong> Resolutions</a></li><li><a href="../reference/indices.html"><strong aria-hidden="true">3.2.</strong> Indices</a></li><li><a href="../reference/dependencies.html"><strong aria-hidden="true">3.3.</strong> Dependencies</a></li><li><a href="../reference/cache.html"><strong aria-hidden="true">3.4.</strong> The Global Cache</a></li></ol></li></ol>
         </nav>
 
         <div id="page-wrapper" class="page-wrapper">
@@ -100,7 +100,7 @@
                         <h1 class="menu-title">The elba Guide</h1> 
 
                         <div class="right-buttons">
-                            <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <a href="../print.html" title="Print this book" aria-label="Print this book">
                                 <i id="print-button" class="fa fa-print"></i>
                             </a>
                         </div>
@@ -131,18 +131,34 @@
 
                 <div id="content" class="content">
                     <main>
-                        <a class="header" href="#the-elba-guide" id="the-elba-guide"><h1>The elba Guide</h1></a>
-<p><code>elba</code> is a package manager for the Idris programming language. This book aims to be a mostly comprehensive guide on actually using it.</p>
-<p>This book can be edited on <a href="https://github.com/elba/elba/tree/master/docs">GitHub</a>.</p>
+                        <a class="header" href="#publishing-to-the-default-index" id="publishing-to-the-default-index"><h2>Publishing to the Default Index</h2></a>
+<p>At the moment, elba has neither a fancy online portal for managing packages nor the proper CLI commands for publishing to a package repository. This will come in time, but for now, you'll have to directly interact with <a href="https://github.com/elba/index">the GitHub repo of the official index</a>.</p>
+<p>The repo's README has more information on what to do if you want to publish a package to the default index and what's allowed and not allowed, but the summary of how to publish a package is this:</p>
+<ol>
+<li>
+<p>Read The elba Guide, especially the parts about <a href="./manifest.html">names in elba</a> and <a href="../reference/indices.html">package indices</a>.</p>
+</li>
+<li>
+<p>Fork the index and modify it as needed.</p>
+</li>
+<li>
+<p>Submit a pull request back in the original repo (<code>elba/index</code>).</p>
+</li>
+</ol>
+<p>Hopefully in the future we'll have a better story for package publishing, but for now, it is what it is.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="../usage/manifest.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
-                            <a rel="next" href="getting_started/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../usage/installing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -154,9 +170,13 @@
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a href="../usage/manifest.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
                 
-                    <a href="getting_started/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a href="../usage/installing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
@@ -171,20 +191,20 @@
         
 
         
-        <script src="searchindex.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searchindex.js" type="text/javascript" charset="utf-8"></script>
         <script>
-            var path_to_root = "";
+            var path_to_root = "../";
         </script>
         
         
-        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
         
 
-        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
         
