@@ -2,7 +2,7 @@
 name = "elba"
 description = "elba is a package manager for Idris"
 authors = ["David Cao <dcao@protonmail.com>"]
-version = "0.1.2"
+version = "0.1.3"
 license = "MIT"
 
 # crates.io stuff

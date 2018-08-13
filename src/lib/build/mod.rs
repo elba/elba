@@ -77,10 +77,6 @@ impl Targets {
                     res.push(i);
                 }
                 Target::Test(_) => {
-                    if !seen_lib {
-                        seen_lib = true;
-                        res.insert(0, Target::Lib(false));
-                    }
                     res.push(i);
                 }
                 Target::Doc => {
@@ -94,6 +90,13 @@ impl Targets {
         }
 
         Targets(res)
+    }
+
+    pub fn has_lib(&self) -> bool {
+        self.0
+            .get(0)
+            .map(|x| if let Target::Lib(_) = x { true } else { false })
+            .unwrap_or(false)
     }
 }
 

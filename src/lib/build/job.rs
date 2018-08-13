@@ -147,7 +147,7 @@ impl JobQueue {
                                 _ => unreachable!(),
                             }).collect::<Vec<_>>();
 
-                        let ts = self.graph[job_index].targets.0.to_vec();
+                        let ts = &self.graph[job_index].targets;
 
                         println!(
                             "{:>7} {} [{}..]",
@@ -174,8 +174,9 @@ impl JobQueue {
                                 };
 
                                 let mut res: Option<Binary> = None;
+                                let has_lib = ts.has_lib();
 
-                                for t in ts {
+                                for t in ts.0.to_vec() {
                                     match t {
                                         Target::Lib(cg) => {
                                             let (cmp, cdg) = compile_lib(&source, cg, &deps, &layout, bcx)
@@ -237,12 +238,15 @@ impl JobQueue {
                                         }
                                         Target::Test(ix) => {
                                             let mut deps = deps.clone();
-                                            let root_lib = {
-                                                let target =
-                                                    DirLock::acquire(&layout.build.join("lib"))?;
-                                                Binary { target }
-                                            };
-                                            deps.push(&root_lib);
+                                            let root_lib;
+                                            if has_lib {
+                                                root_lib = {
+                                                    let target =
+                                                        DirLock::acquire(&layout.build.join("lib"))?;
+                                                    Binary { target }
+                                                };
+                                                deps.push(&root_lib);
+                                            }
                                             let (out, _) = compile_bin(
                                                 &source,
                                                 Target::Test(ix),

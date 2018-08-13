@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3
+
+This release of elba changes how it deals with tests.
+
+### Changed
+
+- elba can now build test targets without a library target needed.
+  Tests always have access to all dependencies, dev-dependencies,
+  and the files which share the same parent folder as the test's
+  Main module. If no library target is found, elba will issue a
+  warning.
+
 ## 0.1.2
 
 This release of elba fixes a critical error with tarball resolutions

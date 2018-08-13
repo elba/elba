@@ -66,7 +66,7 @@ The manifest also allows you to specify which targets you want to have built for
   main = "src/Awesome/B.idr"
   ```
 
-- A **test target** specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use `[[targets.test]]` to specify them and the test binary can depend on the dev-dependencies as well as the root package's library (at the moment, tests require a library target to be present).
+- A **test target** specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use `[[targets.test]]` to specify them and the test binary can depend on the dev-dependencies as well as the root package's library.
 
 ### Building a package
 

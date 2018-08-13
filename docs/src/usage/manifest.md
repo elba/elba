@@ -89,7 +89,13 @@ In order to know which files to build and how to build them, elba manifest files
 - A **test target** shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return **exit code 0 on success** and **any other exit code on failure**. The distinguishing features of a test target are as follows:
 
   - Test targets **require the presence of a library target**.
+
   - Test targets have access to (i.e. can import from) **all dev dependencies** along with **the package's own library target**.
+
+    This means that if you want to test a library target, you don't have to do anything special, just import your library like you normally would.
+
+    If you want to test a binary, you can still do this, since a test will be built with all of the files in the same directory as the test's Main module, so if you put your test's Main module in the folder as a binary target, you can import everything that your binary target can from within the test.
+
   - Test targets can be automatically built and run in one shot using the command `elba test`.
   
   You'll note that the syntax for specifying a test target is remarkably similar to that for specifying a binary target:

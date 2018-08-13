@@ -51,9 +51,6 @@ pub fn test(
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
-    if manifest.targets.lib.is_none() {
-        bail!("running tests requires a defined library to test")
-    }
     if manifest.targets.test.is_empty() {
         bail!("at least one test must be defined")
     }
@@ -86,7 +83,14 @@ pub fn test(
         let bin_dir = layout.bin.clone();
 
         let mut root = vec![];
-        root.push(Target::Lib(false));
+        if manifest.targets.lib.is_some() {
+            root.push(Target::Lib(false));
+        } else {
+            println!(
+                "{:>7} No lib target for tests to import",
+                style("[wrn]").yellow().bold()
+            );
+        }
         let emp = targets.is_empty();
         for (ix, bt) in manifest.targets.test.iter().enumerate() {
             if emp || targets.contains(&bt.name.as_str()) {
