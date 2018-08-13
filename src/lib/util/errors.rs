@@ -9,20 +9,14 @@ pub type Res<T> = Result<T, Error>;
 // implement Fail for each type of error: Index failures, Parsing failures, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(display = "invalid lockfile")]
-    InvalidLockfile,
     #[fail(display = "invalid source url")]
     InvalidSourceUrl,
     #[fail(display = "package doesn't exist in index")]
     PackageNotFound,
     #[fail(display = "conflict resolution failure")]
     NoConflictRes,
-    #[fail(display = "package is missing manifest")]
-    MissingManifest,
     #[fail(display = "could not download package")]
     CannotDownload,
-    #[fail(display = "checksum error")]
-    Checksum,
     #[doc(hidden)]
     #[fail(display = "if you see this error, everything is wrong")]
     __Nonexhaustive,

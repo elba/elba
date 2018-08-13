@@ -70,13 +70,7 @@ use std::{
     sync::Arc,
 };
 use toml;
-use util::{
-    clear_dir, copy_dir,
-    errors::{ErrorKind, Res},
-    graph::Graph,
-    hexify_hash,
-    lock::DirLock,
-};
+use util::{clear_dir, copy_dir, errors::Res, graph::Graph, hexify_hash, lock::DirLock};
 use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
@@ -584,7 +578,11 @@ impl Source {
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
         let mf_path = path.path().join("elba.toml");
 
-        let file = fs::File::open(mf_path).context(ErrorKind::MissingManifest)?;
+        let file = fs::File::open(mf_path).context(format_err!(
+            "package {} at {} is missing manifest",
+            pkg,
+            path.path().display()
+        ))?;
         let mut file = BufReader::new(file);
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;

@@ -107,8 +107,10 @@ impl DirectRes {
 
                         let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
                         if let Some(cksum) = cksum {
-                            if cksum.hash == hash {
-                                return Err(ErrorKind::Checksum)?;
+                            if cksum.hash != hash {
+                                return Err(format_err!(
+                                    "tarball checksum doesn't match real checksum"
+                                ))?;
                             }
                         }
 
@@ -135,8 +137,10 @@ impl DirectRes {
                     );
 
                     if let Some(cksum) = cksum {
-                        if cksum.hash == hash {
-                            return Err(ErrorKind::Checksum)?;
+                        if cksum.hash != hash {
+                            return Err(format_err!(
+                                "tarball checksum doesn't match real checksum"
+                            ))?;
                         }
                     }
 

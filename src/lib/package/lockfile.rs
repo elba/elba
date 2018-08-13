@@ -29,7 +29,7 @@ impl FromStr for LockfileToml {
 
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         toml::from_str(raw)
-            .context(ErrorKind::InvalidLockfile)
+            .context(format_err!("invalid lockfile"))
             .map_err(Error::from)
     }
 }
