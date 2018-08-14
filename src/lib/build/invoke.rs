@@ -102,8 +102,9 @@ impl<'a> CodegenInvocation<'a> {
 
         let res = process.output()?;
         // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
-        // function in the file, so we check if stdout is empty instead
-        if !res.stdout.is_empty() {
+        // function in the file, so we manually check if stdout contains a "main not found" error.
+        let stdout = String::from_utf8_lossy(&res.stdout);
+        if stdout.contains("No such variable Main.main") {
             bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
         }
 

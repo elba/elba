@@ -154,7 +154,7 @@ pub fn compile_lib(
         let to = layout.lib.join(&target_bin);
 
         fs::create_dir_all(to.parent().unwrap())?;
-        fs::rename(&from, &to)?;
+        fs::copy(&from, &to)?;
 
         if codegen {
             lib_files.push(to);

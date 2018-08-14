@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Fixed a bug where Idris would complain about "No ibc for _"
+  when building a bin target (#14)
+
+- Fixed a bug where any stdout output during code generation
+  would cause the build process to error
+
+## 0.1.5
+
+This release of elba fixes a bug with the REPL not loading
+import paths correctly.
+
+### Changed
+
+- When launching the REPL, elba now adds the paths of all
+  specified targets.
+
 ## 0.1.4
 
 This release of elba fixes a bug with package initialization.
