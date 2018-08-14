@@ -361,7 +361,7 @@ impl Cache {
         while let Some(index) = q.pop_front() {
             self.shell.println(
                 style("Retrieving").cyan(),
-                format!("index {}", &index),
+                format!("index ({})", &index),
                 Verbosity::Normal,
             );
             if seen.contains(&index) {
@@ -647,10 +647,10 @@ impl Source {
 
     pub fn summary(&self) -> String {
         format!(
-            "{}@{}|{}",
+            "{} {} ({})",
             self.meta().package.name,
-            self.inner.res,
             self.meta().version(),
+            self.inner.res,
         )
     }
 

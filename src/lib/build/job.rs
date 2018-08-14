@@ -381,7 +381,7 @@ impl JobQueue {
             let res = clear_dir(&ol.build);
             if let Err(e) = res {
                 self.shell.println(
-                    style("[error]").yellow().bold(),
+                    style("[warn]").yellow().bold(),
                     format!(
                         "Couldn't clear build directory {}: {}",
                         ol.build.display(),
@@ -390,12 +390,12 @@ impl JobQueue {
                     Verbosity::Normal,
                 );
             }
-
+            
             if let Some(r) = root_hash {
                 let res = ol.write_hash(&r);
                 if let Err(e) = res {
                     self.shell.println(
-                        style("[error]").yellow().bold(),
+                        style("[warn]").yellow().bold(),
                         format!(
                             "Couldn't write build hash (root will be rebuilt on next run): {}",
                             e
