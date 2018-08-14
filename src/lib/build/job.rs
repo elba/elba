@@ -168,7 +168,7 @@ impl JobQueue {
 
                         self.shell.println(
                             style("Building").cyan(),
-                            format!("{} [{}..]", source.summary(), &build_hash.0[0..8]),
+                            format!("{} [{}..]", source.pretty_summary(), &build_hash.0[0..8]),
                             Verbosity::Normal,
                         );
 
@@ -197,16 +197,19 @@ impl JobQueue {
                                 for t in ts.0.to_vec() {
                                     match t {
                                         Target::Lib(cg) => {
-                                            let (cmp, cdg) = compile_lib(&source, cg, &deps, &layout, bcx)
-                                                .with_context(|e| {
-                                                    format!(
+                                            let (cmp, cdg) =
+                                                compile_lib(&source, cg, &deps, &layout, bcx)
+                                                    .with_context(|e| {
+                                                        format!(
                                                         "Couldn't build library target for {}\n{}",
-                                                        source.summary(),
+                                                        source.pretty_summary(),
                                                         e
                                                     )
-                                                })?;
+                                                    })?;
 
-                                            res = if job_index == NodeIndex::new(0) && root_ol.is_some() {
+                                            res = if job_index == NodeIndex::new(0)
+                                                && root_ol.is_some()
+                                            {
                                                 let cmp_out = fmt_output(&cmp);
                                                 if !cmp_out.is_empty() {
                                                     shell.println_plain(cmp_out, Verbosity::Normal);
@@ -214,7 +217,10 @@ impl JobQueue {
                                                 if let Some(cdg) = cdg {
                                                     let cdg_out = fmt_output(&cdg);
                                                     if !cdg_out.is_empty() {
-                                                        shell.println_plain(cdg_out, Verbosity::Normal);
+                                                        shell.println_plain(
+                                                            cdg_out,
+                                                            Verbosity::Normal,
+                                                        );
                                                     }
                                                 }
 
@@ -238,7 +244,7 @@ impl JobQueue {
                                                 format!(
                                                     "Couldn't build binary {} for {}\n{}",
                                                     ix,
-                                                    source.summary(),
+                                                    source.pretty_summary(),
                                                     e
                                                 )
                                             })?;
@@ -257,8 +263,9 @@ impl JobQueue {
                                             let root_lib;
                                             if has_lib {
                                                 root_lib = {
-                                                    let target =
-                                                        DirLock::acquire(&layout.build.join("lib"))?;
+                                                    let target = DirLock::acquire(
+                                                        &layout.build.join("lib"),
+                                                    )?;
                                                     Binary { target }
                                                 };
                                                 deps.push(&root_lib);
@@ -273,7 +280,7 @@ impl JobQueue {
                                                 format!(
                                                     "Couldn't build test {} for {}\n{}",
                                                     ix,
-                                                    source.summary(),
+                                                    source.pretty_summary(),
                                                     e
                                                 )
                                             })?;
@@ -289,18 +296,14 @@ impl JobQueue {
                                             // don't worry about storing the binary anywhere.
                                         }
                                         Target::Doc => {
-                                            let out = compile_doc(
-                                                &source,
-                                                &deps,
-                                                &layout,
-                                                bcx
-                                            ).with_context(|e| {
-                                                format!(
-                                                    "Couldn't build docs for {}\n{}",
-                                                    source.summary(),
-                                                    e
-                                                )
-                                            })?;
+                                            let out = compile_doc(&source, &deps, &layout, bcx)
+                                                .with_context(|e| {
+                                                    format!(
+                                                        "Couldn't build docs for {}\n{}",
+                                                        source.pretty_summary(),
+                                                        e
+                                                    )
+                                                })?;
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
                                                 let out_str = fmt_output(&out);
@@ -381,7 +384,7 @@ impl JobQueue {
             let res = clear_dir(&ol.build);
             if let Err(e) = res {
                 self.shell.println(
-                    style("[error]").yellow().bold(),
+                    style("[warn]").yellow().bold(),
                     format!(
                         "Couldn't clear build directory {}: {}",
                         ol.build.display(),
@@ -395,7 +398,7 @@ impl JobQueue {
                 let res = ol.write_hash(&r);
                 if let Err(e) = res {
                     self.shell.println(
-                        style("[error]").yellow().bold(),
+                        style("[warn]").yellow().bold(),
                         format!(
                             "Couldn't write build hash (root will be rebuilt on next run): {}",
                             e

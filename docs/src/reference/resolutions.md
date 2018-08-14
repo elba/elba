@@ -15,8 +15,8 @@ In order to refer to these types of direct resolutions, elba has its own simple 
 
   - For a direct resolution which points to a tarball, the resolution string must start with the identifier `tar+` and include a properly-formed URL with either the `http://`/`https://` (referring to a tarball on the network somewhere) or `file://` (referring to a local tarball) schemas:
 
-    ```sh
-    # These are all valid:
+    ```
+    These are all valid:
     tar+http://example.com/asdf.tar.gz
     tar+https://example.com/asdf
     tar+file://../asdf.tar.gz
@@ -24,8 +24,8 @@ In order to refer to these types of direct resolutions, elba has its own simple 
 
   - For a direct resolution which points to a directory on disk, the resolution string must start with the identifier `dir+` and include a properly-formed path to a directory on disk:
   
-    ```sh
-    # These are all valid:
+    ```
+    These are all valid:
     dir+asdf
     dir+./asdf
     dir+../asdf/whatever/subfolder
@@ -36,19 +36,19 @@ In order to refer to these types of direct resolutions, elba has its own simple 
 
   - For a direct resolution which points to a git repository, the resolution string must start with the identifier `git+` and provide the URL of the repository in question. Additionally, a git ref can be specified as part of the fragment of the URL:
 
-    ```sh
-    # These are all valid:
+    ```
+    These are all valid:
     git+https://github.com/example/doesnt-exist
-    git+https://github.com/example/doesnt-exist#master # use the master branch
-    git+https://github.com/example/doesnt-exist#v1.0.0 # use the "v1.0.0" tag
-    git+https://github.com/example/doesnt-exist#a4e13343 # use the commit "a4e13343"
-    git+ssh://git@github.com/example/doesnt-exist # using ssh instead of https
+    git+https://github.com/example/doesnt-exist#master <- use the master branch
+    git+https://github.com/example/doesnt-exist#v1.0.0 <- use the "v1.0.0" tag
+    git+https://github.com/example/doesnt-exist#a4e13343 <- use the commit "a4e13343"
+    git+ssh://git@github.com/example/doesnt-exist <- using ssh instead of https
     ```
 
 - For an index resolution, the resolution string must start with the identifier `index+` and include the direct resolution of the origin of the index:
 
-  ```sh
-  # These are all valid
+  ```
+  These are all valid
   index+tar+http://example.com/asdf.tar.gz
   index+dir+../asdf/whatever/subfolder
   index+git+ssh://git@github.com/example/doesnt-exist#a4e13343

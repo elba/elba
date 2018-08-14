@@ -6,9 +6,16 @@ pub mod job;
 
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
 use failure::ResultExt;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use retrieve::cache::{Binary, OutputLayout, Source};
-use std::{env, fs, path::PathBuf, process::Output};
-use util::{clear_dir, errors::Res, generate_ipkg};
+use std::{
+    env,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+    process::Output,
+};
+use util::{clear_dir, copy_dir, errors::Res, generate_ipkg};
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -120,7 +127,7 @@ pub fn compile_lib(
         .mods
         .iter()
         .map(|mod_name| {
-            let path: PathBuf = mod_name.replace(".", "/").into();
+            let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
             path.with_extension("idr")
         }).collect::<Vec<_>>();
 
@@ -130,8 +137,8 @@ pub fn compile_lib(
     }
     args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));
 
+    clear_and_copy(&src_path, &layout.build.join("lib"))?;
     let invocation = CompileInvocation {
-        src: &src_path,
         deps,
         targets: &targets,
         build: &layout.build.join("lib"),
@@ -187,15 +194,33 @@ pub fn compile_bin(
 ) -> Res<(Output, PathBuf)> {
     let bin_target = match target {
         Target::Bin(ix) => source.meta().targets.bin[ix].clone(),
-        Target::Test(ix) => source.meta().targets.test[ix].clone(),
+        Target::Test(ix) => source.meta().targets.test[ix].clone().into(),
         _ => bail!("compile_bin called with non-binary target"),
     };
 
-    // This is the full target path
-    let target_path = source.path().join(bin_target.main.0).with_extension("idr");
-    let src_path = target_path.parent().unwrap();
-    // This is the relative target path
-    let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
+    let (src_path, target_path) = bin_target.resolve_bin(source.path()).ok_or_else(|| {
+        format_err!(
+            "module {} isn't a subpath and doesn't exist under path {}",
+            bin_target.main,
+            bin_target.path.0.display()
+        )
+    })?;
+
+    clear_and_copy(&src_path, &layout.build.join("bin"))?;
+    // Check extension etc
+    let target_path = if let Some(ext) = target_path.extension() {
+        if ext != OsStr::new("idr") {
+            let mod_name = &*target_path
+                .with_extension("")
+                .to_string_lossy()
+                .replace("/", ".");
+            make_main_file(mod_name, &*ext.to_string_lossy(), &layout.build.join("bin"))?
+        } else {
+            target_path
+        }
+    } else {
+        target_path
+    };
 
     let mut args = vec![];
     if let Ok(val) = env::var("IDRIS_OPTS") {
@@ -204,7 +229,6 @@ pub fn compile_bin(
     args.extend(bin_target.idris_opts.iter().map(|x| x.to_owned()));
 
     let compile_invoke = CompileInvocation {
-        src: &src_path,
         deps,
         targets: &[target_path.clone()],
         build: &layout.build.join("bin"),
@@ -312,4 +336,27 @@ pub fn compile_doc(
     })?;
 
     Ok(res)
+}
+
+fn clear_and_copy(from: &Path, to: &Path) -> Res<()> {
+    clear_dir(to)?;
+    copy_dir(from, to)
+}
+
+fn make_main_file(module: &str, fun: &str, parent: &Path) -> Res<PathBuf> {
+    let rstr: String = thread_rng().sample_iter(&Alphanumeric).take(8).collect();
+    let fname = format!("elba-{}.idr", rstr);
+    fs::write(
+        parent.join(&fname),
+        format!(
+            r#"module Main
+
+import {}
+
+main : IO ()
+main = {}"#,
+            module, fun
+        ),
+    )?;
+    Ok(parent.join(fname))
 }

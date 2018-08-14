@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## Added
+
+- More complex logic for dealing with binary target paths; the end
+  result is that files which don't specify a `Main.main` function
+  can now still be used as binary targets, since elba can generate
+  files with a `Main.main` function on-the-fly.
+
+- Sensible defaults for target paths (#17).
+
 ### Changed
 
 - elba's CLI output has been prettied up, and now respects

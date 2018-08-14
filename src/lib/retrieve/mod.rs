@@ -81,12 +81,6 @@ impl<'cache> Retriever<'cache> {
 
         let sources = solve.map(
             |_, sum| {
-                self.shell.println(
-                    style("Retrieving").cyan(),
-                    sum.to_string(),
-                    Verbosity::Normal,
-                );
-
                 let loc = match sum.resolution() {
                     Resolution::Direct(direct) => direct,
                     Resolution::Index(_) => &self.indices.select(sum).unwrap().location,
@@ -97,6 +91,12 @@ impl<'cache> Retriever<'cache> {
                     // pb.set_position(prg);
                     Ok(s)
                 } else {
+                    self.shell.println(
+                        style("Retrieving").cyan(),
+                        sum.to_string(),
+                        Verbosity::Normal,
+                    );
+
                     let source = self
                         .cache
                         .checkout_source(sum.id(), loc)
@@ -315,6 +315,11 @@ impl<'cache> Retriever<'cache> {
         if reses.contains_key(loc) {
             Ok(&reses[loc])
         } else {
+            self.shell.println(
+                style("Retrieving").cyan(),
+                format!("{} ({})", pkg.name(), pkg.resolution()),
+                Verbosity::Normal,
+            );
             let s = self.cache.checkout_source(&pkg, &loc)?;
 
             reses.insert(loc.clone(), s);

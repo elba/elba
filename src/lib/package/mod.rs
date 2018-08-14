@@ -353,7 +353,7 @@ impl fmt::Display for Summary {
 
 impl fmt::Debug for Summary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{}@{}|{}", self.name(), self.resolution(), self.version)
     }
 }
 

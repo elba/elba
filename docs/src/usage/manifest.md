@@ -60,7 +60,7 @@ In order to know which files to build and how to build them, elba manifest files
 
   ```toml
   [targets.lib]
-  # The path to the library
+  # The path to the library - defaults to "src"
   path = "src"
   # The list of files which should be exported and made available for public use
   mods = [
@@ -76,19 +76,59 @@ In order to know which files to build and how to build them, elba manifest files
 - A **binary target** is a binary which should be generated based on a Main module. Packages can have as many binary targets as they please; by default, all binary targets are built/installed in an `elba build` or `elba install` invocation, but this can be changed with the `--bin` flag. The syntax for a binary target is as follows:
 
   ```toml
+  [[targets.bin]]
   # The name of the output binary
   name = "whatever"
+  # The path to the folder containing the binary source - defaults to "src"
+  path = "src/bin"
   # The path to the Main module
-  main = "src/bin/Whatever.idr"
+  main = "Whatever" # corresponds to src/bin/Whatever.idr
   # Optional flags to pass to the compiler
   idris_opts = ["--warnpartial"]
   ```
 
-  During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory `src/bin` will be made available. Again, the path listed under `main` must be a sub-path of the package directory.
+  The `name`, and `idris_opts` fields should be self-explanatory, but the `path` and `main` arguments have some more nuance to them. In order to maintain backwards compatibility while providing maximum flexibility, elba follows several steps to resolve the location of a binary target. It's pretty hard to explain these steps, but examples are much easier to follow:
+
+  ```toml
+  # Example 1: strict subpath specified in main, with folders separated by
+  # slashes. extension left unspecified.
+  main = "bin/Whatever/Module"
+  # corresponds to bin/Whatever/Module.idr if it exists, otherwise uses
+  # src/bin/Whatever/Module.idr because of the default `path` value; this file
+  # should have a function Main.main
+
+  # Example 2: main uses dots instead of slashes to separate folders, and
+  # includes an idr extension
+  main = "Whatever.Module.idr"
+  # because this is not a valid subpath (uses dots instead of slashes),
+  # this corresponds to the first of the following files which exists:
+  # - src/Whatever/Module/idr.idr (treat the last section as a module)
+  # - src/Whatever/Module.idr (treat the last section as an extension:
+  #                            applies to the "idr" extension only)
+  # this file should have a function Main.main
+
+  # Example 3: strict subpath specified with non-"idr" extension
+  main = "bin/Whatever/Module.custom"
+  # corresponds to the first of the following files which exists:
+  # - bin/Whatever/Module.idr
+  # - src/bin/Whatever/Module.idr (due to the default `path` value)
+  # in both cases, this file should have a function `Module.custom : IO ()`,
+  # which will be used as the main function
+
+  # Example 4: non-subpath combined with custom path and non-"idr" extension
+  path = "bin"
+  main = "Whatever.Module.custom"
+  # corresponds to the first of the following files which exists:
+  # - bin/Whatever/Module/custom.idr (treat the last section as a module)
+  # - bin/Whatever/Module.idr (treat the last section as a function in a parent module)
+  # if this corresponds to `bin/Whatever/Module.idr`, then the file should have a
+  # function `Whatever.Module.custom : IO ()`, which will be used as the main
+  # function
+  ```
 
 - A **test target** shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return **exit code 0 on success** and **any other exit code on failure**. The distinguishing features of a test target are as follows:
 
-  - Test targets **require the presence of a library target**.
+  - The `path` value for test targets defaults to `tests/` instead of `src/`
 
   - Test targets have access to (i.e. can import from) **all dev dependencies** along with **the package's own library target**.
 

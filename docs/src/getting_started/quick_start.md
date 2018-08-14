@@ -48,6 +48,7 @@ The manifest also allows you to specify which targets you want to have built for
   ```toml
   [targets.lib]
   # the path which contains all of the lib files (*cannot* be a parent directory)
+  # this is set to "src" by default
   path = "src/"
   # a list of files to export
   mods = [
@@ -62,11 +63,16 @@ The manifest also allows you to specify which targets you want to have built for
   [[targets.bin]]
   # the name of the binary to create
   name = "awes"
+  # the path which contains all of the bin files (*cannot* be a parent directory)
+  # this is set to "src" by default
+  path = "src/"
   # the path to the Main module of the binary
-  main = "src/Awesome/B.idr"
+  main = "Awesome/B"
   ```
 
-- A **test target** specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use `[[targets.test]]` to specify them and the test binary can depend on the dev-dependencies as well as the root package's library.
+  Note: the format of the binary target has some nuance to it, so for more information, see the docs on [the manifest format](../usage/manifest.md).
+
+- A **test target** specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use `[[targets.test]]` to specify them and the test binary can depend on the dev-dependencies as well as the root package's library. A test binary succeeds upon execution if it returns exit code 0. 
 
 ### Building a package
 

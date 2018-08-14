@@ -7,12 +7,11 @@ use std::{
     path::{Path, PathBuf},
     process::Output,
 };
-use util::{clear_dir, copy_dir, errors::Res, fmt_output};
+use util::{errors::Res, fmt_output};
 
 // CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
 pub struct CompileInvocation<'a> {
-    pub src: &'a Path,
     pub deps: &'a [&'a Binary],
     pub targets: &'a [PathBuf],
     pub build: &'a Path,
@@ -21,8 +20,6 @@ pub struct CompileInvocation<'a> {
 
 impl<'a> CompileInvocation<'a> {
     pub fn exec(&self, bcx: &BuildContext) -> Res<Output> {
-        clear_dir(&self.build)?;
-        copy_dir(&self.src, &self.build)?;
         // invoke compiler
         let mut process = bcx.compiler.process();
         process.current_dir(&self.build).arg("--check");

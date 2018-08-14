@@ -645,6 +645,15 @@ impl Source {
         })
     }
 
+    pub fn pretty_summary(&self) -> String {
+        format!(
+            "{} {} ({})",
+            self.meta().package.name,
+            self.meta().version(),
+            self.inner.res,
+        )
+    }
+
     pub fn summary(&self) -> String {
         format!(
             "{}@{}|{}",

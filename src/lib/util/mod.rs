@@ -120,10 +120,16 @@ modules = {}
 pub fn fmt_output(c: &Output) -> String {
     let mut res = String::new();
     if !c.stderr.is_empty() {
-        res.push_str(format!("[stderr]\n{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
+        if !c.stdout.is_empty() {
+            res.push_str("[stderr]\n");
+        }
+        res.push_str(format!("{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());       res.push_str(format!("[stderr]\n{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
     }
     if !c.stdout.is_empty() {
-        res.push_str(format!("[stdout]\n{}\n", String::from_utf8_lossy(&c.stdout)).as_ref());
+        if !c.stderr.is_empty() {
+            res.push_str("[stdout]\n");
+        }
+        res.push_str(format!("{}\n", String::from_utf8_lossy(&c.stdout)).as_ref());
     }
     // Remove the ending newline if it exists
     res.pop();

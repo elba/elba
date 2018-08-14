@@ -8,7 +8,10 @@ use super::{
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use toml;
 use url::Url;
 use url_serde;
@@ -162,24 +165,116 @@ pub struct Targets {
     #[serde(default = "Vec::new")]
     pub bin: Vec<BinTarget>,
     #[serde(default = "Vec::new")]
-    pub test: Vec<BinTarget>,
+    pub test: Vec<TestTarget>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct LibTarget {
+    #[serde(default = "default_lib_subpath")]
     pub path: SubPath,
     pub mods: Vec<String>,
     #[serde(default)]
     pub idris_opts: Vec<String>,
 }
 
+fn default_lib_subpath() -> SubPath {
+    SubPath::from_path(Path::new("src")).unwrap()
+}
+
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct BinTarget {
     pub name: String,
-    // For binaries and tests, this should point to a file with a Main module.
-    pub main: SubPath,
+    #[serde(default = "default_bin_subpath")]
+    pub path: SubPath,
+    pub main: String,
     #[serde(default)]
     pub idris_opts: Vec<String>,
+}
+
+fn default_bin_subpath() -> SubPath {
+    SubPath::from_path(Path::new("src")).unwrap()
+}
+
+/// A TestTarget is literally exactly the same as a BinTarget, with the only difference being
+/// the difference in default path.
+///
+/// I know, code duplication sucks and is stupid, but what can ya do :v
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TestTarget {
+    pub name: String,
+    #[serde(default = "default_test_subpath")]
+    pub path: SubPath,
+    pub main: String,
+    #[serde(default)]
+    pub idris_opts: Vec<String>,
+}
+
+fn default_test_subpath() -> SubPath {
+    SubPath::from_path(Path::new("tests")).unwrap()
+}
+
+impl From<TestTarget> for BinTarget {
+    fn from(t: TestTarget) -> Self {
+        BinTarget {
+            name: t.name,
+            path: t.path,
+            main: t.main,
+            idris_opts: t.idris_opts,
+        }
+    }
+}
+
+impl BinTarget {
+    // A note on extensions:
+    // - If the extension of the target_path is idr or empty, it will be treated as a Main file.
+    // - If the extension of the target_path is anything else, that extension will be the function
+    //   of the preceding part's module which will be treated as the main function.
+    pub fn resolve_bin(&self, parent: &Path) -> Option<(PathBuf, PathBuf)> {
+        let main_path: PathBuf = self.main.clone().into();
+        // If the main path is a valid SubPath, we just use that.
+        if let Ok(s) = SubPath::from_path(&main_path) {
+            if parent.join(&s.0).with_extension("idr").exists() {
+                let target_path = if s.0.extension().is_none() {
+                    parent.join(&s.0).with_extension("idr")
+                } else {
+                    parent.join(&s.0)
+                };
+                let src_path = target_path.parent().unwrap();
+                // This is the relative target path
+                let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
+                return Some((src_path.to_path_buf(), target_path));
+            }
+        }
+
+        // Otherwise, we have to do more complicated logic.
+        let src_path = parent.join(&self.path.0);
+        let mut split = self.main.trim_matches('.').rsplitn(2, '.');
+        let (after, before) = (split.next().unwrap(), split.next());
+
+        if let Some(before) = before {
+            let target_path: PathBuf = before.replace(".", "/").into();
+            // If there is at least one dot in the name:
+            if src_path.join(&target_path).join(after).with_extension("idr").exists() {
+                // If a file corresponding to the whole module name exists, we use that.
+                Some((src_path, target_path.join(after).with_extension("idr")))
+            } else if src_path.join(&target_path).with_extension("idr").exists() {
+                // Otherwise, if a file corresponding to the module name minus the last
+                // part exists, we assume that the last part refers to a function which
+                // should be treated as the main function.
+                Some((src_path, target_path.with_extension(after)))
+            } else {
+                None
+            }
+        } else {
+            let target_path: PathBuf = after.into();
+            // Otherwise, if the name has no dots:
+            if src_path.join(&target_path).with_extension("idr").exists() {
+                Some((src_path, target_path.with_extension("idr")))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -205,7 +300,7 @@ license = 'MIT'
 
 [[targets.bin]]
 name = 'bin1'
-main = 'src/bin/Here.idr'
+main = 'src/bin/Here'
 
 [targets.lib]
 path = "src/lib/"

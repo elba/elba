@@ -18,6 +18,7 @@ extern crate inflector;
 extern crate itertools;
 #[macro_use]
 extern crate nom;
+extern crate rand;
 extern crate reqwest;
 extern crate scoped_threadpool;
 extern crate serde;

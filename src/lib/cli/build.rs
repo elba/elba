@@ -147,11 +147,7 @@ pub fn test(
                 let bin_dir = &bin_dir;
                 // let pb = &pb;
                 scope.execute(move || {
-                    shell.println(
-                        style("Running").cyan(),
-                        &test.name,
-                        Verbosity::Normal,
-                    );
+                    shell.println(style("Running").cyan(), &test.name, Verbosity::Normal);
                     let out = if let Some(r) = &backend.runner {
                         Command::new(r).arg(bin_dir.join(&test.name)).output()
                     } else {
@@ -323,24 +319,26 @@ pub fn repl(
     for bin in manifest.targets.bin {
         if let Some(v) = targets.1.as_ref() {
             if v.contains(&bin.name.as_ref()) {
-                imports.push(
-                    bin.main
-                        .0
-                        .parent()
-                        .unwrap_or_else(|| Path::new("."))
-                        .to_path_buf(),
-                );
-                paths.push(bin.main.0.clone());
+                let resolved = bin.resolve_bin(Path::new(".")).ok_or_else(|| {
+                    format_err!(
+                        "module {} isn't a subpath and doesn't exist under path {}",
+                        bin.main,
+                        bin.path.0.display()
+                    )
+                })?;
+                imports.push(resolved.0);
+                paths.push(resolved.1);
             }
         } else if !targets.0 {
-            imports.push(
-                bin.main
-                    .0
-                    .parent()
-                    .unwrap_or_else(|| Path::new("."))
-                    .to_path_buf(),
-            );
-            paths.push(bin.main.0.clone());
+            let resolved = bin.resolve_bin(Path::new(".")).ok_or_else(|| {
+                format_err!(
+                    "module {} isn't a subpath and doesn't exist under path {}",
+                    bin.main,
+                    bin.path.0.display()
+                )
+            })?;
+            imports.push(resolved.0);
+            paths.push(resolved.1);
         }
     }
 

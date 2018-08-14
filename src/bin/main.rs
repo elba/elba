@@ -139,7 +139,7 @@ fn main() {
     println!();
     match res {
         Err(e) => {
-            eprintln!("{} {}", style("error!").red().bold(), e);
+            eprintln!("{} {}", style("error:").red().bold(), e);
             exit(1);
         }
         Ok(st) => {
