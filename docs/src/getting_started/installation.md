@@ -19,7 +19,7 @@ Because elba is written in Rust, it is available as an installable crate from [c
 Once you have Rust installed, installing elba is pretty self-explanatory:
 
 ```sh
-$ cargo install elba
+$ cargo +nightly install elba
 $ elba # should work!
 ```
 
