@@ -181,6 +181,8 @@ pub fn test(
         while let Some(res) = results.try_pop() {
             match res {
                 Ok((test, out)) => {
+                    ctx.shell.println_plain(fmt_output(&out), Verbosity::Quiet);
+
                     ctx.shell.println(
                         if out.status.success() {
                             style("Passed").green()
@@ -190,8 +192,6 @@ pub fn test(
                         &test,
                         Verbosity::Quiet,
                     );
-
-                    ctx.shell.println_plain(fmt_output(&out), Verbosity::Quiet);
 
                     if !out.status.success() {
                         errs += 1;
