@@ -24,8 +24,8 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let global_cache = c.directories.cache.clone();
     let logger = logger(c);
     let threads = match_threads(c, args);
-
     let backend = match_backends(c, args);
+    let shell = c.shell();
 
     let ts = (
         args.is_present("lib"),
@@ -37,6 +37,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         global_cache,
         logger,
         threads,
+        shell,
     };
 
     build::repl(&ctx, &project, &ts, &backend)

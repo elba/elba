@@ -1,4 +1,4 @@
-use super::util::{CACHE, INDEX_DIR};
+use super::util::{shell, CACHE, INDEX_DIR};
 use elba::{
     index::Indices,
     package::{
@@ -55,6 +55,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         ixs,
         Graph::default(),
         def_ix,
+        shell(),
     )
 }
 

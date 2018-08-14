@@ -30,8 +30,11 @@ use semver::Version;
 use slog::Logger;
 use std::{cmp, collections::VecDeque};
 use textwrap::fill;
-use util::errors::ErrorKind;
-use util::graph::Graph;
+use util::{
+    errors::ErrorKind,
+    graph::Graph,
+    shell::{Shell, Verbosity},
+};
 
 #[derive(Debug)]
 pub struct Resolver<'ret, 'cache: 'ret> {
@@ -45,6 +48,7 @@ pub struct Resolver<'ret, 'cache: 'ret> {
     incompat_ixs: IndexMap<PackageId, Vec<usize>>,
     retriever: &'ret mut Retriever<'cache>,
     pub logger: Logger,
+    pub shell: Shell,
 }
 
 impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
@@ -65,6 +69,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             incompat_ixs,
             decisions,
             derivations,
+            shell: retriever.shell,
             retriever,
             logger,
         }
@@ -412,12 +417,10 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                 Err(e) => {
                     // This case encapsulates everything from "no versions were found" to "the package
                     // literally doesn't exist in the index"
-                    println!(
-                        "{:>7} Couldn't add package {} {}: {}",
-                        style("[wrn]").yellow().bold(),
-                        package.0,
-                        package.1,
-                        e
+                    self.shell.println(
+                        style("[warn]").yellow().bold(),
+                        format!("Couldn't add package {} {}: {}", package.0, package.1, e),
+                        Verbosity::Normal,
                     );
                     let pkgs = indexmap!(
                         package.0.clone() => package.1.clone()

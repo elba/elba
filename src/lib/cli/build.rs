@@ -27,7 +27,14 @@ use std::{
     str::FromStr,
 };
 use toml;
-use util::{config::Backend, errors::Res, fmt_output, graph::Graph, lock::DirLock};
+use util::{
+    config::Backend,
+    errors::Res,
+    fmt_output,
+    graph::Graph,
+    lock::DirLock,
+    shell::{Shell, Verbosity},
+};
 
 // TODO: In all commands, pick a better compiler than `Compiler::default()`
 
@@ -36,6 +43,7 @@ pub struct BuildCtx {
     pub global_cache: PathBuf,
     pub logger: Logger,
     pub threads: u32,
+    pub shell: Shell,
 }
 
 pub fn test(
@@ -55,8 +63,7 @@ pub fn test(
         bail!("at least one test must be defined")
     }
 
-    solve_local(ctx, &project, 5, |cache, mut retriever, solve| {
-        println!("{} Retrieving packages...", style("[3/5]").dim().bold());
+    solve_local(ctx, &project, 3, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -66,7 +73,7 @@ pub fn test(
         // though we don't even need the Retriever anymore).
         drop(retriever);
 
-        let ctx = BuildContext {
+        let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
             config: BuildConfig {},
@@ -74,7 +81,12 @@ pub fn test(
             threads: ctx.threads,
         };
 
-        println!("{} Building targets...", style("[4/5]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[2/3]").dim().bold(),
+            "Building targets...",
+            Verbosity::Quiet,
+        );
 
         // We want to store the outputs of our labor in a local target directory.
         let lock = DirLock::acquire(&project.join("target"))?;
@@ -86,9 +98,10 @@ pub fn test(
         if manifest.targets.lib.is_some() {
             root.push(Target::Lib(false));
         } else {
-            println!(
-                "{:>7} No lib target for tests to import",
-                style("[wrn]").yellow().bold()
+            ctx.shell.println(
+                style("[warn]").yellow().bold(),
+                "No lib target for tests to import",
+                Verbosity::Normal,
             );
         }
         let emp = targets.is_empty();
@@ -99,10 +112,15 @@ pub fn test(
         }
 
         let root = Targets::new(root);
-        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
-        q.exec(&ctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
+        q.exec(&bctx)?;
 
-        println!("{} Running tests...", style("[5/5]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[3/3]").dim().bold(),
+            "Running tests...",
+            Verbosity::Quiet,
+        );
 
         let root = root
             .0
@@ -124,21 +142,29 @@ pub fn test(
 
         pool.scoped(|scope| {
             // let mut prg = 0;
+            let shell = ctx.shell;
             for test in &root {
                 let bin_dir = &bin_dir;
                 // let pb = &pb;
                 scope.execute(move || {
-                    println!("{:>7} {}", style("[tst]").blue(), &test.name);
+                    shell.println(
+                        style("Running").cyan(),
+                        &test.name,
+                        Verbosity::Normal,
+                    );
                     let out = if let Some(r) = &backend.runner {
                         Command::new(r).arg(bin_dir.join(&test.name)).output()
                     } else {
                         Command::new(bin_dir.join(&test.name)).output()
                     };
                     if out.is_err() {
-                        println!(
-                            "{:>7} Test binary {} could not be executed",
-                            style("[err]").red().bold(),
-                            bin_dir.join(&test.name).display(),
+                        shell.println(
+                            style("[error]").red().bold(),
+                            format!(
+                                "Test binary {} could not be executed",
+                                bin_dir.join(&test.name).display()
+                            ),
+                            Verbosity::Quiet,
                         );
                     }
                     results.push(out.map(|x| (&test.name, x)));
@@ -150,23 +176,22 @@ pub fn test(
             // pb.finish_and_clear();
         });
 
-        println!();
-        println!("{} Test results:", style("[inf]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
         let mut errs = 0;
         while let Some(res) = results.try_pop() {
             match res {
                 Ok((test, out)) => {
-                    println!(
-                        "{:>7} {}",
+                    ctx.shell.println(
                         if out.status.success() {
-                            style("[pss]").green()
+                            style("Passed").green()
                         } else {
-                            style("[fld]").red()
+                            style("Failed").red()
                         },
-                        test
+                        &test,
+                        Verbosity::Quiet,
                     );
 
-                    println!("{}", fmt_output(&out));
+                    ctx.shell.println_plain(fmt_output(&out), Verbosity::Quiet);
 
                     if !out.status.success() {
                         errs += 1;
@@ -200,7 +225,6 @@ pub fn install(
     force: bool,
 ) -> Res<String> {
     let f = |cache: &Cache, mut retriever: Retriever, solve| -> Res<String> {
-        println!("{} Retrieving packages...", style("[3/5]").dim().bold());
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -226,7 +250,7 @@ pub fn install(
         }
         let root = Targets::new(root);
 
-        let ctx = BuildContext {
+        let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
             config: BuildConfig {},
@@ -234,18 +258,28 @@ pub fn install(
             threads: ctx.threads,
         };
 
-        println!("{} Building targets...", style("[4/5]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[2/3]").dim().bold(),
+            "Building targets...",
+            Verbosity::Quiet,
+        );
 
         // We unconditionally use a global OutputLayout to force rebuilding of root packages
         // and to avoid dealing with making our own for global/remote packages
 
-        let q = JobQueue::new(sources, &root, None, &ctx)?;
+        let q = JobQueue::new(sources, &root, None, &bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        let bins = q.exec(&ctx)?.1;
+        let bins = q.exec(&bctx)?.1;
         let binc = bins.len();
 
-        println!("{} Installing binaries...", style("[5/5]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[3/3]").dim().bold(),
+            "Installing binaries...",
+            Verbosity::Quiet,
+        );
         cache.store_bins(&bins, force)?;
 
         Ok(format!(
@@ -256,8 +290,8 @@ pub fn install(
     };
 
     match name {
-        Ok(name) => solve_remote(ctx, name, 5, f),
-        Err(path) => solve_local(ctx, &path, 5, f),
+        Ok(name) => solve_remote(ctx, name, 3, f),
+        Err(path) => solve_local(ctx, &path, 3, f),
     }
 }
 
@@ -310,8 +344,7 @@ pub fn repl(
         }
     }
 
-    solve_local(ctx, &project, 5, |cache, mut retriever, solve| {
-        println!("{} Retrieving packages...", style("[3/5]").dim().bold());
+    solve_local(ctx, &project, 3, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -326,7 +359,7 @@ pub fn repl(
         let root = vec![];
         let root = Targets::new(root);
 
-        let ctx = BuildContext {
+        let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
             config: BuildConfig {},
@@ -334,22 +367,33 @@ pub fn repl(
             threads: ctx.threads,
         };
 
-        println!("{} Building targets...", style("[4/5]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[2/3]").dim().bold(),
+            "Building targets...",
+            Verbosity::Quiet,
+        );
 
-        let mut q = JobQueue::new(sources, &root, None, &ctx)?;
+        let mut q = JobQueue::new(sources, &root, None, &bctx, &ctx.logger, ctx.shell)?;
 
         // We only want to build the dependencies; we expressly do NOT want to generate anything
         // for the root package, because we're gonna manually add the files ourselves.
         // The reason we do this is because the repl is often used for interactive development.
         q.graph.inner[NodeIndex::new(0)] = Job::default();
 
-        let deps = q.exec(&ctx)?.0;
+        let deps = q.exec(&bctx)?.0;
 
         // From here, we basically manually build a CompileInvocation, but tailor-made for the
         // repl command.
-        println!("{} Launching the repl...", style("[5/5]").dim().bold());
-        println!();
-        let mut process = ctx.compiler.process();
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[3/3]").dim().bold(),
+            "Launching REPL...",
+            Verbosity::Quiet,
+        );
+        ctx.shell.println_empty(Verbosity::Quiet);
+
+        let mut process = bctx.compiler.process();
         for binary in deps {
             // We assume that the binary has already been compiled
             process.arg("-i").arg(binary);
@@ -407,8 +451,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
     }
     let root = Targets::new(root);
 
-    solve_local(ctx, &project, 4, |cache, mut retriever, solve| {
-        println!("{} Retrieving packages...", style("[3/4]").dim().bold());
+    solve_local(ctx, &project, 2, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -420,7 +463,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
 
         let backend = Backend::default();
 
-        let ctx = BuildContext {
+        let bctx = BuildContext {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
             compiler: Compiler::default(),
@@ -429,19 +472,21 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
             threads: ctx.threads,
         };
 
-        println!(
-            "{} Building targets + root docs...",
-            style("[4/4]").dim().bold()
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[2/2]").dim().bold(),
+            "Building targets + root docs...",
+            Verbosity::Quiet,
         );
 
         // We want to store the outputs of our labor in a local target directory.
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        q.exec(&ctx)?;
+        q.exec(&bctx)?;
 
         Ok("docs output available at `./target/docs`".to_string())
     })
@@ -499,8 +544,7 @@ pub fn build(
     }
 
     let root = Targets::new(root);
-    solve_local(ctx, &project, 4, |cache, mut retriever, solve| {
-        println!("{} Retrieving packages...", style("[3/4]").dim().bold());
+    solve_local(ctx, &project, 2, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -510,7 +554,7 @@ pub fn build(
         // though we don't even need the Retriever anymore).
         drop(retriever);
 
-        let ctx = BuildContext {
+        let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
             config: BuildConfig {},
@@ -518,23 +562,28 @@ pub fn build(
             threads: ctx.threads,
         };
 
-        println!("{} Building targets...", style("[4/4]").dim().bold());
+        ctx.shell.println_empty(Verbosity::Normal);
+        ctx.shell.println(
+            style("[2/2]").dim().bold(),
+            "Building targets...",
+            Verbosity::Quiet,
+        );
 
         // We want to store the outputs of our labor in a local target directory.
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, &root, Some(layout), &ctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        q.exec(&ctx)?;
+        q.exec(&bctx)?;
 
         Ok("build output available at `./target`".to_string())
     })
 }
 
 pub fn lock(ctx: &BuildCtx, project: &Path) -> Res<String> {
-    solve_local(ctx, &project, 2, |_, _, _| {
+    solve_local(ctx, &project, 1, |_, _, _| {
         Ok("lockfile created at `./elba.lock`".to_string())
     })
 }
@@ -581,26 +630,38 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache)?;
-    println!(
-        "{} Updating package indices...",
-        style(format!("[1/{}]", total)).dim().bold()
-    );
-    let indices = cache.get_indices(&ctx.indices);
-    println!(
-        "{:>7} Indices stored at {}",
-        style("[inf]").dim(),
-        cache.layout.indices.display()
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache, ctx.shell)?;
+
+    ctx.shell.println(
+        style(format!("[1/{}]", total)).dim().bold(),
+        "Resolving dependencies...",
+        Verbosity::Quiet,
     );
 
-    let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
-    let solver = Resolver::new(&retriever.logger.clone(), &mut retriever);
-    println!(
-        "{} Resolving dependencies...",
-        style(format!("[2/{}]", total)).dim().bold()
+    let indices = cache.get_indices(&ctx.indices);
+    ctx.shell.println(
+        style("Cached").dim(),
+        format!("indices at {}", cache.layout.indices.display()),
+        Verbosity::Verbose,
     );
+
+    let mut retriever = Retriever::new(
+        &cache.logger,
+        &cache,
+        root,
+        deps,
+        indices,
+        lock,
+        def_index,
+        ctx.shell,
+    );
+    let solver = Resolver::new(&retriever.logger.clone(), &mut retriever);
     let solve = solver.solve()?;
-    println!("{:>7} Writing lockfile...", style("[inf]").dim());
+    ctx.shell.println(
+        style("Writing").dim(),
+        "lockfile at elba.lock",
+        Verbosity::Verbose,
+    );
 
     let mut lockfile = fs::OpenOptions::new()
         .write(true)
@@ -625,16 +686,17 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     mut f: F,
 ) -> Res<String> {
     let def_index = def_index(ctx);
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache)?;
-    println!(
-        "{} Updating package indices...",
-        style(format!("[1/{}]", total)).dim().bold()
+    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache, ctx.shell)?;
+    ctx.shell.println(
+        style(format!("[1/{}]", total)).dim().bold(),
+        "Resolving dependencies...",
+        Verbosity::Quiet,
     );
     let mut indices = cache.get_indices(&ctx.indices);
-    println!(
-        "{:>7} Indices stored at {}",
-        style("[inf]").dim(),
-        cache.layout.indices.display()
+    ctx.shell.println(
+        style("Cached").dim(),
+        format!("indices at {}", cache.layout.indices.display()),
+        Verbosity::Verbose,
     );
     let root = indices.select_by_spec(name)?;
 
@@ -649,12 +711,19 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
 
     let lock = Graph::default();
 
-    let mut retriever = Retriever::new(&cache.logger, &cache, root, deps, indices, lock, def_index);
-    println!(
-        "{} Resolving dependencies...",
-        style(format!("[2/{}]", total)).dim().bold()
+    let mut retriever = Retriever::new(
+        &cache.logger,
+        &cache,
+        root,
+        deps,
+        indices,
+        lock,
+        def_index,
+        ctx.shell,
     );
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
+
+    ctx.shell.println_empty(Verbosity::Normal);
 
     f(&cache, retriever, solve)
 }

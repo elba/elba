@@ -5,6 +5,7 @@ pub mod errors;
 pub mod git;
 pub mod graph;
 pub mod lock;
+pub mod shell;
 
 use failure::ResultExt;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};

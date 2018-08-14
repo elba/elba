@@ -6,21 +6,13 @@
 //!
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
+use super::shell::{Shell, Verbosity};
 use config;
 use directories::BaseDirs;
 use indexmap::IndexMap;
 use package::resolution::DirectRes;
 use std::{env, path::PathBuf};
 use url::Url;
-
-/// The requested verbosity of output
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Verbosity {
-    Verbose,
-    Normal,
-    Quiet,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -89,6 +81,12 @@ impl Config {
 
     pub fn get_backend(&self, name: &str) -> Option<Backend> {
         self.backend.iter().find(|x| x.name == name).cloned()
+    }
+
+    pub fn shell(&self) -> Shell {
+        Shell {
+            verbosity: self.term.verbosity,
+        }
     }
 }
 

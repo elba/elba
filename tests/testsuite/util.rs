@@ -2,7 +2,7 @@ use elba::{
     index::Index,
     package::resolution::DirectRes,
     retrieve::Cache,
-    util::{copy_dir, lock::DirLock},
+    util::{copy_dir, lock::DirLock, shell::Shell},
 };
 use slog::{self, Logger};
 use std::{path::PathBuf, str::FromStr};
@@ -32,8 +32,12 @@ pub fn index() -> Index {
     Index::from_disk(url, path).unwrap()
 }
 
+pub fn shell() -> Shell {
+    Shell::default()
+}
+
 pub fn cache() -> Cache {
-    Cache::from_disk(&LOGGER, &CACHE_DIR.path()).unwrap()
+    Cache::from_disk(&LOGGER, &CACHE_DIR.path(), shell()).unwrap()
 }
 
 fn index_dir() -> TempDir {

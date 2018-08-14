@@ -115,7 +115,7 @@ elba will print the following output when trying to build it:
 ```sh
 $ elba build
 # snip
-[err] version solving has failed
+[error] version solving has failed
 
 Because conflict_simple/bar@index+dir+/index/ any depends on
 conflict_simple/baz@index+dir+/index/ >=3.0.0 <4.0.0,

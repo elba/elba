@@ -19,12 +19,14 @@ pub fn exec(c: &mut Config, _args: &ArgMatches) -> Res<String> {
     let global_cache = c.directories.cache.clone();
     let logger = logger(c);
     let threads = 1;
+    let shell = c.shell();
 
     let ctx = build::BuildCtx {
         indices,
         global_cache,
         logger,
         threads,
+        shell,
     };
 
     build::lock(&ctx, &project)

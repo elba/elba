@@ -19,8 +19,11 @@ use package::{
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
-use util::errors::{ErrorKind, Res};
-use util::graph::Graph;
+use util::{
+    errors::{ErrorKind, Res},
+    graph::Graph,
+    shell::{Shell, Verbosity},
+};
 
 // TODO: Patching
 /// Retrieves the best packages using both the indices available and a lockfile.
@@ -35,6 +38,7 @@ pub struct Retriever<'cache> {
     lockfile: Graph<Summary>,
     pub logger: Logger,
     pub def_index: IndexRes,
+    pub shell: Shell,
     sources: IndexMap<PackageId, IndexMap<DirectRes, Source>>,
 }
 
@@ -47,6 +51,7 @@ impl<'cache> Retriever<'cache> {
         indices: Indices,
         lockfile: Graph<Summary>,
         def_index: IndexRes,
+        shell: Shell,
     ) -> Self {
         let logger = plog.new(o!("root" => root.to_string()));
 
@@ -58,6 +63,7 @@ impl<'cache> Retriever<'cache> {
             lockfile,
             logger,
             def_index,
+            shell,
             sources: indexmap!(),
         }
     }
@@ -75,7 +81,11 @@ impl<'cache> Retriever<'cache> {
 
         let sources = solve.map(
             |_, sum| {
-                println!("{:>7} {}", style("[rtv]").blue(), sum.to_string());
+                self.shell.println(
+                    style("Retrieving").cyan(),
+                    sum.to_string(),
+                    Verbosity::Normal,
+                );
 
                 let loc = match sum.resolution() {
                     Resolution::Direct(direct) => direct,
@@ -100,10 +110,10 @@ impl<'cache> Retriever<'cache> {
         )?;
 
         // pb.finish_and_clear();
-        println!(
-            "{:>7} Packages cached in {}",
-            style("[inf]").dim(),
-            self.cache.layout.src.display()
+        self.shell.println(
+            style("Cached").dim(),
+            format!("packages in {}", self.cache.layout.src.display()),
+            Verbosity::Verbose,
         );
 
         Ok(sources)

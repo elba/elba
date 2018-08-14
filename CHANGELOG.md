@@ -4,11 +4,14 @@
 
 ### Changed
 
+- elba's CLI output has been prettied up, and now respects
+  the `--verbose` and `--quiet` flags.
+
 - Fixed a bug where Idris would complain about "No ibc for _"
-  when building a bin target (#14)
+  when building a bin target (#14).
 
 - Fixed a bug where any stdout output during code generation
-  would cause the build process to error
+  would cause the build process to error.
 
 ## 0.1.5
 

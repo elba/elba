@@ -341,7 +341,13 @@ impl Summary {
 
 impl fmt::Display for Summary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}|{}", self.id, self.version)
+        write!(
+            f,
+            "{} {} ({})",
+            self.name(),
+            self.version,
+            self.resolution()
+        )
     }
 }
 

@@ -68,7 +68,7 @@ email = "jsmith@example.com"
 
 This section specifies options for terminal output, and has two fields:
 
-- `verbosity`: specifies how verbose elba should be. Can be one of `verbose`, `normal`, or `quiet`.
+- `verbosity`: specifies how verbose elba should be. Can be one of `verbose`, `normal`,  `quiet`, or `none`.
 - `color`: specifies if elba should try to print color output. Either `true` or `false`.
 
 At the moment, neither of these options actually do anything.

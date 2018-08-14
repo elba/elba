@@ -70,7 +70,14 @@ use std::{
     sync::Arc,
 };
 use toml;
-use util::{clear_dir, copy_dir, errors::Res, graph::Graph, hexify_hash, lock::DirLock};
+use util::{
+    clear_dir, copy_dir,
+    errors::Res,
+    graph::Graph,
+    hexify_hash,
+    lock::DirLock,
+    shell::{Shell, Verbosity},
+};
 use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
@@ -84,10 +91,11 @@ pub struct Cache {
     pub layout: Layout,
     client: Client,
     pub logger: Logger,
+    pub shell: Shell,
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, location: &Path) -> Res<Self> {
+    pub fn from_disk(plog: &Logger, location: &Path, shell: Shell) -> Res<Self> {
         let layout = Layout::new(&location)?;
 
         let client = Client::new();
@@ -97,6 +105,7 @@ impl Cache {
             layout,
             client,
             logger,
+            shell,
         })
     }
 
@@ -203,10 +212,10 @@ impl Cache {
             .with_context(|e| format_err!("could not deserialize .bins file:\n{}", e))?;
 
         for (path, sum) in bins {
-            println!(
-                "{:>7} {}",
-                style("[ins]").blue(),
-                path.file_name().unwrap().to_string_lossy().as_ref()
+            self.shell.println(
+                style("Installing").cyan(),
+                path.file_name().unwrap().to_string_lossy().as_ref(),
+                Verbosity::Normal,
             );
             self.store_bin(path, force)?;
             dot.insert(
@@ -350,7 +359,11 @@ impl Cache {
         let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
 
         while let Some(index) = q.pop_front() {
-            println!("{:>7} {}", style("[rtv]").dim(), index);
+            self.shell.println(
+                style("Retrieving").cyan(),
+                format!("index {}", &index),
+                Verbosity::Normal,
+            );
             if seen.contains(&index) {
                 continue;
             }
@@ -359,11 +372,10 @@ impl Cache {
                 let lock = match DirLock::acquire(path) {
                     Ok(dir) => dir,
                     Err(e) => {
-                        println!(
-                            "{:>7} Couldn't lock dir index {}: {}",
-                            style("[wrn]").yellow().bold(),
-                            path.display(),
-                            e
+                        self.shell.println(
+                            style("[warn]").yellow().bold(),
+                            format!("Couldn't lock dir index {}: {}", path.display(), e),
+                            Verbosity::Quiet,
                         );
                         continue;
                     }
@@ -384,11 +396,10 @@ impl Cache {
             let dir = match DirLock::acquire(&index_path) {
                 Ok(dir) => dir,
                 Err(e) => {
-                    println!(
-                        "{:>7} Couldn't lock cached index {}: {}",
-                        style("[wrn]").yellow().bold(),
-                        index,
-                        e
+                    self.shell.println(
+                        style("[warn]").yellow().bold(),
+                        format!("Couldn't lock cached index {}: {}", index, e),
+                        Verbosity::Quiet,
                     );
                     continue;
                 }
@@ -407,21 +418,19 @@ impl Cache {
                             indices.push(ix);
                         }
                         Err(e) => {
-                            println!(
-                                "{:>7} Invalid/corrupt index {}: {}",
-                                style("[wrn]").yellow().bold(),
-                                index,
-                                e
+                            self.shell.println(
+                                style("[warn]").yellow().bold(),
+                                format!("Invalid/corrupt index {}: {}", index, e),
+                                Verbosity::Quiet,
                             );
                         }
                     }
                 }
                 Err(e) => {
-                    println!(
-                        "{:>7} Couldn't retrieve cache {}: {}",
-                        style("[wrn]").yellow().bold(),
-                        index,
-                        e
+                    self.shell.println(
+                        style("[warn]").yellow().bold(),
+                        format!("Couldn't retrieve cache {}: {}", index, e),
+                        Verbosity::Quiet,
                     );
                 }
             }
@@ -641,7 +650,7 @@ impl Source {
             "{}@{}|{}",
             self.meta().package.name,
             self.inner.res,
-            self.meta().version()
+            self.meta().version(),
         )
     }
 

@@ -15,7 +15,7 @@ mod cmds;
 
 use clap::{App, AppSettings, Arg, ArgMatches};
 use console::style;
-use elba::util::config::{Config, Verbosity};
+use elba::util::{config::Config, shell::Verbosity};
 use failure::{Error, ResultExt};
 use std::{process::exit, time::Instant};
 
@@ -32,6 +32,7 @@ fn cli() -> App<'static, 'static> {
         .arg(
             Arg::with_name("verbose")
                 .short("v")
+                .long("verbose")
                 .help("Verbose output")
                 .global(true)
                 .conflicts_with("quiet"),
@@ -63,6 +64,8 @@ fn expand_aliases(
     config: &mut Config,
     args: ArgMatches<'static>,
 ) -> Result<ArgMatches<'static>, Error> {
+    let shell = config.shell();
+
     if let (cmd, Some(args)) = args.subcommand() {
         match (cmds::execute_internal(cmd), unalias(config, cmd)) {
             (None, Some(alias)) => {
@@ -78,10 +81,10 @@ fn expand_aliases(
                 return expand_aliases(config, args);
             }
             (Some(_), Some(_)) => {
-                println!(
-                    "{} Builtin command shadows alias {}",
-                    style("[wrn]").yellow().bold(),
-                    cmd
+                shell.println_unindented(
+                    style("[warn]").yellow().bold(),
+                    format!("Builtin command shadows alias {}", cmd),
+                    Verbosity::Normal,
                 );
             }
             (_, None) => {}
@@ -136,7 +139,7 @@ fn main() {
     println!();
     match res {
         Err(e) => {
-            eprintln!("{} {}", style("[err]").red().bold(), e);
+            eprintln!("{} {}", style("error!").red().bold(), e);
             exit(1);
         }
         Ok(st) => {
