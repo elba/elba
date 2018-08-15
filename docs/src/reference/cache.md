@@ -1,12 +1,13 @@
 ## The Global Cache
 
-elba uses a global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:
+elba uses an internal global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:
 
 ```sh
-~/.elba/cache or wherever
+this directory is platform specific:
+- Linux: ~/.cache/elba
+- Windows: %LOCALAPPDATA%\elba
+- macOS: /Users/<user>/Library/Caches/elba
 |
-|-- bin
-|   +-- .bins
 |-- build
 |   |-- a78bu877c78deadbeef...
 |   +-- # snip
@@ -21,9 +22,9 @@ elba uses a global cache to store downloaded packages, build packages in a tempo
     +-- # snip
 ```
 
-### `bin`
+### Installed binaries
 
-This folder stores all of the installed binaries of elba packages, and should be added to the path. Additionally, an extra file `.bins` lives inside this directory, which maps from installed binaries to their corresponding package. This directory **should not** be touched by the user in any way.
+Binaries are special in that they get their own folder separate from the internal cache stuff. Ordinarily this is stored at `~/.elba/bin` for all systems, but this can be controlled in the config, separate from the cache dir. Deleting the whole folder should be safe, but deleting individual binaries might not be; if you try to uninstall them later down the line, you might get an error.
 
 ### `build`
 

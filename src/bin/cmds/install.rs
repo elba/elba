@@ -37,7 +37,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     let logger = logger(c);
     let indices = c.indices.to_vec();
-    let global_cache = c.directories.cache.clone();
+    let global_cache = c.layout();
     let threads = match_threads(c, args);
     let shell = c.shell();
 

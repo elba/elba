@@ -11,6 +11,10 @@
 
 - Sensible defaults for target paths (#17).
 
+- Separate configuration options for storing binary files and elba-
+  internal cache files, if you're really intent on keeping your
+  home directory clean.
+
 ### Changed
 
 - elba's CLI output has been prettied up, and now respects
@@ -21,6 +25,16 @@
 
 - Fixed a bug where any stdout output during code generation
   would cause the build process to error.
+
+- Fixed bugs with config file parsing; elba can actually read
+  the term.verbosity key, and elba is more lenient when it
+  comes to missing keys in configuration.
+
+- elba no longer pollutes the home directory as much by default; 
+  elba's internal cache files are stored in a platform-specific
+  cache folder if another folder isn't specified in the config.
+  elba still uses `~/.elba/bin` for globally-installed binaries,
+  however.
 
 ## 0.1.5
 

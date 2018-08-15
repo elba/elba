@@ -254,7 +254,12 @@ impl BinTarget {
         if let Some(before) = before {
             let target_path: PathBuf = before.replace(".", "/").into();
             // If there is at least one dot in the name:
-            if src_path.join(&target_path).join(after).with_extension("idr").exists() {
+            if src_path
+                .join(&target_path)
+                .join(after)
+                .with_extension("idr")
+                .exists()
+            {
                 // If a file corresponding to the whole module name exists, we use that.
                 Some((src_path, target_path.join(after).with_extension("idr")))
             } else if src_path.join(&target_path).with_extension("idr").exists() {

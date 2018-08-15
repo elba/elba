@@ -1,7 +1,7 @@
 use elba::{
     index::Index,
     package::resolution::DirectRes,
-    retrieve::Cache,
+    retrieve::cache::{Cache, Layout},
     util::{copy_dir, lock::DirLock, shell::Shell},
 };
 use slog::{self, Logger};
@@ -37,7 +37,15 @@ pub fn shell() -> Shell {
 }
 
 pub fn cache() -> Cache {
-    Cache::from_disk(&LOGGER, &CACHE_DIR.path(), shell()).unwrap()
+    let layout = Layout {
+        bin: CACHE_DIR.path().join("bin"),
+        build: CACHE_DIR.path().join("build"),
+        indices: CACHE_DIR.path().join("indices"),
+        src: CACHE_DIR.path().join("src"),
+        tmp: CACHE_DIR.path().join("tmp"),
+    };
+
+    Cache::from_disk(&LOGGER, layout, shell()).unwrap()
 }
 
 fn index_dir() -> TempDir {

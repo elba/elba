@@ -8,9 +8,10 @@
 
 use super::shell::{Shell, Verbosity};
 use config;
-use directories::BaseDirs;
+use directories::{BaseDirs, ProjectDirs};
 use indexmap::IndexMap;
 use package::resolution::DirectRes;
+use retrieve::cache::Layout;
 use std::{env, path::PathBuf};
 use url::Url;
 
@@ -37,11 +38,17 @@ impl Config {
         let cwd = env::current_dir();
 
         c.merge(
-            config::File::with_name(
-                format!(
-                    "{}/.elba/config",
-                    BaseDirs::new().unwrap().home_dir().display()
-                ).as_ref(),
+            config::File::from(BaseDirs::new().unwrap().home_dir().join(".elba/config"))
+                .format(config::FileFormat::Toml)
+                .required(false),
+        )?;
+
+        c.merge(
+            config::File::from(
+                ProjectDirs::from("", "", "elba")
+                    .unwrap()
+                    .config_dir()
+                    .join("config"),
             ).format(config::FileFormat::Toml)
             .required(false),
         )?;
@@ -88,6 +95,16 @@ impl Config {
             verbosity: self.term.verbosity,
         }
     }
+
+    pub fn layout(&self) -> Layout {
+        Layout {
+            bin: self.directories.bin.to_path_buf(),
+            build: self.directories.cache.join("build"),
+            indices: self.directories.cache.join("indices"),
+            src: self.directories.cache.join("src"),
+            tmp: self.directories.cache.join("tmp"),
+        }
+    }
 }
 
 impl Default for Config {
@@ -125,8 +142,14 @@ pub struct Profile {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Term {
+    #[serde(default = "default_color")]
     pub color: bool,
+    #[serde(default)]
     pub verbosity: Verbosity,
+}
+
+fn default_color() -> bool {
+    true
 }
 
 impl Default for Term {
@@ -140,14 +163,16 @@ impl Default for Term {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Directories {
+    pub bin: PathBuf,
     pub cache: PathBuf,
 }
 
 impl Default for Directories {
     fn default() -> Self {
+        let proj = ProjectDirs::from("", "", "elba").unwrap();
         Directories {
-            // TOOD: no unwrapperino pls
-            cache: BaseDirs::new().unwrap().home_dir().join(".elba"),
+            bin: BaseDirs::new().unwrap().home_dir().join(".elba/bin"),
+            cache: proj.cache_dir().to_path_buf(),
         }
     }
 }
@@ -155,7 +180,9 @@ impl Default for Directories {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Backend {
     pub name: String,
+    #[serde(default)]
     pub default: bool,
+    #[serde(default)]
     pub portable: bool,
     pub runner: Option<String>,
     pub opts: Vec<String>,

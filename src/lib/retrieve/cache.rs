@@ -95,11 +95,11 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, location: &Path, shell: Shell) -> Res<Self> {
-        let layout = Layout::new(&location)?;
+    pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Res<Self> {
+        layout.init()?;
 
         let client = Client::new();
-        let logger = plog.new(o!("location" => location.to_string_lossy().into_owned()));
+        let logger = plog.new(o!());
 
         Ok(Cache {
             layout,
@@ -343,8 +343,7 @@ impl Cache {
     }
 
     fn check_build(&self, hash: &BuildHash) -> Option<PathBuf> {
-        let path = self.layout.root.to_owned();
-        let path = path.join("build").join(&hash.0);
+        let path = self.layout.build.join(&hash.0);
 
         if path.exists() {
             Some(path)
@@ -449,8 +448,6 @@ impl Cache {
 /// Layouts encapsulate the logic behind our directory structure.
 #[derive(Debug, Clone)]
 pub struct Layout {
-    /// Root directory of the Layout
-    pub root: PathBuf,
     /// Location to dump binaries
     pub bin: PathBuf,
     /// Source download directory
@@ -464,25 +461,15 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn new(root: &Path) -> Res<Self> {
-        let layout = Layout {
-            root: root.to_path_buf(),
-            bin: root.join("bin"),
-            src: root.join("src"),
-            build: root.join("build"),
-            indices: root.join("indices"),
-            tmp: root.join("tmp"),
-        };
-
+    pub fn init(&self) -> Res<()> {
         // create_dir_all ignores pre-existing folders
-        fs::create_dir_all(&layout.root)?;
-        fs::create_dir_all(&layout.bin)?;
-        fs::create_dir_all(&layout.src)?;
-        fs::create_dir_all(&layout.build)?;
-        fs::create_dir_all(&layout.indices)?;
-        fs::create_dir_all(&layout.tmp)?;
+        fs::create_dir_all(&self.bin)?;
+        fs::create_dir_all(&self.src)?;
+        fs::create_dir_all(&self.build)?;
+        fs::create_dir_all(&self.indices)?;
+        fs::create_dir_all(&self.tmp)?;
 
-        Ok(layout)
+        Ok(())
     }
 }
 

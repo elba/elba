@@ -40,7 +40,8 @@ pub fn init(ctx: NewCtx) -> Res<String> {
         format!(
             r#"[[targets.bin]]
 name = "{}"
-main = "src/Main.idr"
+path = "src/"
+main = "Main"
 
 "#,
             name.name()

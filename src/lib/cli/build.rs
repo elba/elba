@@ -14,9 +14,10 @@ use package::{
 };
 use petgraph::graph::NodeIndex;
 use resolve::Resolver;
-use retrieve::cache::Cache;
-use retrieve::cache::OutputLayout;
-use retrieve::Retriever;
+use retrieve::{
+    cache::{Cache, Layout, OutputLayout},
+    Retriever,
+};
 use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
@@ -40,7 +41,7 @@ use util::{
 
 pub struct BuildCtx {
     pub indices: Vec<DirectRes>,
-    pub global_cache: PathBuf,
+    pub global_cache: Layout,
     pub logger: Logger,
     pub threads: u32,
     pub shell: Shell,
@@ -628,7 +629,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache, ctx.shell)?;
+    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
 
     ctx.shell.println(
         style(format!("[1/{}]", total)).dim().bold(),
@@ -684,7 +685,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     mut f: F,
 ) -> Res<String> {
     let def_index = def_index(ctx);
-    let cache = Cache::from_disk(&ctx.logger, &ctx.global_cache, ctx.shell)?;
+    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
     ctx.shell.println(
         style(format!("[1/{}]", total)).dim().bold(),
         "Resolving dependencies...",

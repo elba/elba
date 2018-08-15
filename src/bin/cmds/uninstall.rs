@@ -28,7 +28,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let logger = logger(c);
     let shell = c.shell();
 
-    let cache = Cache::from_disk(&logger, &c.directories.cache, shell)?;
+    let cache = Cache::from_disk(&logger, c.layout(), shell)?;
 
     let rc = cache.remove_bins(&spec, &targets)?;
 
