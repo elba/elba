@@ -201,7 +201,7 @@ fn default_bin_subpath() -> SubPath {
 /// I know, code duplication sucks and is stupid, but what can ya do :v
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct TestTarget {
-    pub name: String,
+    pub name: Option<String>,
     #[serde(default = "default_test_subpath")]
     pub path: SubPath,
     pub main: String,
@@ -215,8 +215,13 @@ fn default_test_subpath() -> SubPath {
 
 impl From<TestTarget> for BinTarget {
     fn from(t: TestTarget) -> Self {
+        let default_name = format!("tests-{}", &t.main)
+            .trim_right_matches(".idr")
+            .replace("/", "_")
+            .replace(".", "_");
+
         BinTarget {
-            name: t.name,
+            name: t.name.unwrap_or(default_name),
             path: t.path,
             main: t.main,
             idris_opts: t.idris_opts,

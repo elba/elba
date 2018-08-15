@@ -2,7 +2,7 @@ use failure::ResultExt;
 use inflector::Inflector;
 use package::Name;
 use std::{fs, path::PathBuf};
-use util::errors::Res;
+use util::{errors::Res, git};
 
 pub struct NewCtx {
     pub path: PathBuf,
@@ -28,6 +28,8 @@ pub fn new(ctx: NewCtx) -> Res<String> {
 }
 
 pub fn init(ctx: NewCtx) -> Res<String> {
+    git::init(&ctx.path)?;
+
     let name = &ctx.name;
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)
@@ -40,7 +42,6 @@ pub fn init(ctx: NewCtx) -> Res<String> {
         format!(
             r#"[[targets.bin]]
 name = "{}"
-path = "src/"
 main = "Main"
 
 "#,
@@ -49,7 +50,6 @@ main = "Main"
     } else {
         format!(
             r#"[targets.lib]
-path = "src/"
 mods = [
     "{}"
 ]
