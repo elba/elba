@@ -685,10 +685,18 @@ pub struct Binary {
 pub struct BuildHash(pub String);
 
 impl BuildHash {
-    pub fn new(root: &Source, sources: &Graph<Source>, targets: &Targets) -> Self {
+    pub fn new(
+        root: &Source,
+        compiler_ver: Option<&str>,
+        sources: &Graph<Source>,
+        targets: &Targets,
+    ) -> Self {
         let mut hasher = Sha256::default();
         for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
             hasher.input(&src.hash().as_bytes());
+        }
+        if let Some(ver) = compiler_ver {
+            hasher.input(ver.as_bytes());
         }
         // We also hash the targets because if we change the taregets for a package, we want to
         // rebuild it

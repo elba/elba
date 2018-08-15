@@ -38,9 +38,9 @@ impl<'de> Deserialize<'de> for Verbosity {
             "quiet" => Ok(Verbosity::Quiet),
             "normal" => Ok(Verbosity::Normal),
             "verbose" => Ok(Verbosity::Verbose),
-            _ => Err(Error::custom(format!(
-                r#"invalid verbosity: must be one of: none, quiet, normal, verbose"#
-            ))),
+            _ => Err(Error::custom(
+                r#"invalid verbosity: must be one of: none, quiet, normal, verbose"#.to_string(),
+            )),
         }
     }
 }

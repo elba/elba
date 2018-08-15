@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
 
-## Added
+### Added
 
 - More complex logic for dealing with binary target paths; the end
   result is that files which don't specify a `Main.main` function
@@ -15,9 +15,12 @@
   internal cache files, if you're really intent on keeping your
   home directory clean.
 
+- A new flag `--ide-mode` to the `elba repl` subcommand, for
+  running an ide server for the current root package.
+
 ### Changed
 
-- elba's CLI output has been prettied up, and now respects
+- Prettied up and fixed elba's CLI output; elba now also respects
   the `--verbose` and `--quiet` flags.
 
 - Fixed a bug where Idris would complain about "No ibc for _"
@@ -36,7 +39,10 @@
   elba still uses `~/.elba/bin` for globally-installed binaries,
   however.
 
-## 0.1.5
+- elba now takes the version of the current compiler into account
+  when deciding if it needs to rebuild a package.
+
+## [0.1.5]
 
 This release of elba fixes a bug with the REPL not loading
 import paths correctly.
@@ -46,7 +52,7 @@ import paths correctly.
 - When launching the REPL, elba now adds the paths of all
   specified targets.
 
-## 0.1.4
+## [0.1.4]
 
 This release of elba fixes a bug with package initialization.
 
@@ -55,7 +61,7 @@ This release of elba fixes a bug with package initialization.
 - When creating a new library project, elba now adds the correct
   module by default.
 
-## 0.1.3
+## [0.1.3]
 
 This release of elba changes how it deals with tests.
 
@@ -67,7 +73,7 @@ This release of elba changes how it deals with tests.
   Main module. If no library target is found, elba will issue a
   warning.
 
-## 0.1.2
+## [0.1.2]
 
 This release of elba fixes a critical error with tarball resolutions
 and cleans up error handling a bit.
@@ -77,7 +83,7 @@ and cleans up error handling a bit.
 - elba now errors when downloading a tarball resolution if the hashes
   *do not* match, as opposed to before when it errored if they matched.
 
-## 0.1.1
+## [0.1.1]
 
 This release of elba modifies the behavior of elba to interact better
 with package indices overall.
@@ -102,3 +108,9 @@ other packages.
 - Commands for creating packages, building packages (generating a lockfile
   and building all targets), testing packages, and (un)installing packages.
 
+[Unreleased]: https://github.com/elba/elba/compare/0.1.5...HEAD
+[0.1.5]: https://github.com/elba/elba/compare/0.1.4...0.1.5
+[0.1.4]: https://github.com/elba/elba/compare/0.1.3...0.1.4
+[0.1.3]: https://github.com/elba/elba/compare/0.1.2...0.1.3
+[0.1.2]: https://github.com/elba/elba/compare/0.1.1...0.1.2
+[0.1.1]: https://github.com/elba/elba/compare/0.1.0...0.1.1

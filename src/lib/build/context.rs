@@ -1,6 +1,7 @@
+use failure::ResultExt;
 use retrieve::cache::Cache;
 use std::{path::PathBuf, process::Command};
-use util::config::Backend;
+use util::{config::Backend, errors::Res, fmt_output};
 
 // TODO: triple target
 #[derive(Debug)]
@@ -33,6 +34,22 @@ impl Compiler {
     /// Get a process set up to use the found compiler
     pub fn process(&self) -> Command {
         Command::new(&self.path)
+    }
+
+    /// Get the version of the compiler
+    pub fn version(&self) -> Res<String> {
+        let out = Command::new(&self.path)
+            .arg("--version")
+            .output()
+            .with_context(|e| format!("couldn't invoke version command: {}", e))?;
+        if out.status.success() {
+            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        } else {
+            Err(format_err!(
+                "couldn't get idris version:\n{}",
+                fmt_output(&out)
+            ))
+        }
     }
 }
 

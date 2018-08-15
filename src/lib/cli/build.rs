@@ -297,6 +297,7 @@ pub fn repl(
     project: &Path,
     targets: &(bool, Option<Vec<&str>>),
     backend: &Backend,
+    ide: bool,
 ) -> Res<String> {
     let mut contents = String::new();
     let mut manifest = fs::File::open(project.join("elba.toml"))
@@ -409,6 +410,10 @@ pub fn repl(
         // Add the files we want to make available for the repl
         for target in &paths {
             process.arg(target);
+        }
+
+        if ide {
+            process.arg("--ide-mode");
         }
 
         // The moment of truth:

@@ -1,5 +1,5 @@
 use super::{args, logger, match_backends, match_threads};
-use clap::{App, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
     util::{config::Config, errors::Res},
@@ -13,7 +13,11 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::build_threads())
         .arg(args::target_bin())
         .arg(args::target_lib())
-        .args(&args::backends())
+        .arg(
+            Arg::with_name("ide-mode")
+                .long("ide-mode")
+                .help("Launches the interactive IDE backend instead of a normal REPL"),
+        ).args(&args::backends())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
@@ -40,5 +44,5 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         shell,
     };
 
-    build::repl(&ctx, &project, &ts, &backend)
+    build::repl(&ctx, &project, &ts, &backend, args.is_present("ide-mode"))
 }
