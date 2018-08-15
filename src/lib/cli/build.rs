@@ -8,7 +8,7 @@ use crossbeam::queue::MsQueue;
 use failure::ResultExt;
 use package::{
     lockfile::LockfileToml,
-    manifest::Manifest,
+    manifest::{Manifest, BinTarget},
     resolution::{DirectRes, IndexRes},
     PackageId, Spec, Summary,
 };
@@ -107,6 +107,7 @@ pub fn test(
         }
         let emp = targets.is_empty();
         for (ix, bt) in manifest.targets.test.iter().enumerate() {
+            let bt: BinTarget = bt.clone().into();
             if emp || targets.contains(&bt.name.as_str()) {
                 root.push(Target::Test(ix));
             }
@@ -123,16 +124,16 @@ pub fn test(
             Verbosity::Quiet,
         );
 
-        let root = root
+        let root: Vec<BinTarget> = root
             .0
             .into_iter()
             .filter_map(|t| {
                 if let Target::Test(ix) = t {
-                    Some(&manifest.targets.test[ix])
+                    Some(manifest.targets.test[ix].clone().into())
                 } else {
                     None
                 }
-            }).collect::<Vec<_>>();
+            }).collect();
 
         // Until pb.println gets added, we can't use progress bars
         // let pb = ProgressBar::new(root.len() as u64);
@@ -540,6 +541,7 @@ pub fn build(
     // We only build test targets if the user asks for them.
     if let Some(ts) = &targets.3 {
         for (ix, bt) in manifest.targets.test.iter().enumerate() {
+            let bt: BinTarget = bt.clone().into();
             let target_specified = ts.is_empty() || ts.contains(&bt.name.as_str());
             if target_specified {
                 root.push(Target::Test(ix));
