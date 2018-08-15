@@ -20,10 +20,14 @@
 
 ### Changed
 
-- Prettied up and fixed elba's CLI output; elba now also respects
-  the `--verbose` and `--quiet` flags.
+- elba will now look through all of the current directory's
+  ancestors for a manifest file, rather than just the current
+  directory.
 
-- Fixed a bug where Idris would complain about "No ibc for _"
+- Prettied up and fixed elba's CLI output; elba now also respects
+  the `--verbose` and `--quiet` flags (#12).
+
+- Fixed a bug where Idris would complain about `No ibc for...`
   when building a bin target (#14).
 
 - Fixed a bug where any stdout output during code generation

@@ -9,6 +9,10 @@ elba's behavior can be configured through the use of TOML configuration files an
 /foo/bar/.elba/config
 /foo/.elba/config
 /.elba/config
+# Your platform-specific config file would go here
+# - Linux: ~/.config/elba/config
+# - macOS: /Users/<user>/Library/Preferences/elba/config
+# - Windows: %LOCALAPPDATA%\elba\config\config
 $HOME/.elba/config
 ```
 

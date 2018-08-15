@@ -55,8 +55,9 @@ pub fn test(
     test_threads: u32,
 ) -> Res<String> {
     let mut contents = String::new();
+    let project = find_manifest_root(project)?;
     let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
@@ -233,7 +234,7 @@ pub fn install(
 
         let mut contents = String::new();
         let mut manifest = fs::File::open(sources[NodeIndex::new(0)].path().join("elba.toml"))
-            .context(format_err!("failed to read maifest file (elba.toml)"))?;
+            .context(format_err!("failed to read manifest file (elba.toml)"))?;
         manifest.read_to_string(&mut contents)?;
         let manifest = Manifest::from_str(&contents)?;
 
@@ -300,8 +301,9 @@ pub fn repl(
     ide: bool,
 ) -> Res<String> {
     let mut contents = String::new();
+    let project = find_manifest_root(project)?;
     let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
@@ -439,8 +441,9 @@ pub fn repl(
 
 pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
     let mut contents = String::new();
+    let project = find_manifest_root(project)?;
     let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
@@ -503,8 +506,9 @@ pub fn build(
     backend: &Backend,
 ) -> Res<String> {
     let mut contents = String::new();
+    let project = find_manifest_root(project)?;
     let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
@@ -598,8 +602,9 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     total: u8,
     mut f: F,
 ) -> Res<String> {
+    let project = find_manifest_root(project)?;
     let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read maifest file (elba.toml)"))?;
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
     let mut contents = String::new();
     manifest.read_to_string(&mut contents)?;
 
@@ -621,8 +626,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     };
 
     let root = {
-        let cur = env::current_dir()
-            .with_context(|e| format_err!("unable to get current directory: {}", e))?;
+        let cur = project.clone();
         let pid = PackageId::new(manifest.name().clone(), DirectRes::Dir { path: cur }.into());
         Summary::new(pid, manifest.version().clone())
     };
@@ -670,7 +674,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     let mut lockfile = fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .open(&project.join("elba.lock"))
+        .open(project.join("elba.lock"))
         .context(format_err!("could not open elba.lock for writing"))?;
 
     let lf_contents: LockfileToml = solve.clone().into();
@@ -738,4 +742,14 @@ fn def_index(ctx: &BuildCtx) -> IndexRes {
     } else {
         ctx.indices[0].clone().into()
     }
+}
+
+fn find_manifest_root(path: &Path) -> Res<PathBuf> {
+    for p in path.ancestors() {
+        if p.join("elba.toml").exists() {
+            return Ok(p.to_path_buf());
+        }
+    }
+
+    Err(format_err!("no manifest file (elba.toml) exists in any parent directory"))
 }

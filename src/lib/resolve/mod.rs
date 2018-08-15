@@ -484,7 +484,13 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         out: &mut String,
     ) {
         let root = &self.incompats[icix];
-        let (left_ix, right_ix) = get_two(ics, icix).unwrap();
+        let (left_ix, right_ix) = if let Some(r) = get_two(ics, icix) {
+            r
+        } else {
+            // This case only happens if the root package is inaccessible
+            out.push_str("An error occurred with the root package");
+            return;
+        };
         let (left, right) = (&self.incompats[left_ix], &self.incompats[right_ix]);
 
         match (get_two(ics, left_ix), get_two(ics, right_ix)) {
