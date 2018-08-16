@@ -52,7 +52,7 @@ use build::Targets;
 use console::style;
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, Resolution},
@@ -68,6 +68,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 use toml;
 use util::{
@@ -98,7 +99,7 @@ impl Cache {
     pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Res<Self> {
         layout.init()?;
 
-        let client = Client::new();
+        let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
         let logger = plog.new(o!());
 
         Ok(Cache {
@@ -110,8 +111,13 @@ impl Cache {
     }
 
     /// Retrieve the metadata of a package, loading it into the cache if necessary.
-    pub fn checkout_source(&self, pkg: &PackageId, loc: &DirectRes) -> Result<Source, Error> {
-        let p = self.load_source(loc)?;
+    pub fn checkout_source(
+        &self,
+        pkg: &PackageId,
+        loc: &DirectRes,
+        offline: bool,
+    ) -> Result<Source, Error> {
+        let p = self.load_source(loc, offline)?;
 
         Source::from_folder(pkg, p, loc.clone())
     }
@@ -127,37 +133,51 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    fn load_source(&self, loc: &DirectRes) -> Result<DirLock, Error> {
-        if let Some(path) = self.check_source(loc) {
-            DirLock::acquire(&path)
-        } else {
-            let p = self.layout.src.join(Self::get_source_dir(loc));
-
-            let dir = DirLock::acquire(&p)?;
-            loc.retrieve(&self.client, &dir)?;
-
-            Ok(dir)
+    fn load_source(&self, loc: &DirectRes, offline: bool) -> Result<DirLock, Error> {
+        if let DirectRes::Dir { path } = loc {
+            return DirLock::acquire(&path);
         }
-    }
 
-    /// Check if package is downloaded and in the cache. If so, returns the path of source of the cached
-    /// package.
-    fn check_source(&self, loc: &DirectRes) -> Option<PathBuf> {
-        match loc {
-            DirectRes::Dir { path } => Some(path.clone()),
-            // Note: we will always assume that a git repository is out of date, because, well,
-            // it could be! The Retriever keeps track of if we've updated a git repository during
-            // this invocation
-            DirectRes::Git { .. } => None,
-            _ => {
-                let path = self.layout.src.join(Self::get_source_dir(loc));
-                if path.exists() {
-                    Some(path)
-                } else {
-                    None
-                }
+        let p = self.layout.src.join(Self::get_source_dir(loc));
+
+        // We record first if the directory existed before the retrieval process
+        let pre_exists = p.exists();
+        let dir = DirLock::acquire(&p)?;
+
+        // For tarball resolutions, if it does exist, we can stop immediately
+        if let DirectRes::Tar { .. } = loc {
+            if pre_exists {
+                return Ok(dir);
             }
         }
+
+        // At this point, we're only dealing with all git resolutions and tarball resolutions
+        // which don't exist yet. For git repositories, errors are recoverable. For tarball
+        // resolutions, they're not.
+        // If we're in "offline" mode, we immediately return an error from here because we
+        // won't be able to download anything anyways.
+        let res = if offline {
+            Err(format_err!("Can't retrieve package in offline mode"))
+        } else {
+            loc.retrieve(&self.client, &dir)
+        };
+
+        if let Err(e) = res {
+            if let DirectRes::Git { .. } = loc {
+                if !offline {
+                    self.shell.println(
+                        style("[warn]").yellow().bold(),
+                        format!("Couldn't update git repo {}", loc),
+                        Verbosity::Normal,
+                    );
+                }
+            } else {
+                // This is a non-recoverable error when downloading a tarball for the first time.
+                return Err(e);
+            }
+        }
+
+        Ok(dir)
     }
 
     /// Gets the corresponding directory of a package. We need this because for packages which have
@@ -166,7 +186,7 @@ impl Cache {
     ///
     /// Note: with regard to git repos, we treat the same repo with different checked out commits/
     /// tags as completely different repos.
-    fn get_source_dir(loc: &DirectRes) -> String {
+    pub fn get_source_dir(loc: &DirectRes) -> String {
         let mut hasher = Sha256::default();
         hasher.input(loc.to_string().as_bytes());
         hexify_hash(hasher.result().as_slice())
@@ -352,7 +372,7 @@ impl Cache {
         }
     }
 
-    pub fn get_indices(&self, index_reses: &[DirectRes]) -> Indices {
+    pub fn get_indices(&self, index_reses: &[DirectRes], offline: bool) -> Indices {
         let mut indices = vec![];
         let mut seen = vec![];
         let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
@@ -405,7 +425,13 @@ impl Cache {
             };
 
             // We unconditionally re-retrieve indices.
-            match index.retrieve(&self.client, &dir) {
+            let res = if offline {
+                Err(format_err!("Offline mode; can't update indices"))
+            } else {
+                index.retrieve(&self.client, &dir)
+            };
+
+            match res {
                 Ok(_) => {
                     let ix = Index::from_disk(index.clone(), dir);
                     match ix {
@@ -442,6 +468,32 @@ impl Cache {
         let mut hasher = Sha256::default();
         hasher.input(loc.to_string().as_bytes());
         hexify_hash(hasher.result().as_slice())
+    }
+
+    /// Returns all of the package hashes available in this cache.
+    pub fn cached_packages(&self) -> IndexSet<String> {
+        let walker = WalkDir::new(&self.layout.src)
+            .min_depth(1)
+            .max_depth(1)
+            .into_iter()
+            .filter_map(|e| e.ok());
+
+        let mut res = indexset!();
+
+        for dir in walker {
+            let fname = dir
+                .path()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+
+            if dir.path().join("elba.toml").exists() {
+                res.insert(fname);
+            }
+        }
+
+        res
     }
 }
 

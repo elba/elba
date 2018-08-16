@@ -182,4 +182,10 @@ mod args {
                 .help("Options to pass to the codegen backend"),
         ]
     }
+
+    pub fn offline() -> Arg {
+        Arg::with_name("offline")
+            .long("offline")
+            .help("Run in offline mode; nothing will be retrieved.")
+    }
 }

@@ -9,8 +9,8 @@ pub mod cache;
 pub use self::cache::{Cache, Source};
 use console::style;
 use failure::{Error, ResultExt};
-use index::Indices;
-use indexmap::IndexMap;
+use index::{Indices, ResolvedEntry};
+use indexmap::{IndexMap, IndexSet};
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
@@ -19,13 +19,20 @@ use package::{
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
+use std::borrow::Cow;
 use util::{
     errors::{ErrorKind, Res},
     graph::Graph,
     shell::{Shell, Verbosity},
 };
 
-// TODO: Patching
+// TODO: Generalized patching and source replacement
+// Right now, when using the `--offline` flag, we replace all locations of all index entries with
+// locations in the cache instead. We should generalize this process somehow.
+// See Cargo for a reference:
+// `[patch]`: https://doc.rust-lang.org/cargo/reference/manifest.html#the-patch-section
+// Source replacement: https://doc.rust-lang.org/cargo/reference/source-replacement.html
+
 /// Retrieves the best packages using both the indices available and a lockfile.
 /// By default, prioritizes using a lockfile.
 #[derive(Debug)]
@@ -39,6 +46,7 @@ pub struct Retriever<'cache> {
     pub logger: Logger,
     pub def_index: IndexRes,
     pub shell: Shell,
+    offline_cache: Option<IndexSet<String>>,
     sources: IndexMap<PackageId, IndexMap<DirectRes, Source>>,
 }
 
@@ -52,8 +60,20 @@ impl<'cache> Retriever<'cache> {
         lockfile: Graph<Summary>,
         def_index: IndexRes,
         shell: Shell,
+        offline: bool,
     ) -> Self {
         let logger = plog.new(o!("root" => root.to_string()));
+
+        let offline_cache = if offline {
+            shell.println(
+                style("[warn]").yellow().bold(),
+                "Offline mode: only cached packages will be used",
+                Verbosity::Normal,
+            );
+            Some(cache.cached_packages())
+        } else {
+            None
+        };
 
         Retriever {
             cache,
@@ -64,6 +84,7 @@ impl<'cache> Retriever<'cache> {
             logger,
             def_index,
             shell,
+            offline_cache,
             sources: indexmap!(),
         }
     }
@@ -82,11 +103,11 @@ impl<'cache> Retriever<'cache> {
         let sources = solve.map(
             |_, sum| {
                 let loc = match sum.resolution() {
-                    Resolution::Direct(direct) => direct,
-                    Resolution::Index(_) => &self.indices.select(sum).unwrap().location,
+                    Resolution::Direct(direct) => direct.clone(),
+                    Resolution::Index(_) => self.select(sum).unwrap().into_owned().location,
                 };
 
-                if let Some(s) = self.sources.get_mut(sum.id()).and_then(|x| x.remove(loc)) {
+                if let Some(s) = self.sources.get_mut(sum.id()).and_then(|x| x.remove(&loc)) {
                     // prg += 1;
                     // pb.set_position(prg);
                     Ok(s)
@@ -99,7 +120,7 @@ impl<'cache> Retriever<'cache> {
 
                     let source = self
                         .cache
-                        .checkout_source(sum.id(), loc)
+                        .checkout_source(sum.id(), &loc, self.offline_cache.is_some())
                         .context(format_err!("unable to retrieve package {}", sum))?;
                     // prg += 1;
                     // pb.set_position(prg);
@@ -136,11 +157,10 @@ impl<'cache> Retriever<'cache> {
         if let Some(v) = pkg_version {
             if con.satisfies(&v) {
                 let dir = if let Resolution::Direct(loc) = pkg.resolution() {
-                    Some(loc)
+                    Some(loc.clone())
                 } else {
-                    self.indices
-                        .select(&Summary::new(pkg.clone(), v.clone()))
-                        .map(|e| &e.location)
+                    self.select(&Summary::new(pkg.clone(), v.clone()))
+                        .map(|e| e.into_owned().location)
                         .ok()
                 };
 
@@ -158,9 +178,8 @@ impl<'cache> Retriever<'cache> {
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
-            .indices
             .entries(pkg)?
-            .clone()
+            .into_owned()
             .into_iter()
             .map(|v| v.0)
             .filter(|v| con.satisfies(v))
@@ -214,7 +233,7 @@ impl<'cache> Retriever<'cache> {
             return Ok(res);
         }
 
-        let entries = self.indices.entries(pkg.id())?;
+        let entries = self.entries(pkg.id())?;
 
         let l = entries.len();
 
@@ -300,7 +319,54 @@ impl<'cache> Retriever<'cache> {
     }
 
     pub fn count_versions(&self, pkg: &PackageId) -> usize {
-        self.indices.count_versions(pkg)
+        if let Some(cache) = self.offline_cache.as_ref() {
+            self.indices
+                .cache
+                .get(pkg)
+                .map(|x| {
+                    x.iter()
+                        .filter(|(_, e)| {
+                            let hash = Cache::get_source_dir(&e.location);
+                            cache.contains(&hash)
+                        }).count()
+                }).unwrap_or(0)
+        } else {
+            self.indices.count_versions(pkg)
+        }
+    }
+
+    pub fn select(&mut self, sum: &Summary) -> Res<Cow<ResolvedEntry>> {
+        if let Some(cache) = self.offline_cache.as_ref() {
+            let selected = self.indices.select(sum)?;
+            let hash = Cache::get_source_dir(&selected.location);
+            if cache.contains(&hash) {
+                let mut selected = selected.clone();
+                selected.location = DirectRes::Dir { path: self.cache.layout.src.join(&hash) };
+                Ok(Cow::Owned(selected))
+            } else {
+                Err(ErrorKind::PackageNotFound)?
+            }
+        } else {
+            Ok(Cow::Borrowed(self.indices.select(sum)?))
+        }
+    }
+
+    pub fn entries(&mut self, pkg: &PackageId) -> Res<Cow<IndexMap<Version, ResolvedEntry>>> {
+        if let Some(cache) = self.offline_cache.as_ref() {
+            let mut entries = self.indices.entries(pkg)?.clone();
+            for (_, e) in entries.iter_mut() {
+                let hash = Cache::get_source_dir(&e.location);
+                if cache.contains(&hash) {
+                    e.location = DirectRes::Dir { path: self.cache.layout.src.join(&hash) };
+                } else {
+                    return Err(ErrorKind::PackageNotFound)?
+                }
+            }
+
+            Ok(Cow::Owned(entries))
+        } else {
+            Ok(Cow::Borrowed(self.indices.entries(pkg)?))
+        }
     }
 
     pub fn root(&self) -> &Summary {
@@ -320,7 +386,9 @@ impl<'cache> Retriever<'cache> {
                 format!("{} ({})", pkg.name(), pkg.resolution()),
                 Verbosity::Normal,
             );
-            let s = self.cache.checkout_source(&pkg, &loc)?;
+            let s = self
+                .cache
+                .checkout_source(&pkg, &loc, self.offline_cache.is_some())?;
 
             reses.insert(loc.clone(), s);
             Ok(&reses[loc])

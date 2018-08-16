@@ -45,6 +45,7 @@ pub struct BuildCtx {
     pub logger: Logger,
     pub threads: u32,
     pub shell: Shell,
+    pub offline: bool,
 }
 
 pub fn test(
@@ -646,7 +647,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Verbosity::Quiet,
     );
 
-    let indices = cache.get_indices(&ctx.indices);
+    let indices = cache.get_indices(&ctx.indices, ctx.offline);
     ctx.shell.println(
         style("Cached").dim(),
         format!("indices at {}", cache.layout.indices.display()),
@@ -662,6 +663,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         lock,
         def_index,
         ctx.shell,
+        ctx.offline,
     );
     let solver = Resolver::new(&retriever.logger.clone(), &mut retriever);
     let solve = solver.solve()?;
@@ -700,7 +702,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         "Resolving dependencies...",
         Verbosity::Quiet,
     );
-    let mut indices = cache.get_indices(&ctx.indices);
+    let mut indices = cache.get_indices(&ctx.indices, ctx.offline);
     ctx.shell.println(
         style("Cached").dim(),
         format!("indices at {}", cache.layout.indices.display()),
@@ -728,6 +730,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         lock,
         def_index,
         ctx.shell,
+        ctx.offline,
     );
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
 
@@ -751,5 +754,7 @@ fn find_manifest_root(path: &Path) -> Res<PathBuf> {
         }
     }
 
-    Err(format_err!("no manifest file (elba.toml) exists in any parent directory"))
+    Err(format_err!(
+        "no manifest file (elba.toml) exists in any parent directory"
+    ))
 }

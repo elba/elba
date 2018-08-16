@@ -13,6 +13,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::build_threads())
         .arg(args::target_bin())
         .arg(args::target_lib())
+        .arg(args::offline())
         .arg(
             Arg::with_name("ide-mode")
                 .long("ide-mode")
@@ -24,12 +25,9 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
-    let indices = c.indices.to_vec();
-    let global_cache = c.layout();
-    let logger = logger(c);
+
     let threads = match_threads(c, args);
     let backend = match_backends(c, args);
-    let shell = c.shell();
 
     let ts = (
         args.is_present("lib"),
@@ -37,11 +35,12 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     );
 
     let ctx = build::BuildCtx {
-        indices,
-        global_cache,
-        logger,
+        indices: c.indices.to_vec(),
+        global_cache: c.layout(),
+        logger: logger(c),
         threads,
-        shell,
+        shell: c.shell(),
+        offline: args.is_present("offline"),
     };
 
     build::repl(&ctx, &project, &ts, &backend, args.is_present("ide-mode"))

@@ -9,6 +9,11 @@
   can now still be used as binary targets, since elba can generate
   files with a `Main.main` function on-the-fly.
 
+- A flag `--offline` to enable offline mode. In offline mode, elba
+  will skip downloading anything entirely (to avoid waiting for
+  timeouts) and will only use packages available in the elba's
+  local cache when resolving dependencies (#23).
+
 - Sensible defaults for target paths (#17).
 
 - Separate configuration options for storing binary files and elba-
@@ -23,6 +28,8 @@
 - elba will now look through all of the current directory's
   ancestors for a manifest file, rather than just the current
   directory.
+
+- Reduced HTTP timeout from 30 to 10 seconds.
 
 - Prettied up and fixed elba's CLI output; elba now also respects
   the `--verbose` and `--quiet` flags (#12).

@@ -148,13 +148,15 @@ impl DirectRes {
                     let archive = GzDecoder::new(archive);
                     let mut archive = Archive::new(archive);
 
+                    clear_dir(target.path())?;
+
                     archive
                         .unpack(target.path())
                         .context(ErrorKind::CannotDownload)?;
 
                     Ok(())
                 }
-                _ => Err(Error::from(ErrorKind::CannotDownload)),
+                _ => unreachable!(),
             },
             DirectRes::Git { repo: url, tag } => {
                 // If we find a directory which already has a repo, we just check out the correct

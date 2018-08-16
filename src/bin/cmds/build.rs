@@ -18,6 +18,7 @@ pub fn cli() -> App<'static, 'static> {
         ).arg(args::target_bin())
         .arg(args::target_test())
         .arg(args::build_threads())
+        .arg(args::offline())
         .args(&args::backends())
 }
 
@@ -25,18 +26,14 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
-    let indices = c.indices.to_vec();
-    let global_cache = c.layout();
-    let logger = logger(c);
-    let threads = match_threads(c, args);
-    let shell = c.shell();
 
     let ctx = build::BuildCtx {
-        indices,
-        global_cache,
-        logger,
-        threads,
-        shell,
+        indices: c.indices.to_vec(),
+        global_cache: c.layout(),
+        logger: logger(c),
+        threads: match_threads(c, args),
+        shell: c.shell(),
+        offline: args.is_present("offline"),
     };
 
     let ts = (

@@ -28,7 +28,7 @@ fn indices() -> Indices {
         path: INDEX_DIR.path().to_owned(),
     };
 
-    CACHE.get_indices(&[index])
+    CACHE.get_indices(&[index], false)
 }
 
 fn retriever(root: Summary) -> Retriever<'static> {
@@ -56,6 +56,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         Graph::default(),
         def_ix,
         shell(),
+        false,
     )
 }
 

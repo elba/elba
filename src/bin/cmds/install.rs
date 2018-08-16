@@ -14,6 +14,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(Arg::with_name("spec"))
         .arg(args::build_threads())
         .arg(args::target_bin())
+        .arg(args::offline())
         .arg(
             Arg::with_name("force")
                 .long("force")
@@ -35,18 +36,13 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         bail!("no package was specified to be installed and the current directory is inaccessible")
     };
 
-    let logger = logger(c);
-    let indices = c.indices.to_vec();
-    let global_cache = c.layout();
-    let threads = match_threads(c, args);
-    let shell = c.shell();
-
     let ctx = build::BuildCtx {
-        indices,
-        global_cache,
-        logger,
-        threads,
-        shell,
+        indices: c.indices.to_vec(),
+        global_cache: c.layout(),
+        logger: logger(c),
+        threads: match_threads(c, args),
+        shell: c.shell(),
+        offline: args.is_present("offline"),
     };
 
     let targets = args

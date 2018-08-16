@@ -11,22 +11,18 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("lock").about("Generates an elba.lock according to the manifest")
 }
 
-pub fn exec(c: &mut Config, _args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
-    let indices = c.indices.to_vec();
-    let global_cache = c.layout();
-    let logger = logger(c);
-    let threads = 1;
-    let shell = c.shell();
 
     let ctx = build::BuildCtx {
-        indices,
-        global_cache,
-        logger,
-        threads,
-        shell,
+        indices: c.indices.to_vec(),
+        global_cache: c.layout(),
+        logger: logger(c),
+        threads: 1, // irrelevant
+        shell: c.shell(),
+        offline: args.is_present("offline"),
     };
 
     build::lock(&ctx, &project)

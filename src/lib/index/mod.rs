@@ -61,8 +61,8 @@ pub struct Indices {
     ///
     /// It is assumed that all dependent indices have been resolved, and that this mapping contains
     /// every index mentioned or depended on.
-    indices: IndexMap<IndexRes, Index>,
-    cache: IndexMap<PackageId, IndexMap<Version, ResolvedEntry>>,
+    pub indices: IndexMap<IndexRes, Index>,
+    pub cache: IndexMap<PackageId, IndexMap<Version, ResolvedEntry>>,
 }
 
 impl Indices {
@@ -108,11 +108,9 @@ impl Indices {
         Ok(entry)
     }
 
+    // This assumes that the packages have already been loaded into the cache.
     pub fn count_versions(&self, pkg: &PackageId) -> usize {
-        match self.cache.get(pkg) {
-            Some(m) => m.len(),
-            None => 0,
-        }
+        self.cache.get(pkg).map(|m| m.len()).unwrap_or(0)
     }
 
     pub fn entries(&mut self, pkg: &PackageId) -> Res<&IndexMap<Version, ResolvedEntry>> {
