@@ -2,7 +2,7 @@
 
 [![Not-Windows Build Status](https://travis-ci.com/elba/elba.svg?branch=master)](https://travis-ci.com/elba/elba) [![Windows Build Status](https://ci.appveyor.com/api/projects/status/j2pk9krx63o1dpdv?svg=true)](https://ci.appveyor.com/project/dcao/elba)
 
-A modern and (hopefully!) fast package manager for Idris.
+A modern and (hopefully!) fast package manager for [Idris](https://www.idris-lang.org).
 
 ## Installation
 
