@@ -1,3 +1,4 @@
+use super::args;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::new,
@@ -11,6 +12,7 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("new")
         .about("Creates a new empty project")
         .arg(Arg::with_name("name").required(true))
+        .arg(args::vcs())
         .arg(
             Arg::with_name("lib")
                 .long("lib")
@@ -39,6 +41,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         author,
         name,
         bin,
+        git: args.value_of_lossy("vcs").unwrap() == "git",
     };
 
     new::new(new_ctx)

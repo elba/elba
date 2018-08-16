@@ -10,7 +10,7 @@ $ elba new asd # won't work: no namespace
 $ elba new grp/asd # ok!
 ```
 
-This command will generate a new elba project with name `grp/asd` in the folder `./asd/`.
+This command will generate a new elba project with name `grp/asd` in the folder `./asd/`, along with an associated git project. If you want to omit the git project, pass the option `--vcs none`.
 
 By default, elba will create a project with a binary target, with a main file located at `src/Main.idr`. If you'd like to generate a package with a library target instead, pass the `--lib` flag, which will add a library target to the manifest and generate the file `src/{group}/{name}.idr`. This file structure of having a group followed by a name is just convention, and isn't required.
 
@@ -67,7 +67,7 @@ The manifest also allows you to specify which targets you want to have built for
   # this is set to "src" by default
   path = "src/"
   # the path to the Main module of the binary
-  main = "Awesome/B"
+  main = "Awesome.B"
   ```
 
   Note: the format of the binary target has some nuance to it, so for more information, see the docs on [the manifest format](../usage/manifest.md).

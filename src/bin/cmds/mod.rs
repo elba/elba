@@ -188,4 +188,13 @@ mod args {
             .long("offline")
             .help("Run in offline mode; nothing will be retrieved.")
     }
+
+    pub fn vcs() -> Arg {
+        Arg::with_name("vcs")
+            .long("vcs")
+            .takes_value(true)
+            .possible_values(&["none", "git"])
+            .default_value("git")
+            .help("The VCS template to use when initializing a new repo")
+    }
 }

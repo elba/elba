@@ -130,6 +130,8 @@ In order to know which files to build and how to build them, elba manifest files
 
   - The `path` value for test targets defaults to `tests/` instead of `src/`
 
+  - The `name` value defaults to the value in main, with slashes and periods replaced with underscores and `test-` prepended. 
+
   - Test targets have access to (i.e. can import from) **all dev dependencies** along with **the package's own library target**.
 
     This means that if you want to test a library target, you don't have to do anything special, just import your library like you normally would.

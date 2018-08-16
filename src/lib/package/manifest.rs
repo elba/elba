@@ -215,7 +215,7 @@ fn default_test_subpath() -> SubPath {
 
 impl From<TestTarget> for BinTarget {
     fn from(t: TestTarget) -> Self {
-        let default_name = format!("tests-{}", &t.main)
+        let default_name = format!("test-{}", &t.main)
             .trim_right_matches(".idr")
             .replace("/", "_")
             .replace(".", "_");

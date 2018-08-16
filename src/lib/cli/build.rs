@@ -8,7 +8,7 @@ use crossbeam::queue::MsQueue;
 use failure::ResultExt;
 use package::{
     lockfile::LockfileToml,
-    manifest::{Manifest, BinTarget},
+    manifest::{BinTarget, Manifest},
     resolution::{DirectRes, IndexRes},
     PackageId, Spec, Summary,
 };

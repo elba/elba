@@ -10,6 +10,7 @@ pub struct NewCtx {
     // Tuple of name and email.
     pub author: Option<(String, String)>,
     pub bin: bool,
+    pub git: bool,
 }
 
 pub fn new(ctx: NewCtx) -> Res<String> {
@@ -28,8 +29,6 @@ pub fn new(ctx: NewCtx) -> Res<String> {
 }
 
 pub fn init(ctx: NewCtx) -> Res<String> {
-    git::init(&ctx.path)?;
-
     let name = &ctx.name;
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)
@@ -41,6 +40,7 @@ pub fn init(ctx: NewCtx) -> Res<String> {
     let target = if ctx.bin {
         format!(
             r#"[[targets.bin]]
+path = "src"
 name = "{}"
 main = "Main"
 
@@ -50,6 +50,7 @@ main = "Main"
     } else {
         format!(
             r#"[targets.lib]
+path = "src"
 mods = [
     "{}"
 ]
@@ -108,7 +109,7 @@ main = do
         )?;
     }
 
-    if !path.join(".gitignore").exists() {
+    if !path.join(".gitignore").exists() && ctx.git {
         fs::write(
             path.join(".gitignore"),
             r#"/target
@@ -116,6 +117,10 @@ main = do
 *.o
 "#,
         )?;
+    }
+
+    if ctx.git {
+        git::init(&ctx.path)?;
     }
 
     Ok(format!(

@@ -14,7 +14,11 @@
   timeouts) and will only use packages available in the elba's
   local cache when resolving dependencies (#23).
 
-- Sensible defaults for target paths (#17).
+- A flag `--vcs` for `elba new` and `elba init`, to determine if
+  elba should automatically create a vcs repo when creating a
+  project.
+
+- Sensible defaults for target paths and tests (#17).
 
 - Separate configuration options for storing binary files and elba-
   internal cache files, if you're really intent on keeping your
@@ -43,6 +47,12 @@
 - Fixed bugs with config file parsing; elba can actually read
   the term.verbosity key, and elba is more lenient when it
   comes to missing keys in configuration.
+
+- Fixed a bug with "unknown reference" errors when generating
+  test binaries.
+
+- Fixed a bug with not erroring during a codegen invocation
+  when we should.
 
 - elba no longer pollutes the home directory as much by default; 
   elba's internal cache files are stored in a platform-specific

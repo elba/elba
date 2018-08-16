@@ -341,7 +341,9 @@ impl<'cache> Retriever<'cache> {
             let hash = Cache::get_source_dir(&selected.location);
             if cache.contains(&hash) {
                 let mut selected = selected.clone();
-                selected.location = DirectRes::Dir { path: self.cache.layout.src.join(&hash) };
+                selected.location = DirectRes::Dir {
+                    path: self.cache.layout.src.join(&hash),
+                };
                 Ok(Cow::Owned(selected))
             } else {
                 Err(ErrorKind::PackageNotFound)?
@@ -357,9 +359,11 @@ impl<'cache> Retriever<'cache> {
             for (_, e) in entries.iter_mut() {
                 let hash = Cache::get_source_dir(&e.location);
                 if cache.contains(&hash) {
-                    e.location = DirectRes::Dir { path: self.cache.layout.src.join(&hash) };
+                    e.location = DirectRes::Dir {
+                        path: self.cache.layout.src.join(&hash),
+                    };
                 } else {
-                    return Err(ErrorKind::PackageNotFound)?
+                    return Err(ErrorKind::PackageNotFound)?;
                 }
             }
 

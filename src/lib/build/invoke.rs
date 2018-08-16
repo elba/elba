@@ -94,6 +94,8 @@ impl<'a> CodegenInvocation<'a> {
         process.args(self.args);
 
         for bin in self.binary {
+            process.arg("-i");
+            process.arg(bin.parent().unwrap());
             process.arg(bin);
         }
 
@@ -101,7 +103,8 @@ impl<'a> CodegenInvocation<'a> {
         // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
         // function in the file, so we manually check if stdout contains a "main not found" error.
         let stdout = String::from_utf8_lossy(&res.stdout);
-        if stdout.contains("No such variable Main.main") {
+
+        if stdout.contains("No such variable Main.main") || !res.status.success() {
             bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
         }
 

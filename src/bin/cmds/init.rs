@@ -1,3 +1,4 @@
+use super::args;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::new,
@@ -10,6 +11,7 @@ use std::env::current_dir;
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("init")
         .about("Initializes an elba project in the current directory")
+        .arg(args::vcs())
         .arg(
             Arg::with_name("lib")
                 .long("lib")
@@ -40,6 +42,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         author,
         name,
         bin,
+        git: args.value_of_lossy("vcs").unwrap() == "git",
     };
 
     new::init(new_ctx)
