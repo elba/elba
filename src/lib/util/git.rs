@@ -34,6 +34,11 @@ use std::{env, fs, path::Path};
 use url::Url;
 use util::errors::Res;
 
+pub fn init(path: &Path) -> Res<()> {
+    git2::Repository::init(path)?;
+    Ok(())
+}
+
 pub fn clone(url: &Url, into: &Path) -> Res<git2::Repository> {
     let git_config = git2::Config::open_default()?;
     with_fetch_options(&git_config, &url, &mut |opts| {
