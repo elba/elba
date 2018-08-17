@@ -1,7 +1,7 @@
 use super::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
-use git2::{BranchType, Repository};
+use git2::{BranchType, Repository, Sort};
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
@@ -238,12 +238,15 @@ impl DirectRes {
                         //
                         // If the tag is a branch:
                         if !eager {
-                            if let Ok(b) = repo.find_branch(&tag, BranchType::Remote) {
+                            if let Ok(b) = repo.find_branch(&tag, BranchType::Local) {
                                 let head = b.into_reference().resolve()?.peel_to_commit()?;
                                 let cur = repo.head()?.resolve()?.peel_to_commit()?;
-                                if cur.id() == head.id()
-                                    || cur.parents().any(|x| x.id() == head.id())
-                                {
+
+                                let mut revwalk = repo.revwalk()?;
+                                revwalk.push(head.id())?;
+                                revwalk.set_sorting(Sort::TOPOLOGICAL);
+
+                                if revwalk.any(|x| x == Ok(cur.id())) {
                                     if &cur.id().to_string() == tag {
                                         return Ok(None);
                                     } else {

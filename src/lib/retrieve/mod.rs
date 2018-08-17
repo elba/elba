@@ -180,7 +180,7 @@ impl<'cache> Retriever<'cache> {
         if pkg.resolution().direct().is_some() {
             return Ok(self.direct_checkout(pkg, None)?.meta().version().clone());
         }
-        
+
         self.get_indices();
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
@@ -434,12 +434,12 @@ impl<'cache> Retriever<'cache> {
             self.sources.remove(pkg)
         }
     }
-    
+
     fn get_indices(&mut self) {
         if !self.indices_set {
-            self.indices =
-                self.cache
-                    .get_indices(&self.reses, true, self.offline_cache.is_some());
+            self.indices = self
+                .cache
+                .get_indices(&self.reses, true, self.offline_cache.is_some());
             self.indices_set = true;
             self.shell.println(
                 style("Cached").dim(),
