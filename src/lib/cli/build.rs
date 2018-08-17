@@ -649,19 +649,12 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Verbosity::Quiet,
     );
 
-    let indices = cache.get_indices(&ctx.indices, ctx.offline);
-    ctx.shell.println(
-        style("Cached").dim(),
-        format!("indices at {}", cache.layout.indices.display()),
-        Verbosity::Verbose,
-    );
-
     let mut retriever = Retriever::new(
         &cache.logger,
         &cache,
         root,
         deps,
-        indices,
+        Ok(ctx.indices.to_vec()),
         lock,
         def_index,
         ctx.shell,
@@ -704,7 +697,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         "Resolving dependencies...",
         Verbosity::Quiet,
     );
-    let mut indices = cache.get_indices(&ctx.indices, ctx.offline);
+    let mut indices = cache.get_indices(&ctx.indices, true, ctx.offline);
     ctx.shell.println(
         style("Cached").dim(),
         format!("indices at {}", cache.layout.indices.display()),
@@ -728,7 +721,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         &cache,
         root,
         deps,
-        indices,
+        Err(indices),
         lock,
         def_index,
         ctx.shell,

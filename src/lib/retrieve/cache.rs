@@ -116,8 +116,9 @@ impl Cache {
         pkg: &PackageId,
         loc: &DirectRes,
         offline: bool,
+        dl_f: impl Fn(),
     ) -> Result<(Option<DirectRes>, Source), Error> {
-        let p = self.load_source(loc, offline)?;
+        let p = self.load_source(pkg, loc, offline, dl_f)?;
 
         Ok((p.0, Source::from_folder(pkg, p.1, loc.clone())?))
     }
@@ -133,10 +134,17 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
+    ///
+    /// We take both the PackageId and the DirectRes because of git repositories. The PackageId will
+    /// be the package as declared in the manifest, while the DirectRes will be the git resolution
+    /// in the lockfile. If a lockfile doesn't exist, or the manifest and lockfile have the exact
+    /// same git resolution, the pkg argument won't be used.
     fn load_source(
         &self,
+        pkg: &PackageId,
         loc: &DirectRes,
         offline: bool,
+        dl_f: impl Fn(),
     ) -> Result<(Option<DirectRes>, DirLock), Error> {
         if let DirectRes::Dir { path } = loc {
             return Ok((None, DirLock::acquire(&path)?));
@@ -153,15 +161,43 @@ impl Cache {
             return Ok((None, dir));
         }
 
+        let new_f = |dl_online| {
+            if offline && dl_online {
+                return Err(format_err!("Can't download package in offline mode"));
+            }
+            dl_f();
+            Ok(())
+        };
+
         // At this point, we're only dealing with all git resolutions and tarball resolutions
         // which don't exist yet. For git repositories, errors are recoverable. For tarball
         // resolutions, they're not.
         // If we're in "offline" mode, we immediately return an error from here because we
         // won't be able to download anything anyways.
-        let res = if offline {
-            Err(format_err!("Can't retrieve package in offline mode"))
+        let res = if let Resolution::Direct(g) = pkg.resolution() {
+            // For a git repository, if the DirectRes and the PackageId don't match, we should try to
+            // retrieve the locked variant (the DirectRes) and then update with the latest variant
+            // (the PackageId).
+            // The only different between the two should be the `tag`.
+            // The worst case performance-wise for this operation is if a repository doesn't exist
+            // in the cache and the lockfile and manifest are out-of-sync, which will result in
+            // two fetch operations.
+            if g.is_git() && g != loc {
+                debug_assert!(loc.is_git());
+                loc.retrieve(&self.client, &dir, false, new_f)
+                    .and_then(|_| {
+                        pkg.resolution().direct().unwrap().retrieve(
+                            &self.client,
+                            &dir,
+                            false,
+                            |_| Ok(()),
+                        )
+                    })
+            } else {
+                loc.retrieve(&self.client, &dir, false, new_f)
+            }
         } else {
-            loc.retrieve(&self.client, &dir, false)
+            loc.retrieve(&self.client, &dir, false, new_f)
         };
 
         if res.is_err() {
@@ -179,21 +215,6 @@ impl Cache {
             }
         }
 
-        // For git resolutions, we have to rename the folder based on the new DirectRes
-        let new_dir = self.layout.src.join(Self::get_source_dir(loc));
-
-        let dir = if new_dir == p {
-            dir
-        } else {
-            drop(dir);
-            if new_dir.exists() {
-                fs::remove_dir_all(&p)?;
-            } else {
-                fs::rename(&p, &new_dir)?;
-            }
-            DirLock::acquire(&new_dir)?
-        };
-
         let old: Res<Option<DirectRes>> = Ok(None);
 
         Ok((res.or(old).unwrap(), dir))
@@ -204,10 +225,15 @@ impl Cache {
     /// in the resolution itself), we ignore a version specifier.
     ///
     /// Note: with regard to git repos, we treat the same repo with different checked out commits/
-    /// tags as completely different repos.
+    /// tags as the same repo. This runs the risk of breaking reproducible builds if commits are
+    /// changed/deleted during fetches.
     pub fn get_source_dir(loc: &DirectRes) -> String {
         let mut hasher = Sha256::default();
-        hasher.input(loc.to_string().as_bytes());
+        if let DirectRes::Git { repo, .. } = loc {
+            hasher.input(repo.to_string().as_bytes());
+        } else {
+            hasher.input(loc.to_string().as_bytes());
+        }
         hexify_hash(hasher.result().as_slice())
     }
 
@@ -391,17 +417,12 @@ impl Cache {
         }
     }
 
-    pub fn get_indices(&self, index_reses: &[DirectRes], offline: bool) -> Indices {
+    pub fn get_indices(&self, index_reses: &[DirectRes], eager: bool, offline: bool) -> Indices {
         let mut indices = vec![];
         let mut seen = vec![];
         let mut q: VecDeque<DirectRes> = index_reses.iter().cloned().collect();
 
         while let Some(index) = q.pop_front() {
-            self.shell.println(
-                style("Retrieving").cyan(),
-                format!("index {}", &index),
-                Verbosity::Normal,
-            );
             if seen.contains(&index) {
                 continue;
             }
@@ -443,12 +464,17 @@ impl Cache {
                 }
             };
 
-            // We unconditionally re-retrieve indices.
-            let res = if offline {
-                Err(format_err!("Offline mode; can't update indices"))
-            } else {
-                index.retrieve(&self.client, &dir, true)
-            };
+            let res = index.retrieve(&self.client, &dir, eager, |dl_online| {
+                if offline && dl_online {
+                    return Err(format_err!("Offline mode; can't update indices"));
+                }
+                self.shell.println(
+                    style("Retrieving").cyan(),
+                    format!("index {}", &index),
+                    Verbosity::Normal,
+                );
+                Ok(())
+            });
 
             match res {
                 Ok(_) => {
@@ -484,9 +510,7 @@ impl Cache {
     }
 
     fn get_index_dir(loc: &DirectRes) -> String {
-        let mut hasher = Sha256::default();
-        hasher.input(loc.to_string().as_bytes());
-        hexify_hash(hasher.result().as_slice())
+        Self::get_source_dir(loc)
     }
 
     /// Returns all of the package hashes available in this cache.

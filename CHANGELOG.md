@@ -38,6 +38,11 @@
   always trying to get the latest revision of the git repo (see
   the docs for more details).
 
+- During dependency retrieval, a package index will only be
+  updated iff the manifest depends on a package which cannot
+  be found in the cached indices or the version specified in
+  the manifest conflicts with that in the lockfile.
+
 - Reduced HTTP timeout from 30 to 10 seconds.
 
 - Prettied up and fixed elba's CLI output; elba now also respects

@@ -55,7 +55,7 @@ pub struct Dep<T> {
 pub type ResolvedDep = Dep<IndexRes>;
 pub type TomlDep = Dep<Option<String>>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Indices {
     /// The indices being used.
     ///

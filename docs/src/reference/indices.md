@@ -97,3 +97,12 @@ Each line of the metadata file for a package should be a complete JSON object co
 The `name` and `version` fields should be self-explanatory. The `dependencies` section should be a list of objects with fields `name`, `index`, and `req`. `name` is self-explanatory, and `req` is just the version constraint of that particular dependency. The value in `index` should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.
 
 The `yanked` field allows for "yanking" of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the `location` field indicates the direct resolution of the package in question.
+
+### Index Retrieval Semantics
+
+To avoid constantly updating the package index, elba will only update its
+indices if it's building a global project (i.e. `elba install`), or if a
+package cannot be found in the locally cached indices or changes versions in
+such a way that is incompatible with an existing lockfile. This means that if
+an index changes the resolution of a package, the package indices might not be
+updated immediately.

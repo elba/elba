@@ -34,14 +34,15 @@ use util::{
 // Source replacement: https://doc.rust-lang.org/cargo/reference/source-replacement.html
 
 /// Retrieves the best packages using both the indices available and a lockfile.
-/// By default, prioritizes using a lockfile.
 #[derive(Debug)]
 pub struct Retriever<'cache> {
     /// The local cache of packages.
     cache: &'cache Cache,
     root: Summary,
     root_deps: Vec<(PackageId, Constraint)>,
+    reses: Vec<DirectRes>,
     indices: Indices,
+    indices_set: bool,
     lockfile: Graph<Summary>,
     pub logger: Logger,
     pub def_index: IndexRes,
@@ -57,7 +58,7 @@ impl<'cache> Retriever<'cache> {
         cache: &'cache Cache,
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
-        indices: Indices,
+        reses: Result<Vec<DirectRes>, Indices>,
         lockfile: Graph<Summary>,
         def_index: IndexRes,
         shell: Shell,
@@ -76,11 +77,18 @@ impl<'cache> Retriever<'cache> {
             None
         };
 
+        let (indices, indices_set, reses) = match reses {
+            Ok(v) => (cache.get_indices(&v, false, offline), false, v),
+            Err(e) => (e, true, vec![]),
+        };
+
         Retriever {
             cache,
             root,
             root_deps,
             indices,
+            indices_set,
+            reses,
             lockfile,
             logger,
             def_index,
@@ -114,16 +122,15 @@ impl<'cache> Retriever<'cache> {
                     // pb.set_position(prg);
                     Ok(s)
                 } else {
-                    self.shell.println(
-                        style("Retrieving").cyan(),
-                        sum.to_string(),
-                        Verbosity::Normal,
-                    );
-
                     let source = self
                         .cache
-                        .checkout_source(sum.id(), &loc, self.offline_cache.is_some())
-                        .context(format_err!("unable to retrieve package {}", sum))?;
+                        .checkout_source(sum.id(), &loc, self.offline_cache.is_some(), || {
+                            self.shell.println(
+                                style("Retrieving").cyan(),
+                                sum.to_string(),
+                                Verbosity::Normal,
+                            );
+                        }).context(format_err!("unable to retrieve package {}", sum))?;
                     // prg += 1;
                     // pb.set_position(prg);
                     Ok(source.1)
@@ -152,14 +159,14 @@ impl<'cache> Retriever<'cache> {
         // With stuff from lockfiles, we try to retrieve whatever version was specified in the
         // lockfile. However, if it fails, we don't want to error out; we want to try to find
         // the best version we can otherwise.
-        let pkg_version = self
-            .lockfile
-            .find_by(|sum| sum.id.lowkey_eq(pkg))
-            .map(|meta| &meta.version);
-        if let Some(v) = pkg_version {
+        let locked = self.lockfile.find_by(|sum| sum.id.lowkey_eq(pkg));
+
+        if let Some(lp) = locked {
+            let v = &lp.version;
             if con.satisfies(&v) {
-                if pkg.resolution().direct().is_some() {
-                    if let Ok(src) = self.direct_checkout(pkg) {
+                if let Resolution::Direct(dir) = lp.resolution() {
+                    let dir = dir.clone();
+                    if let Ok(src) = self.direct_checkout(pkg, Some(&dir)) {
                         return Ok(src.meta().version().clone());
                     }
                 } else {
@@ -171,8 +178,10 @@ impl<'cache> Retriever<'cache> {
         }
 
         if pkg.resolution().direct().is_some() {
-            return Ok(self.direct_checkout(pkg)?.meta().version().clone());
+            return Ok(self.direct_checkout(pkg, None)?.meta().version().clone());
         }
+        
+        self.get_indices();
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
             .entries(pkg)?
@@ -217,7 +226,7 @@ impl<'cache> Retriever<'cache> {
         // If this is a DirectRes dep, we ask the cache for info.
         if pkg.resolution().direct().is_some() {
             let deps = self
-                .direct_checkout(pkg.id())?
+                .direct_checkout(pkg.id(), None)?
                 .meta()
                 .deps(&def_index, false);
             let mut res = vec![];
@@ -231,7 +240,6 @@ impl<'cache> Retriever<'cache> {
         }
 
         let entries = self.entries(pkg.id())?;
-
         let l = entries.len();
 
         let (ix, ver, start_deps) = entries
@@ -346,7 +354,14 @@ impl<'cache> Retriever<'cache> {
                 Err(ErrorKind::PackageNotFound)?
             }
         } else {
-            Ok(Cow::Borrowed(self.indices.select(sum)?))
+            let res = self.indices.select(sum);
+            if res.is_err() && !self.indices_set {
+                drop(res);
+                self.get_indices();
+                self.select(sum)
+            } else {
+                Ok(Cow::Borrowed(self.indices.select(sum)?))
+            }
         }
     }
 
@@ -366,7 +381,14 @@ impl<'cache> Retriever<'cache> {
 
             Ok(Cow::Owned(entries))
         } else {
-            Ok(Cow::Borrowed(self.indices.entries(pkg)?))
+            let res = self.indices.entries(pkg);
+            if res.is_err() && !self.indices_set {
+                drop(res);
+                self.get_indices();
+                self.entries(pkg)
+            } else {
+                Ok(Cow::Borrowed(self.indices.entries(pkg)?))
+            }
         }
     }
 
@@ -374,21 +396,22 @@ impl<'cache> Retriever<'cache> {
         &self.root
     }
 
-    pub fn direct_checkout(&mut self, pkg: &PackageId) -> Res<&Source> {
+    pub fn direct_checkout(&mut self, pkg: &PackageId, og: Option<&DirectRes>) -> Res<&Source> {
         if self.res_mapping.contains_key(pkg) {
             Ok(&self.sources[&self.res_mapping[pkg]])
         } else if self.sources.contains_key(pkg) {
             Ok(&self.sources[pkg])
         } else {
-            let loc = pkg.resolution().direct().unwrap();
-            self.shell.println(
-                style("Retrieving").cyan(),
-                format!("{} ({})", pkg.name(), pkg.resolution()),
-                Verbosity::Normal,
-            );
+            let loc = og.unwrap_or_else(|| pkg.resolution().direct().unwrap());
             let (new_res, s) =
                 self.cache
-                    .checkout_source(&pkg, &loc, self.offline_cache.is_some())?;
+                    .checkout_source(&pkg, &loc, self.offline_cache.is_some(), || {
+                        self.shell.println(
+                            style("Retrieving").cyan(),
+                            format!("{} ({})", pkg.name(), pkg.resolution()),
+                            Verbosity::Normal,
+                        );
+                    })?;
 
             let res = if let Some(delta) = new_res {
                 delta
@@ -409,6 +432,20 @@ impl<'cache> Retriever<'cache> {
             self.sources.remove(&self.res_mapping[pkg])
         } else {
             self.sources.remove(pkg)
+        }
+    }
+    
+    fn get_indices(&mut self) {
+        if !self.indices_set {
+            self.indices =
+                self.cache
+                    .get_indices(&self.reses, true, self.offline_cache.is_some());
+            self.indices_set = true;
+            self.shell.println(
+                style("Cached").dim(),
+                format!("indices at {}", self.cache.layout.indices.display()),
+                Verbosity::Verbose,
+            );
         }
     }
 }
