@@ -116,10 +116,10 @@ impl Cache {
         pkg: &PackageId,
         loc: &DirectRes,
         offline: bool,
-    ) -> Result<Source, Error> {
+    ) -> Result<(Option<DirectRes>, Source), Error> {
         let p = self.load_source(loc, offline)?;
 
-        Source::from_folder(pkg, p, loc.clone())
+        Ok((p.0, Source::from_folder(pkg, p.1, loc.clone())?))
     }
 
     // TODO: In the future (heh), return Box<Future<Item = PathBuf, Error = Error>> and use async
@@ -133,9 +133,13 @@ impl Cache {
     ///
     /// If the package has been cached, this function does no I/O. If it hasn't, it goes wherever
     /// it needs to in order to retrieve the package.
-    fn load_source(&self, loc: &DirectRes, offline: bool) -> Result<DirLock, Error> {
+    fn load_source(
+        &self,
+        loc: &DirectRes,
+        offline: bool,
+    ) -> Result<(Option<DirectRes>, DirLock), Error> {
         if let DirectRes::Dir { path } = loc {
-            return DirLock::acquire(&path);
+            return Ok((None, DirLock::acquire(&path)?));
         }
 
         let p = self.layout.src.join(Self::get_source_dir(loc));
@@ -144,11 +148,9 @@ impl Cache {
         let pre_exists = p.exists();
         let dir = DirLock::acquire(&p)?;
 
-        // For tarball resolutions, if it does exist, we can stop immediately
-        if let DirectRes::Tar { .. } = loc {
-            if pre_exists {
-                return Ok(dir);
-            }
+        // If it does exist, we can stop immediately
+        if loc.is_tar() && pre_exists {
+            return Ok((None, dir));
         }
 
         // At this point, we're only dealing with all git resolutions and tarball resolutions
@@ -159,10 +161,10 @@ impl Cache {
         let res = if offline {
             Err(format_err!("Can't retrieve package in offline mode"))
         } else {
-            loc.retrieve(&self.client, &dir)
+            loc.retrieve(&self.client, &dir, false)
         };
 
-        if let Err(e) = res {
+        if res.is_err() {
             if let DirectRes::Git { .. } = loc {
                 if !offline {
                     self.shell.println(
@@ -173,11 +175,28 @@ impl Cache {
                 }
             } else {
                 // This is a non-recoverable error when downloading a tarball for the first time.
-                return Err(e);
+                return Err(res.unwrap_err());
             }
         }
 
-        Ok(dir)
+        // For git resolutions, we have to rename the folder based on the new DirectRes
+        let new_dir = self.layout.src.join(Self::get_source_dir(loc));
+
+        let dir = if new_dir == p {
+            dir
+        } else {
+            drop(dir);
+            if new_dir.exists() {
+                fs::remove_dir_all(&p)?;
+            } else {
+                fs::rename(&p, &new_dir)?;
+            }
+            DirLock::acquire(&new_dir)?
+        };
+
+        let old: Res<Option<DirectRes>> = Ok(None);
+
+        Ok((res.or(old).unwrap(), dir))
     }
 
     /// Gets the corresponding directory of a package. We need this because for packages which have
@@ -428,7 +447,7 @@ impl Cache {
             let res = if offline {
                 Err(format_err!("Offline mode; can't update indices"))
             } else {
-                index.retrieve(&self.client, &dir)
+                index.retrieve(&self.client, &dir, true)
             };
 
             match res {
@@ -676,7 +695,11 @@ impl Source {
         Ok(Source {
             inner: Arc::new(SourceInner {
                 meta: manifest,
-                res: pkg.resolution().clone(),
+                res: if pkg.resolution().direct().is_some() {
+                    location.clone().into()
+                } else {
+                    pkg.resolution().clone()
+                },
                 location,
                 path,
                 hash,

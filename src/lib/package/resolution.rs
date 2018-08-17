@@ -1,7 +1,7 @@
 use super::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
-use git2::{ObjectType, Repository};
+use git2::{BranchType, Repository};
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
@@ -77,6 +77,24 @@ impl<'de> Deserialize<'de> for Resolution {
     }
 }
 
+impl Resolution {
+    pub fn direct(&self) -> Option<&DirectRes> {
+        if let Resolution::Direct(d) = &self {
+            Some(&d)
+        } else {
+            None
+        }
+    }
+
+    pub fn lowkey_eq(&self, other: &Resolution) -> bool {
+        match (self, other) {
+            (Resolution::Direct(d), Resolution::Direct(d2)) => d.lowkey_eq(d2),
+            (Resolution::Index(i), Resolution::Index(i2)) => i == i2,
+            (_, _) => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DirectRes {
     /// Git: the package originated from a git repository.
@@ -93,8 +111,26 @@ pub enum DirectRes {
 }
 
 impl DirectRes {
+    pub fn lowkey_eq(&self, other: &DirectRes) -> bool {
+        match (self, other) {
+            (DirectRes::Git { repo: r1, .. }, DirectRes::Git { repo: r2, .. }) => r1 == r2,
+            (DirectRes::Dir { path: p1 }, DirectRes::Dir { path: p2 }) => p1 == p2,
+            (DirectRes::Tar { url: u1, cksum: c1 }, DirectRes::Tar { url: u2, cksum: c2 }) => {
+                u1 == u2 && c1 == c2
+            }
+            _ => false,
+        }
+    }
+}
+
+impl DirectRes {
     // TODO: argument progress: impl Fn(u8) where 0 <= u8 <= 100
-    pub fn retrieve(&self, client: &Client, target: &DirLock) -> Result<(), Error> {
+    pub fn retrieve(
+        &self,
+        client: &Client,
+        target: &DirLock,
+        eager: bool,
+    ) -> Result<Option<DirectRes>, Error> {
         match self {
             DirectRes::Tar { url, cksum } => match url.scheme() {
                 "http" | "https" => client
@@ -124,7 +160,7 @@ impl DirectRes {
                             .unpack(target.path())
                             .context(ErrorKind::CannotDownload)?;
 
-                        Ok(())
+                        Ok(None)
                     }),
                 "file" => {
                     let mut archive =
@@ -154,7 +190,7 @@ impl DirectRes {
                         .unpack(target.path())
                         .context(ErrorKind::CannotDownload)?;
 
-                    Ok(())
+                    Ok(None)
                 }
                 _ => unreachable!(),
             },
@@ -175,31 +211,86 @@ impl DirectRes {
                     }
                 };
 
+                // This logic is for in case we are pointed to an existing git repository.
+                // We only want to NOT update an existing git repository if eager is false.
+                // We assume that the HEAD of the repo is at the current "locked" state.
+                //
+                // If the tag is a branch:
+                if !eager {
+                    if let Ok(b) = repo.find_branch(&tag, BranchType::Remote) {
+                        let head = b.into_reference().resolve()?.peel_to_commit()?;
+                        let cur = repo.head()?.resolve()?.peel_to_commit()?;
+                        if cur.id() == head.id() || cur.parents().any(|x| x.id() == head.id()) {
+                            return Ok(Some(DirectRes::Git {
+                                repo: url.clone(),
+                                tag: cur.id().to_string(),
+                            }));
+                        }
+                    }
+
+                    // Otherwise, if the tag is an exact pointer to a commit, we try to check out to
+                    // it locally without fetching anything
+                    let target = repo.revparse_single(&tag).and_then(|x| x.peel_to_commit());
+                    let cur = repo
+                        .head()
+                        .and_then(|x| x.resolve())
+                        .and_then(|x| x.peel_to_commit());
+                    if let Ok(t) = target {
+                        if let Ok(c) = cur {
+                            if t.id() == c.id() {
+                                return Ok(Some(DirectRes::Git {
+                                    repo: url.clone(),
+                                    tag: c.id().to_string(),
+                                }));
+                            } else {
+                                // Because we know the other tag exists in our local copy of the
+                                // repo, we can just check out into that and return
+                                let obj = t.into_object().clone();
+                                reset(&repo, &obj).with_context(|e| {
+                                    format_err!("couldn't checkout commit {}: {}", obj.id(), e)
+                                })?;
+                                return Ok(Some(DirectRes::Git {
+                                    repo: url.clone(),
+                                    tag: obj.id().to_string(),
+                                }));
+                            }
+                        }
+                    }
+                }
+
                 // Get everything!!
                 let refspec = "refs/heads/*:refs/heads/*";
                 fetch(&mut repo, &url, refspec)
-                    .with_context(|e| format_err!("couldn't fetch git repo {}:\n{}", url, e))?;
-                let head = repo.head()?.resolve()?.peel(ObjectType::Any)?;
-                reset(&repo, &head)
+                    .with_context(|e| format_err!("couldn't fetch git repo {}: {}", url, e))?;
+
+                let obj = repo
+                    .revparse_single(&tag)
+                    .context(ErrorKind::CannotDownload)?;
+                reset(&repo, &obj)
                     .with_context(|e| format_err!("couldn't fetch git repo {}:\n{}", url, e))?;
                 update_submodules(&repo).with_context(|e| {
                     format_err!("couldn't update submodules for git repo {}:\n{}", url, e)
                 })?;
 
-                let branch = tag;
+                let id = obj.peel_to_commit()?.id().to_string();
 
-                let obj = repo
-                    .revparse_single(&branch)
-                    .context(ErrorKind::CannotDownload)?;
-                repo.checkout_tree(&obj, None)
-                    .context(ErrorKind::CannotDownload)?;
-
-                Ok(())
+                Ok(Some(DirectRes::Git {
+                    repo: url.clone(),
+                    tag: id,
+                }))
             }
             DirectRes::Dir { path: _path } => {
                 // If this package is located on disk, we don't have to do anything...
-                Ok(())
+                Ok(None)
             }
+        }
+    }
+
+    pub fn is_tar(&self) -> bool {
+        if let DirectRes::Tar { .. } = &self {
+            true
+        } else {
+            false
         }
     }
 }

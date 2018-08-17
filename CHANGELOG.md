@@ -33,6 +33,11 @@
   ancestors for a manifest file, rather than just the current
   directory.
 
+- When generating lockfiles, for packages located at git repos,
+  elba will lock the git repo to a specific commit, rather than
+  always trying to get the latest revision of the git repo (see
+  the docs for more details).
+
 - Reduced HTTP timeout from 30 to 10 seconds.
 
 - Prettied up and fixed elba's CLI output; elba now also respects

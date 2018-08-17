@@ -116,9 +116,17 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             // At this point, we know there has to be dependencies for these packages.
             let deps = self.retriever.incompats(&tree[pid]).unwrap();
             for inc in deps {
-                let pkg = inc.deps.get_index(1).unwrap().0;
-                let ver = &self.decisions[pkg];
-                let sum = Summary::new(pkg.clone(), ver.clone());
+                let og_pkg = inc.deps.get_index(1).unwrap().0;
+                let new_pkg = {
+                    let gotten = og_pkg;
+                    if self.retriever.res_mapping.contains_key(gotten) {
+                        &self.retriever.res_mapping[gotten]
+                    } else {
+                        gotten
+                    }
+                };
+                let ver = &self.decisions[og_pkg];
+                let sum = Summary::new(new_pkg.clone(), ver.clone());
 
                 let nix = if set.contains_key(&sum) {
                     set[&sum]

@@ -194,6 +194,12 @@ impl PackageId {
     pub fn resolution(&self) -> &Resolution {
         &self.inner.resolution
     }
+
+    /// lowkey_eq is like eq except that it's meant to be used for determining if a package is in
+    /// a lockfile already.
+    pub fn lowkey_eq(&self, other: &PackageId) -> bool {
+        self.name() == other.name() && self.resolution().lowkey_eq(other.resolution())
+    }
 }
 
 impl FromStr for PackageId {

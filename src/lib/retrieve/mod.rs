@@ -47,7 +47,8 @@ pub struct Retriever<'cache> {
     pub def_index: IndexRes,
     pub shell: Shell,
     offline_cache: Option<IndexSet<String>>,
-    sources: IndexMap<PackageId, IndexMap<DirectRes, Source>>,
+    sources: IndexMap<PackageId, Source>,
+    pub res_mapping: IndexMap<PackageId, PackageId>,
 }
 
 impl<'cache> Retriever<'cache> {
@@ -86,6 +87,7 @@ impl<'cache> Retriever<'cache> {
             shell,
             offline_cache,
             sources: indexmap!(),
+            res_mapping: indexmap!(),
         }
     }
 
@@ -107,7 +109,7 @@ impl<'cache> Retriever<'cache> {
                     Resolution::Index(_) => self.select(sum).unwrap().into_owned().location,
                 };
 
-                if let Some(s) = self.sources.get_mut(sum.id()).and_then(|x| x.remove(&loc)) {
+                if let Some(s) = self.remove(sum.id()) {
                     // prg += 1;
                     // pb.set_position(prg);
                     Ok(s)
@@ -124,7 +126,7 @@ impl<'cache> Retriever<'cache> {
                         .context(format_err!("unable to retrieve package {}", sum))?;
                     // prg += 1;
                     // pb.set_position(prg);
-                    Ok(source)
+                    Ok(source.1)
                 }
             },
             |_| Ok(()),
@@ -152,29 +154,24 @@ impl<'cache> Retriever<'cache> {
         // the best version we can otherwise.
         let pkg_version = self
             .lockfile
-            .find_by(|sum| sum.id == *pkg)
+            .find_by(|sum| sum.id.lowkey_eq(pkg))
             .map(|meta| &meta.version);
         if let Some(v) = pkg_version {
             if con.satisfies(&v) {
-                let dir = if let Resolution::Direct(loc) = pkg.resolution() {
-                    Some(loc.clone())
-                } else {
-                    self.select(&Summary::new(pkg.clone(), v.clone()))
-                        .map(|e| e.into_owned().location)
-                        .ok()
-                };
-
-                if let Some(dir) = dir {
-                    let dir = dir.clone();
-                    if let Ok(src) = self.direct_checkout(pkg, &dir) {
+                if pkg.resolution().direct().is_some() {
+                    if let Ok(src) = self.direct_checkout(pkg) {
                         return Ok(src.meta().version().clone());
                     }
-                }
+                } else {
+                    return self
+                        .select(&Summary::new(pkg.clone(), v.clone()))
+                        .map(|e| e.into_owned().version);
+                };
             }
         }
 
-        if let Resolution::Direct(loc) = pkg.resolution() {
-            return Ok(self.direct_checkout(pkg, loc)?.meta().version().clone());
+        if pkg.resolution().direct().is_some() {
+            return Ok(self.direct_checkout(pkg)?.meta().version().clone());
         }
 
         let (mut pre, mut not_pre): (Vec<Version>, Vec<Version>) = self
@@ -218,9 +215,9 @@ impl<'cache> Retriever<'cache> {
         let def_index = self.def_index.clone();
 
         // If this is a DirectRes dep, we ask the cache for info.
-        if let Resolution::Direct(loc) = pkg.resolution() {
+        if pkg.resolution().direct().is_some() {
             let deps = self
-                .direct_checkout(pkg.id(), loc)?
+                .direct_checkout(pkg.id())?
                 .meta()
                 .deps(&def_index, false);
             let mut res = vec![];
@@ -377,25 +374,41 @@ impl<'cache> Retriever<'cache> {
         &self.root
     }
 
-    pub fn direct_checkout(&mut self, pkg: &PackageId, loc: &DirectRes) -> Res<&Source> {
-        let reses = self
-            .sources
-            .entry(pkg.clone())
-            .or_insert_with(IndexMap::new);
-        if reses.contains_key(loc) {
-            Ok(&reses[loc])
+    pub fn direct_checkout(&mut self, pkg: &PackageId) -> Res<&Source> {
+        if self.res_mapping.contains_key(pkg) {
+            Ok(&self.sources[&self.res_mapping[pkg]])
+        } else if self.sources.contains_key(pkg) {
+            Ok(&self.sources[pkg])
         } else {
+            let loc = pkg.resolution().direct().unwrap();
             self.shell.println(
                 style("Retrieving").cyan(),
                 format!("{} ({})", pkg.name(), pkg.resolution()),
                 Verbosity::Normal,
             );
-            let s = self
-                .cache
-                .checkout_source(&pkg, &loc, self.offline_cache.is_some())?;
+            let (new_res, s) =
+                self.cache
+                    .checkout_source(&pkg, &loc, self.offline_cache.is_some())?;
 
-            reses.insert(loc.clone(), s);
-            Ok(&reses[loc])
+            let res = if let Some(delta) = new_res {
+                delta
+            } else {
+                loc.clone()
+            };
+
+            let new_id = PackageId::new(pkg.name().clone(), res.into());
+
+            self.res_mapping.insert(pkg.clone(), new_id.clone());
+            self.sources.insert(new_id.clone(), s);
+            Ok(&self.sources[&new_id])
+        }
+    }
+
+    pub fn remove(&mut self, pkg: &PackageId) -> Option<Source> {
+        if self.res_mapping.contains_key(pkg) {
+            self.sources.remove(&self.res_mapping[pkg])
+        } else {
+            self.sources.remove(pkg)
         }
     }
 }

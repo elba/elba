@@ -173,4 +173,18 @@ Note that a a `[workspace]` section can stand alone and be parsed as a valid man
 
 ### An aside: the lockfile
 
-In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called `elba.lock`. This lockfile **should not be modified** in any way, as it can lead to unpredictable results during the build process.
+In order to keep track of the dependency tree and create reproducible builds,
+elba uses a lockfile called `elba.lock`. This lockfile **should not be
+modified** in any way, as it can lead to unpredictable results during the build
+process.
+
+The lockfile will not change so long as all of the packages in the lockfile
+satisfy the requirements of the manifest and of its transitive dependencies. For
+git repositories, the lockfile will lock a package to a commit, which won't
+change given that the following conditions hold:
+
+  - If the manifest references a branch, the locked commit must be contained
+    within that branch.
+
+  - If the manifest references a specific tag or commit, the locked commit must
+    be equal to that tag or commit.
