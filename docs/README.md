@@ -4,6 +4,8 @@
 user-facing guide for using `elba` for day-to-day development tasks and
 understanding its functionality.
 
+The guide is available online at [Read the Docs](https://elba.readthedocs.io).
+
 ## Building
 
 The guide is built using Sphinx. After installing that, building the
