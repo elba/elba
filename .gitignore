@@ -1,3 +1,5 @@
 /target
 **/*.rs.bk
-docs/book
+docs/build
+__pycache__/
+*.pyc
