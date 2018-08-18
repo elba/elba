@@ -138,7 +138,7 @@
 <pre><code class="language-sh">$ elba new asd # won't work: no namespace
 $ elba new grp/asd # ok!
 </code></pre>
-<p>This command will generate a new elba project with name <code>grp/asd</code> in the folder <code>./asd/</code>.</p>
+<p>This command will generate a new elba project with name <code>grp/asd</code> in the folder <code>./asd/</code>, along with an associated git project. If you want to omit the git project, pass the option <code>--vcs none</code>.</p>
 <p>By default, elba will create a project with a binary target, with a main file located at <code>src/Main.idr</code>. If you'd like to generate a package with a library target instead, pass the <code>--lib</code> flag, which will add a library target to the manifest and generate the file <code>src/{group}/{name}.idr</code>. This file structure of having a group followed by a name is just convention, and isn't required.</p>
 <p>Regardless of which target is chosen, an <code>elba.toml</code> manifest file will also be generated.</p>
 <a class="header" href="#initializing-a-pre-existing-package" id="initializing-a-pre-existing-package"><h4>Initializing a pre-existing package</h4></a>
@@ -162,6 +162,7 @@ $ elba new grp/asd # ok!
 <p>A <strong>library target</strong> allows this package to be depended on by other packages. A package can only have one library, and the syntax follows the following:</p>
 <pre><code class="language-toml">[targets.lib]
 # the path which contains all of the lib files (*cannot* be a parent directory)
+# this is set to &quot;src&quot; by default
 path = &quot;src/&quot;
 # a list of files to export
 mods = [
@@ -175,12 +176,16 @@ mods = [
 <pre><code class="language-toml">[[targets.bin]]
 # the name of the binary to create
 name = &quot;awes&quot;
+# the path which contains all of the bin files (*cannot* be a parent directory)
+# this is set to &quot;src&quot; by default
+path = &quot;src/&quot;
 # the path to the Main module of the binary
-main = &quot;src/Awesome/B.idr&quot;
+main = &quot;Awesome.B&quot;
 </code></pre>
+<p>Note: the format of the binary target has some nuance to it, so for more information, see the docs on <a href="../usage/manifest.html">the manifest format</a>.</p>
 </li>
 <li>
-<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library.</p>
+<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library. A test binary succeeds upon execution if it returns exit code 0.</p>
 </li>
 </ul>
 <a class="header" href="#building-a-package" id="building-a-package"><h3>Building a package</h3></a>

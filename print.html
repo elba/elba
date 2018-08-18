@@ -132,8 +132,9 @@
                 <div id="content" class="content">
                     <main>
                         <a class="header" href="#the-elba-guide" id="the-elba-guide"><h1>The elba Guide</h1></a>
-<p><code>elba</code> is a package manager for the Idris programming language. This book aims to be a mostly comprehensive guide on actually using it.</p>
-<p>This book can be edited on <a href="https://github.com/elba/elba/tree/master/docs">GitHub</a>.</p>
+<p><strong>elba</strong> is a package manager for the Idris programming language. This is the
+<strong>OUTDATED GUIDE</strong> to using it.</p>
+<p>The current version can be found at <a href="https://elba.readthedocs.io">https://elba.readthedocs.io</a>.</p>
 <a class="header" href="#getting-started" id="getting-started"><h1>Getting Started</h1></a>
 <p>This section is for getting up-to-speed with elba as fast as possible, covering getting elba installed on your machine in the first place and making a new project.</p>
 <p>By the end of this chapter, you should have a basic elba installation up-and-running, as well as a general overview of how to use elba for day-to-day Idris development.</p>
@@ -151,14 +152,14 @@ using the <code>-musl</code> binary.</p>
 <a class="header" href="#installing-with-cargo" id="installing-with-cargo"><h3>Installing with Cargo</h3></a>
 <p>Because elba is written in Rust, it is available as an installable crate from <a href="https://crates.io">crates.io</a>. In order to install elba this way, you should have a copy of the Rust toolchain installed on your computer first. The process for this is explained on <a href="https://www.rust-lang.org/en-US/install.html">the Rust website</a>. Note that during installation, when prompted for which version of Rust should be installed, you should choose the <strong>nightly version</strong> of Rust. elba depends on certain features which can only be enabled in the nightly build of Rust.</p>
 <p>Once you have Rust installed, installing elba is pretty self-explanatory:</p>
-<pre><code class="language-sh">$ cargo install elba
+<pre><code class="language-sh">$ cargo +nightly install elba
 $ elba # should work!
 </code></pre>
 <p>Remember to add <code>~/.elba/bin</code> to your PATH to be able to run elba-installed packages.</p>
 <a class="header" href="#building-elba" id="building-elba"><h3>Building elba</h3></a>
 <p>Building elba from source is much the same process as installing it using cargo; the only difference is that instead of using a stable, versioned-crate available from crates.io, elba's source code is used directly. You'll still need to have the nightly version of the Rust toolchain installed (see the above section for more details). After that's done, download elba's source code and install it:</p>
 <pre><code class="language-sh">$ git clone https://github.com/elba/elba
-$ cargo install --release
+$ cargo +nightly install --release
 $ elba # should work!
 </code></pre>
 <p>Remember to add <code>~/.elba/bin</code> to your PATH to be able to run elba-installed packages.</p>
@@ -169,7 +170,7 @@ $ elba # should work!
 <pre><code class="language-sh">$ elba new asd # won't work: no namespace
 $ elba new grp/asd # ok!
 </code></pre>
-<p>This command will generate a new elba project with name <code>grp/asd</code> in the folder <code>./asd/</code>.</p>
+<p>This command will generate a new elba project with name <code>grp/asd</code> in the folder <code>./asd/</code>, along with an associated git project. If you want to omit the git project, pass the option <code>--vcs none</code>.</p>
 <p>By default, elba will create a project with a binary target, with a main file located at <code>src/Main.idr</code>. If you'd like to generate a package with a library target instead, pass the <code>--lib</code> flag, which will add a library target to the manifest and generate the file <code>src/{group}/{name}.idr</code>. This file structure of having a group followed by a name is just convention, and isn't required.</p>
 <p>Regardless of which target is chosen, an <code>elba.toml</code> manifest file will also be generated.</p>
 <a class="header" href="#initializing-a-pre-existing-package" id="initializing-a-pre-existing-package"><h4>Initializing a pre-existing package</h4></a>
@@ -193,6 +194,7 @@ $ elba new grp/asd # ok!
 <p>A <strong>library target</strong> allows this package to be depended on by other packages. A package can only have one library, and the syntax follows the following:</p>
 <pre><code class="language-toml">[targets.lib]
 # the path which contains all of the lib files (*cannot* be a parent directory)
+# this is set to &quot;src&quot; by default
 path = &quot;src/&quot;
 # a list of files to export
 mods = [
@@ -206,12 +208,16 @@ mods = [
 <pre><code class="language-toml">[[targets.bin]]
 # the name of the binary to create
 name = &quot;awes&quot;
+# the path which contains all of the bin files (*cannot* be a parent directory)
+# this is set to &quot;src&quot; by default
+path = &quot;src/&quot;
 # the path to the Main module of the binary
-main = &quot;src/Awesome/B.idr&quot;
+main = &quot;Awesome.B&quot;
 </code></pre>
+<p>Note: the format of the binary target has some nuance to it, so for more information, see the docs on <a href="../usage/manifest.html">the manifest format</a>.</p>
 </li>
 <li>
-<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library.</p>
+<p>A <strong>test target</strong> specifies a test binary to build. It uses the same syntax as a bin target, with the difference that we use <code>[[targets.test]]</code> to specify them and the test binary can depend on the dev-dependencies as well as the root package's library. A test binary succeeds upon execution if it returns exit code 0.</p>
 </li>
 </ul>
 <a class="header" href="#building-a-package" id="building-a-package"><h3>Building a package</h3></a>
@@ -279,7 +285,7 @@ license = &quot;MIT&quot;
 <li>
 <p>A <strong>library target</strong> is exactly what it sounds like: a built library of ibc files which can be used and imported by other elba packages. Each package can only export a single library target; attempting to specify multiple library targets will result in a manifest parsing error. The syntax for a library target is as follows:</p>
 <pre><code class="language-toml">[targets.lib]
-# The path to the library
+# The path to the library - defaults to &quot;src&quot;
 path = &quot;src&quot;
 # The list of files which should be exported and made available for public use
 mods = [
@@ -293,20 +299,61 @@ idris_opts = [&quot;--warnpartial&quot;]
 </li>
 <li>
 <p>A <strong>binary target</strong> is a binary which should be generated based on a Main module. Packages can have as many binary targets as they please; by default, all binary targets are built/installed in an <code>elba build</code> or <code>elba install</code> invocation, but this can be changed with the <code>--bin</code> flag. The syntax for a binary target is as follows:</p>
-<pre><code class="language-toml"># The name of the output binary
+<pre><code class="language-toml">[[targets.bin]]
+# The name of the output binary
 name = &quot;whatever&quot;
+# The path to the folder containing the binary source - defaults to &quot;src&quot;
+path = &quot;src/bin&quot;
 # The path to the Main module
-main = &quot;src/bin/Whatever.idr&quot;
+main = &quot;Whatever&quot; # corresponds to src/bin/Whatever.idr
 # Optional flags to pass to the compiler
 idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
-<p>During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory <code>src/bin</code> will be made available. Again, the path listed under <code>main</code> must be a sub-path of the package directory.</p>
+<p>The <code>name</code>, and <code>idris_opts</code> fields should be self-explanatory, but the <code>path</code> and <code>main</code> arguments have some more nuance to them. In order to maintain backwards compatibility while providing maximum flexibility, elba follows several steps to resolve the location of a binary target. It's pretty hard to explain these steps, but examples are much easier to follow:</p>
+<pre><code class="language-toml"># Example 1: strict subpath specified in main, with folders separated by
+# slashes. extension left unspecified.
+main = &quot;bin/Whatever/Module&quot;
+# corresponds to bin/Whatever/Module.idr if it exists, otherwise uses
+# src/bin/Whatever/Module.idr because of the default `path` value; this file
+# should have a function Main.main
+
+# Example 2: main uses dots instead of slashes to separate folders, and
+# includes an idr extension
+main = &quot;Whatever.Module.idr&quot;
+# because this is not a valid subpath (uses dots instead of slashes),
+# this corresponds to the first of the following files which exists:
+# - src/Whatever/Module/idr.idr (treat the last section as a module)
+# - src/Whatever/Module.idr (treat the last section as an extension:
+#                            applies to the &quot;idr&quot; extension only)
+# this file should have a function Main.main
+
+# Example 3: strict subpath specified with non-&quot;idr&quot; extension
+main = &quot;bin/Whatever/Module.custom&quot;
+# corresponds to the first of the following files which exists:
+# - bin/Whatever/Module.idr
+# - src/bin/Whatever/Module.idr (due to the default `path` value)
+# in both cases, this file should have a function `Module.custom : IO ()`,
+# which will be used as the main function
+
+# Example 4: non-subpath combined with custom path and non-&quot;idr&quot; extension
+path = &quot;bin&quot;
+main = &quot;Whatever.Module.custom&quot;
+# corresponds to the first of the following files which exists:
+# - bin/Whatever/Module/custom.idr (treat the last section as a module)
+# - bin/Whatever/Module.idr (treat the last section as a function in a parent module)
+# if this corresponds to `bin/Whatever/Module.idr`, then the file should have a
+# function `Whatever.Module.custom : IO ()`, which will be used as the main
+# function
+</code></pre>
 </li>
 <li>
 <p>A <strong>test target</strong> shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return <strong>exit code 0 on success</strong> and <strong>any other exit code on failure</strong>. The distinguishing features of a test target are as follows:</p>
 <ul>
 <li>
-<p>Test targets <strong>require the presence of a library target</strong>.</p>
+<p>The <code>path</code> value for test targets defaults to <code>tests/</code> instead of <code>src/</code></p>
+</li>
+<li>
+<p>The <code>name</code> value defaults to the value in main, with slashes and periods replaced with underscores and <code>test-</code> prepended.</p>
 </li>
 <li>
 <p>Test targets have access to (i.e. can import from) <strong>all dev dependencies</strong> along with <strong>the package's own library target</strong>.</p>
@@ -339,13 +386,30 @@ idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>Note that a a <code>[workspace]</code> section can stand alone and be parsed as a valid manifest if there is no package in the root directory.</p>
 <a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
-<p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
+<p>In order to keep track of the dependency tree and create reproducible builds,
+elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be
+modified</strong> in any way, as it can lead to unpredictable results during the build
+process.</p>
+<p>The lockfile will not change so long as all of the packages in the lockfile
+satisfy the requirements of the manifest and of its transitive dependencies. For
+git repositories, the lockfile will lock a package to a commit, which won't
+change given that the following conditions hold:</p>
+<ul>
+<li>
+<p>If the manifest references a branch, the locked commit must be contained
+within that branch.</p>
+</li>
+<li>
+<p>If the manifest references a specific tag or commit, the locked commit must
+be equal to that tag or commit.</p>
+</li>
+</ul>
 <a class="header" href="#publishing-to-the-default-index" id="publishing-to-the-default-index"><h2>Publishing to the Default Index</h2></a>
 <p>At the moment, elba has neither a fancy online portal for managing packages nor the proper CLI commands for publishing to a package repository. This will come in time, but for now, you'll have to directly interact with <a href="https://github.com/elba/index">the GitHub repo of the official index</a>.</p>
 <p>The repo's README has more information on what to do if you want to publish a package to the default index and what's allowed and not allowed, but the summary of how to publish a package is this:</p>
 <ol>
 <li>
-<p>Read The elba Guide, especially the parts about <a href="./manifest.html">names in elba</a> and <a href="../reference/indices.html">package indices</a>.</p>
+<p>Read The elba Guide, especially the parts about <a href="./manifest.html">names in elba</a>, <a href="../reference/resolutions.html">resolutions in elba</a>, and <a href="../reference/indices.html">package indices</a>.</p>
 </li>
 <li>
 <p>Fork the index and modify it as needed.</p>
@@ -411,6 +475,10 @@ $ elba installnt --cool awesome --one -f # executes `elba-installnt --cool aweso
 /foo/bar/.elba/config
 /foo/.elba/config
 /.elba/config
+# Your platform-specific config file would go here
+# - Linux: ~/.config/elba/config
+# - macOS: /Users/&lt;user&gt;/Library/Preferences/elba/config
+# - Windows: %LOCALAPPDATA%\elba\config\config
 $HOME/.elba/config
 </code></pre>
 <p>Any specified environment variables have the highest priority. This behavior heavily borrows from <a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo's configuration format</a>.</p>
@@ -455,7 +523,7 @@ email = &quot;jsmith@example.com&quot;
 <a class="header" href="#term" id="term"><h4><code>[term]</code></h4></a>
 <p>This section specifies options for terminal output, and has two fields:</p>
 <ul>
-<li><code>verbosity</code>: specifies how verbose elba should be. Can be one of <code>verbose</code>, <code>normal</code>, or <code>quiet</code>.</li>
+<li><code>verbosity</code>: specifies how verbose elba should be. Can be one of <code>verbose</code>, <code>normal</code>,  <code>quiet</code>, or <code>none</code>.</li>
 <li><code>color</code>: specifies if elba should try to print color output. Either <code>true</code> or <code>false</code>.</li>
 </ul>
 <p>At the moment, neither of these options actually do anything.</p>
@@ -509,7 +577,7 @@ opts = []
 <ul>
 <li>
 <p>For a direct resolution which points to a tarball, the resolution string must start with the identifier <code>tar+</code> and include a properly-formed URL with either the <code>http://</code>/<code>https://</code> (referring to a tarball on the network somewhere) or <code>file://</code> (referring to a local tarball) schemas:</p>
-<pre><code class="language-sh"># These are all valid:
+<pre><code>These are all valid:
 tar+http://example.com/asdf.tar.gz
 tar+https://example.com/asdf
 tar+file://../asdf.tar.gz
@@ -517,7 +585,7 @@ tar+file://../asdf.tar.gz
 </li>
 <li>
 <p>For a direct resolution which points to a directory on disk, the resolution string must start with the identifier <code>dir+</code> and include a properly-formed path to a directory on disk:</p>
-<pre><code class="language-sh"># These are all valid:
+<pre><code>These are all valid:
 dir+asdf
 dir+./asdf
 dir+../asdf/whatever/subfolder
@@ -528,19 +596,19 @@ dir+C:\Users\John\etc
 </li>
 <li>
 <p>For a direct resolution which points to a git repository, the resolution string must start with the identifier <code>git+</code> and provide the URL of the repository in question. Additionally, a git ref can be specified as part of the fragment of the URL:</p>
-<pre><code class="language-sh"># These are all valid:
+<pre><code>These are all valid:
 git+https://github.com/example/doesnt-exist
-git+https://github.com/example/doesnt-exist#master # use the master branch
-git+https://github.com/example/doesnt-exist#v1.0.0 # use the &quot;v1.0.0&quot; tag
-git+https://github.com/example/doesnt-exist#a4e13343 # use the commit &quot;a4e13343&quot;
-git+ssh://git@github.com/example/doesnt-exist # using ssh instead of https
+git+https://github.com/example/doesnt-exist#master &lt;- use the master branch
+git+https://github.com/example/doesnt-exist#v1.0.0 &lt;- use the &quot;v1.0.0&quot; tag
+git+https://github.com/example/doesnt-exist#a4e13343 &lt;- use the commit &quot;a4e13343&quot;
+git+ssh://git@github.com/example/doesnt-exist &lt;- using ssh instead of https
 </code></pre>
 </li>
 </ul>
 </li>
 <li>
 <p>For an index resolution, the resolution string must start with the identifier <code>index+</code> and include the direct resolution of the origin of the index:</p>
-<pre><code class="language-sh"># These are all valid
+<pre><code>These are all valid
 index+tar+http://example.com/asdf.tar.gz
 index+dir+../asdf/whatever/subfolder
 index+git+ssh://git@github.com/example/doesnt-exist#a4e13343
@@ -630,6 +698,13 @@ secure = false
 </code></pre>
 <p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code>, and <code>req</code>. <code>name</code> is self-explanatory, and <code>req</code> is just the version constraint of that particular dependency. The value in <code>index</code> should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.</p>
 <p>The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
+<a class="header" href="#index-retrieval-semantics" id="index-retrieval-semantics"><h3>Index Retrieval Semantics</h3></a>
+<p>To avoid constantly updating the package index, elba will only update its
+indices if it's building a global project (i.e. <code>elba install</code>), or if a
+package cannot be found in the locally cached indices or changes versions in
+such a way that is incompatible with an existing lockfile. This means that if
+an index changes the resolution of a package, the package indices might not be
+updated immediately.</p>
 <a class="header" href="#dependencies" id="dependencies"><h2>Dependencies</h2></a>
 <p>The most important job of a package manager is building dependencies of a package. Packages in elba can depend on other packages in external <a href="./indices.html">indices</a>, a local file directory, or a git repository.</p>
 <a class="header" href="#versions" id="versions"><h3>Versions</h3></a>
@@ -713,7 +788,7 @@ work.</p>
 <p>elba will print the following output when trying to build it:</p>
 <pre><code class="language-sh">$ elba build
 # snip
-[err] version solving has failed
+[error] version solving has failed
 
 Because conflict_simple/bar@index+dir+/index/ any depends on
 conflict_simple/baz@index+dir+/index/ &gt;=3.0.0 &lt;4.0.0,
@@ -724,11 +799,12 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
 </code></pre>
 <p>Nice!</p>
 <a class="header" href="#the-global-cache" id="the-global-cache"><h2>The Global Cache</h2></a>
-<p>elba uses a global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
-<pre><code class="language-sh">~/.elba/cache or wherever
+<p>elba uses an internal global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
+<pre><code class="language-sh">this directory is platform specific:
+- Linux: ~/.cache/elba
+- Windows: %LOCALAPPDATA%\elba
+- macOS: /Users/&lt;user&gt;/Library/Caches/elba
 |
-|-- bin
-|   +-- .bins
 |-- build
 |   |-- a78bu877c78deadbeef...
 |   +-- # snip
@@ -742,8 +818,8 @@ conflict_simple/root@index+dir+/index/ &gt;=1.0.0 &lt;=1.0.0 is impossible.
     |-- a78bu877c78deadbeef...
     +-- # snip
 </code></pre>
-<a class="header" href="#bin" id="bin"><h3><code>bin</code></h3></a>
-<p>This folder stores all of the installed binaries of elba packages, and should be added to the path. Additionally, an extra file <code>.bins</code> lives inside this directory, which maps from installed binaries to their corresponding package. This directory <strong>should not</strong> be touched by the user in any way.</p>
+<a class="header" href="#installed-binaries" id="installed-binaries"><h3>Installed binaries</h3></a>
+<p>Binaries are special in that they get their own folder separate from the internal cache stuff. Ordinarily this is stored at <code>~/.elba/bin</code> for all systems, but this can be controlled in the config, separate from the cache dir. Deleting the whole folder should be safe, but deleting individual binaries might not be; if you try to uninstall them later down the line, you might get an error.</p>
 <a class="header" href="#build" id="build"><h3><code>build</code></h3></a>
 <p>This folder stores the binary (i.e. <code>.ibc</code> file) outputs of library builds. elba globally caches the builds of all dependencies to avoid having to rebuild the same library over and over across different projects. Each built version of a package gets its own hash which encapsulates the entire environment under which the package was built (package dependencies, etc.), ensuring reproducible builds. This emulates the Nix package manager in some respects.</p>
 <p>This folder and its subfolders are safe to delete, although it may cause rebuilds of some packages.</p>

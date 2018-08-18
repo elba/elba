@@ -181,7 +181,7 @@ license = &quot;MIT&quot;
 <li>
 <p>A <strong>library target</strong> is exactly what it sounds like: a built library of ibc files which can be used and imported by other elba packages. Each package can only export a single library target; attempting to specify multiple library targets will result in a manifest parsing error. The syntax for a library target is as follows:</p>
 <pre><code class="language-toml">[targets.lib]
-# The path to the library
+# The path to the library - defaults to &quot;src&quot;
 path = &quot;src&quot;
 # The list of files which should be exported and made available for public use
 mods = [
@@ -195,20 +195,61 @@ idris_opts = [&quot;--warnpartial&quot;]
 </li>
 <li>
 <p>A <strong>binary target</strong> is a binary which should be generated based on a Main module. Packages can have as many binary targets as they please; by default, all binary targets are built/installed in an <code>elba build</code> or <code>elba install</code> invocation, but this can be changed with the <code>--bin</code> flag. The syntax for a binary target is as follows:</p>
-<pre><code class="language-toml"># The name of the output binary
+<pre><code class="language-toml">[[targets.bin]]
+# The name of the output binary
 name = &quot;whatever&quot;
+# The path to the folder containing the binary source - defaults to &quot;src&quot;
+path = &quot;src/bin&quot;
 # The path to the Main module
-main = &quot;src/bin/Whatever.idr&quot;
+main = &quot;Whatever&quot; # corresponds to src/bin/Whatever.idr
 # Optional flags to pass to the compiler
 idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
-<p>During the build process, the Main module will have access to all of the modules which share the Main module's parent directory. So for the example above, all of the Idris files in the directory <code>src/bin</code> will be made available. Again, the path listed under <code>main</code> must be a sub-path of the package directory.</p>
+<p>The <code>name</code>, and <code>idris_opts</code> fields should be self-explanatory, but the <code>path</code> and <code>main</code> arguments have some more nuance to them. In order to maintain backwards compatibility while providing maximum flexibility, elba follows several steps to resolve the location of a binary target. It's pretty hard to explain these steps, but examples are much easier to follow:</p>
+<pre><code class="language-toml"># Example 1: strict subpath specified in main, with folders separated by
+# slashes. extension left unspecified.
+main = &quot;bin/Whatever/Module&quot;
+# corresponds to bin/Whatever/Module.idr if it exists, otherwise uses
+# src/bin/Whatever/Module.idr because of the default `path` value; this file
+# should have a function Main.main
+
+# Example 2: main uses dots instead of slashes to separate folders, and
+# includes an idr extension
+main = &quot;Whatever.Module.idr&quot;
+# because this is not a valid subpath (uses dots instead of slashes),
+# this corresponds to the first of the following files which exists:
+# - src/Whatever/Module/idr.idr (treat the last section as a module)
+# - src/Whatever/Module.idr (treat the last section as an extension:
+#                            applies to the &quot;idr&quot; extension only)
+# this file should have a function Main.main
+
+# Example 3: strict subpath specified with non-&quot;idr&quot; extension
+main = &quot;bin/Whatever/Module.custom&quot;
+# corresponds to the first of the following files which exists:
+# - bin/Whatever/Module.idr
+# - src/bin/Whatever/Module.idr (due to the default `path` value)
+# in both cases, this file should have a function `Module.custom : IO ()`,
+# which will be used as the main function
+
+# Example 4: non-subpath combined with custom path and non-&quot;idr&quot; extension
+path = &quot;bin&quot;
+main = &quot;Whatever.Module.custom&quot;
+# corresponds to the first of the following files which exists:
+# - bin/Whatever/Module/custom.idr (treat the last section as a module)
+# - bin/Whatever/Module.idr (treat the last section as a function in a parent module)
+# if this corresponds to `bin/Whatever/Module.idr`, then the file should have a
+# function `Whatever.Module.custom : IO ()`, which will be used as the main
+# function
+</code></pre>
 </li>
 <li>
 <p>A <strong>test target</strong> shares many similarities with a binary target: the syntax is almost exactly the same, and a single package can have multiple test targets. Indeed, in elba, tests are just executables which return <strong>exit code 0 on success</strong> and <strong>any other exit code on failure</strong>. The distinguishing features of a test target are as follows:</p>
 <ul>
 <li>
-<p>Test targets <strong>require the presence of a library target</strong>.</p>
+<p>The <code>path</code> value for test targets defaults to <code>tests/</code> instead of <code>src/</code></p>
+</li>
+<li>
+<p>The <code>name</code> value defaults to the value in main, with slashes and periods replaced with underscores and <code>test-</code> prepended.</p>
 </li>
 <li>
 <p>Test targets have access to (i.e. can import from) <strong>all dev dependencies</strong> along with <strong>the package's own library target</strong>.</p>
@@ -241,7 +282,24 @@ idris_opts = [&quot;--warnpartial&quot;]
 </code></pre>
 <p>Note that a a <code>[workspace]</code> section can stand alone and be parsed as a valid manifest if there is no package in the root directory.</p>
 <a class="header" href="#an-aside-the-lockfile" id="an-aside-the-lockfile"><h3>An aside: the lockfile</h3></a>
-<p>In order to keep track of the dependency tree and create reproducible builds, elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be modified</strong> in any way, as it can lead to unpredictable results during the build process.</p>
+<p>In order to keep track of the dependency tree and create reproducible builds,
+elba uses a lockfile called <code>elba.lock</code>. This lockfile <strong>should not be
+modified</strong> in any way, as it can lead to unpredictable results during the build
+process.</p>
+<p>The lockfile will not change so long as all of the packages in the lockfile
+satisfy the requirements of the manifest and of its transitive dependencies. For
+git repositories, the lockfile will lock a package to a commit, which won't
+change given that the following conditions hold:</p>
+<ul>
+<li>
+<p>If the manifest references a branch, the locked commit must be contained
+within that branch.</p>
+</li>
+<li>
+<p>If the manifest references a specific tag or commit, the locked commit must
+be equal to that tag or commit.</p>
+</li>
+</ul>
 
                     </main>
 

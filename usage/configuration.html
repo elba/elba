@@ -139,6 +139,10 @@
 /foo/bar/.elba/config
 /foo/.elba/config
 /.elba/config
+# Your platform-specific config file would go here
+# - Linux: ~/.config/elba/config
+# - macOS: /Users/&lt;user&gt;/Library/Preferences/elba/config
+# - Windows: %LOCALAPPDATA%\elba\config\config
 $HOME/.elba/config
 </code></pre>
 <p>Any specified environment variables have the highest priority. This behavior heavily borrows from <a href="https://doc.rust-lang.org/cargo/reference/config.html">Cargo's configuration format</a>.</p>
@@ -183,7 +187,7 @@ email = &quot;jsmith@example.com&quot;
 <a class="header" href="#term" id="term"><h4><code>[term]</code></h4></a>
 <p>This section specifies options for terminal output, and has two fields:</p>
 <ul>
-<li><code>verbosity</code>: specifies how verbose elba should be. Can be one of <code>verbose</code>, <code>normal</code>, or <code>quiet</code>.</li>
+<li><code>verbosity</code>: specifies how verbose elba should be. Can be one of <code>verbose</code>, <code>normal</code>,  <code>quiet</code>, or <code>none</code>.</li>
 <li><code>color</code>: specifies if elba should try to print color output. Either <code>true</code> or <code>false</code>.</li>
 </ul>
 <p>At the moment, neither of these options actually do anything.</p>

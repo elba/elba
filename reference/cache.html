@@ -132,11 +132,12 @@
                 <div id="content" class="content">
                     <main>
                         <a class="header" href="#the-global-cache" id="the-global-cache"><h2>The Global Cache</h2></a>
-<p>elba uses a global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
-<pre><code class="language-sh">~/.elba/cache or wherever
+<p>elba uses an internal global cache to store downloaded packages, build packages in a temporary clean directory, and store built packages for future re-use. The structure of the global cache looks like the following:</p>
+<pre><code class="language-sh">this directory is platform specific:
+- Linux: ~/.cache/elba
+- Windows: %LOCALAPPDATA%\elba
+- macOS: /Users/&lt;user&gt;/Library/Caches/elba
 |
-|-- bin
-|   +-- .bins
 |-- build
 |   |-- a78bu877c78deadbeef...
 |   +-- # snip
@@ -150,8 +151,8 @@
     |-- a78bu877c78deadbeef...
     +-- # snip
 </code></pre>
-<a class="header" href="#bin" id="bin"><h3><code>bin</code></h3></a>
-<p>This folder stores all of the installed binaries of elba packages, and should be added to the path. Additionally, an extra file <code>.bins</code> lives inside this directory, which maps from installed binaries to their corresponding package. This directory <strong>should not</strong> be touched by the user in any way.</p>
+<a class="header" href="#installed-binaries" id="installed-binaries"><h3>Installed binaries</h3></a>
+<p>Binaries are special in that they get their own folder separate from the internal cache stuff. Ordinarily this is stored at <code>~/.elba/bin</code> for all systems, but this can be controlled in the config, separate from the cache dir. Deleting the whole folder should be safe, but deleting individual binaries might not be; if you try to uninstall them later down the line, you might get an error.</p>
 <a class="header" href="#build" id="build"><h3><code>build</code></h3></a>
 <p>This folder stores the binary (i.e. <code>.ibc</code> file) outputs of library builds. elba globally caches the builds of all dependencies to avoid having to rebuild the same library over and over across different projects. Each built version of a package gets its own hash which encapsulates the entire environment under which the package was built (package dependencies, etc.), ensuring reproducible builds. This emulates the Nix package manager in some respects.</p>
 <p>This folder and its subfolders are safe to delete, although it may cause rebuilds of some packages.</p>

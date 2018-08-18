@@ -145,14 +145,14 @@ using the <code>-musl</code> binary.</p>
 <a class="header" href="#installing-with-cargo" id="installing-with-cargo"><h3>Installing with Cargo</h3></a>
 <p>Because elba is written in Rust, it is available as an installable crate from <a href="https://crates.io">crates.io</a>. In order to install elba this way, you should have a copy of the Rust toolchain installed on your computer first. The process for this is explained on <a href="https://www.rust-lang.org/en-US/install.html">the Rust website</a>. Note that during installation, when prompted for which version of Rust should be installed, you should choose the <strong>nightly version</strong> of Rust. elba depends on certain features which can only be enabled in the nightly build of Rust.</p>
 <p>Once you have Rust installed, installing elba is pretty self-explanatory:</p>
-<pre><code class="language-sh">$ cargo install elba
+<pre><code class="language-sh">$ cargo +nightly install elba
 $ elba # should work!
 </code></pre>
 <p>Remember to add <code>~/.elba/bin</code> to your PATH to be able to run elba-installed packages.</p>
 <a class="header" href="#building-elba" id="building-elba"><h3>Building elba</h3></a>
 <p>Building elba from source is much the same process as installing it using cargo; the only difference is that instead of using a stable, versioned-crate available from crates.io, elba's source code is used directly. You'll still need to have the nightly version of the Rust toolchain installed (see the above section for more details). After that's done, download elba's source code and install it:</p>
 <pre><code class="language-sh">$ git clone https://github.com/elba/elba
-$ cargo install --release
+$ cargo +nightly install --release
 $ elba # should work!
 </code></pre>
 <p>Remember to add <code>~/.elba/bin</code> to your PATH to be able to run elba-installed packages.</p>

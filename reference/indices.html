@@ -214,6 +214,13 @@ secure = false
 </code></pre>
 <p>The <code>name</code> and <code>version</code> fields should be self-explanatory. The <code>dependencies</code> section should be a list of objects with fields <code>name</code>, <code>index</code>, and <code>req</code>. <code>name</code> is self-explanatory, and <code>req</code> is just the version constraint of that particular dependency. The value in <code>index</code> should correspond to an index name specified within the index's config; if the index is unspecified or if the index name can't be found in configuration, elba will assume that the package is available from the current index.</p>
 <p>The <code>yanked</code> field allows for &quot;yanking&quot; of a package, which disallows future consumers of a package from using that version (but allows current consumers of a yanked package version to continue using it). Finally, the <code>location</code> field indicates the direct resolution of the package in question.</p>
+<a class="header" href="#index-retrieval-semantics" id="index-retrieval-semantics"><h3>Index Retrieval Semantics</h3></a>
+<p>To avoid constantly updating the package index, elba will only update its
+indices if it's building a global project (i.e. <code>elba install</code>), or if a
+package cannot be found in the locally cached indices or changes versions in
+such a way that is incompatible with an existing lockfile. This means that if
+an index changes the resolution of a package, the package indices might not be
+updated immediately.</p>
 
                     </main>
 
