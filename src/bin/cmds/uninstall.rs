@@ -1,4 +1,4 @@
-use super::{args, logger};
+use super::{args, match_logger};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     package::Spec,
@@ -13,6 +13,7 @@ pub fn cli() -> App<'static, 'static> {
         .about("Uninstalls the binaries of a package")
         .arg(Arg::with_name("spec").required(true))
         .arg(args::target_bin())
+        .arg(args::debug_log())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
@@ -25,7 +26,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
 
-    let logger = logger(c);
+    let logger = match_logger(c, args);
     let shell = c.shell();
 
     let cache = Cache::from_disk(&logger, c.layout(), shell)?;

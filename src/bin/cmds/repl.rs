@@ -1,4 +1,4 @@
-use super::{args, logger, match_backends, match_threads};
+use super::{args, match_backends, match_logger, match_threads};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -14,6 +14,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::target_bin())
         .arg(args::target_lib())
         .arg(args::offline())
+        .arg(args::debug_log())
         .arg(
             Arg::with_name("ide-mode")
                 .long("ide-mode")
@@ -26,6 +27,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
+    let logger = match_logger(c, args);
     let threads = match_threads(c, args);
     let backend = match_backends(c, args);
 
@@ -37,7 +39,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let ctx = build::BuildCtx {
         indices: c.indices.to_vec(),
         global_cache: c.layout(),
-        logger: logger(c),
+        logger,
         threads,
         shell: c.shell(),
         offline: args.is_present("offline"),

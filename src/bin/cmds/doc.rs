@@ -1,4 +1,4 @@
-use super::{args, logger, match_threads};
+use super::{args, match_logger, match_threads};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -11,6 +11,7 @@ pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("doc")
         .about("Builds the docs for the root package")
         .arg(args::build_threads())
+        .arg(args::debug_log())
         .arg(args::offline())
 }
 
@@ -19,10 +20,12 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
+    let logger = match_logger(c, args);
+
     let ctx = build::BuildCtx {
         indices: c.indices.to_vec(),
         global_cache: c.layout(),
-        logger: logger(c),
+        logger,
         threads: match_threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),

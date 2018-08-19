@@ -100,7 +100,7 @@ impl Cache {
         layout.init()?;
 
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
-        let logger = plog.new(o!());
+        let logger = plog.new(o!("phase" => "cache"));
 
         Ok(Cache {
             layout,
@@ -147,6 +147,7 @@ impl Cache {
         dl_f: impl Fn(),
     ) -> Result<(Option<DirectRes>, DirLock), Error> {
         if let DirectRes::Dir { path } = loc {
+            debug!(self.logger, "loaded source"; "cause" => "dir", "pkg" => pkg.to_string());
             return Ok((None, DirLock::acquire(&path)?));
         }
 
@@ -158,6 +159,12 @@ impl Cache {
 
         // If it does exist, we can stop immediately
         if loc.is_tar() && pre_exists {
+            debug!(
+                self.logger, "loaded source";
+                "cause" => "tar_exists",
+                "pkg" => pkg.to_string(),
+                "dir" => dir.path().display()
+            );
             return Ok((None, dir));
         }
 
@@ -214,6 +221,14 @@ impl Cache {
                 return Err(res.unwrap_err());
             }
         }
+
+        debug!(
+            self.logger, "loaded source";
+            "cause" => "retrieved_new",
+            "pkg" => pkg.to_string(),
+            "loc" => loc.to_string(),
+            "dir" => dir.path().display()
+        );
 
         let old: Res<Option<DirectRes>> = Ok(None);
 

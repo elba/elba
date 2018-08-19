@@ -52,6 +52,11 @@ impl JobQueue {
         }
 
         let ver = ver.ok();
+        let logger = plog.new(o!(
+            "phase" => "build",
+            "threads" => bcx.threads,
+            "compiler" => ver.clone().unwrap_or_else(|| "none".to_string())
+        ));
 
         while !next_layer.is_empty() {
             debug_assert!(curr_layer.is_empty());
@@ -110,7 +115,7 @@ impl JobQueue {
         Ok(JobQueue {
             graph,
             root_ol,
-            logger: plog.new(o!()),
+            logger,
             shell,
         })
     }
@@ -163,6 +168,7 @@ impl JobQueue {
             // start a group of independent jobs, which can be executed in parallel at current step
             thread_pool.scoped(|scoped| {
                 for job_index in queue.drain(..) {
+                    let logger = &self.logger;
                     if let Work::Dirty(source, build_hash) = &self.graph[job_index].work {
                         let deps = self
                             .graph
@@ -206,6 +212,12 @@ impl JobQueue {
                                 for t in ts.0.to_vec() {
                                     match t {
                                         Target::Lib(cg) => {
+                                            debug!(
+                                                logger, "building target";
+                                                "target_type" => "lib",
+                                                "target" => cg,
+                                                "summary" => source.summary()
+                                            );
                                             let (cmp, cdg) =
                                                 compile_lib(&source, cg, &deps, &layout, bcx)
                                                     .with_context(|e| {
@@ -243,6 +255,12 @@ impl JobQueue {
                                             }
                                         }
                                         Target::Bin(ix) => {
+                                            debug!(
+                                                logger, "building target";
+                                                "target_type" => "bin",
+                                                "target" => ix,
+                                                "summary" => source.summary()
+                                            );
                                             let (out, path) = compile_bin(
                                                 &source,
                                                 Target::Bin(ix),
@@ -268,6 +286,12 @@ impl JobQueue {
                                             }
                                         }
                                         Target::Test(ix) => {
+                                            debug!(
+                                                logger, "building target";
+                                                "target_type" => "test",
+                                                "target" => ix,
+                                                "summary" => source.summary()
+                                            );
                                             let mut deps = deps.clone();
                                             let root_lib;
                                             if has_lib {
@@ -305,6 +329,11 @@ impl JobQueue {
                                             // don't worry about storing the binary anywhere.
                                         }
                                         Target::Doc => {
+                                            debug!(
+                                                logger, "building target";
+                                                "target_type" => "doc",
+                                                "summary" => source.summary()
+                                            );
                                             let out = compile_doc(&source, &deps, &layout, bcx)
                                                 .with_context(|e| {
                                                     format!(

@@ -16,12 +16,6 @@ lazy_static! {
 }
 
 fn new_logger() -> Logger {
-    /*
-    let decorator = slog_term::TermDecorator::new().build();
-    let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    */
-
     // Suppress logging output during tests - we don't need to see it
     Logger::root(slog::Discard, o!())
 }

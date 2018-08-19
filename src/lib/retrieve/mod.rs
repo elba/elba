@@ -64,7 +64,7 @@ impl<'cache> Retriever<'cache> {
         shell: Shell,
         offline: bool,
     ) -> Self {
-        let logger = plog.new(o!("root" => root.to_string()));
+        let logger = plog.new(o!("phase" => "retrieve", "root" => root.to_string()));
 
         let offline_cache = if offline {
             shell.println(
@@ -110,6 +110,8 @@ impl<'cache> Retriever<'cache> {
         // let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
         // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
+        info!(self.logger, "beginning bulk package retrieval");
+
         let sources = solve.map(
             |_, sum| {
                 let loc = match sum.resolution() {
@@ -146,6 +148,8 @@ impl<'cache> Retriever<'cache> {
             Verbosity::Verbose,
         );
 
+        info!(self.logger, "retrieve successful"; "cache" => self.cache.layout.src.display());
+
         Ok(sources)
     }
 
@@ -162,14 +166,32 @@ impl<'cache> Retriever<'cache> {
         let locked = self.lockfile.find_by(|sum| sum.id.lowkey_eq(pkg));
 
         if let Some(lp) = locked {
+            debug!(
+                self.logger, "found locked pkg";
+                "locked" => lp.to_string(),
+                "given" => pkg.to_string(),
+                "constraint" => con.to_string()
+            );
             let v = &lp.version;
             if con.satisfies(&v) {
                 if let Resolution::Direct(dir) = lp.resolution() {
+                    debug!(
+                        self.logger, "good locked pkg";
+                        "given" => pkg.to_string(),
+                        "locked" => lp.to_string(),
+                        "type" => "direct"
+                    );
                     let dir = dir.clone();
                     if let Ok(src) = self.direct_checkout(pkg, Some(&dir)) {
                         return Ok(src.meta().version().clone());
                     }
                 } else {
+                    debug!(
+                        self.logger, "good locked pkg";
+                        "given" => pkg.to_string(),
+                        "locked" => lp.to_string(),
+                        "type" => "index"
+                    );
                     return self
                         .select(&Summary::new(pkg.clone(), v.clone()))
                         .map(|e| e.into_owned().version);
@@ -178,6 +200,11 @@ impl<'cache> Retriever<'cache> {
         }
 
         if pkg.resolution().direct().is_some() {
+            debug!(
+                self.logger, "new chosen pkg";
+                "given" => pkg.to_string(),
+                "type" => "direct"
+            );
             return Ok(self.direct_checkout(pkg, None)?.meta().version().clone());
         }
 
@@ -191,7 +218,7 @@ impl<'cache> Retriever<'cache> {
             .filter(|v| con.satisfies(v))
             .partition(|v| v.is_prerelease());
 
-        if !not_pre.is_empty() {
+        let res = if !not_pre.is_empty() {
             if !minimize {
                 Ok(not_pre.pop().unwrap())
             } else {
@@ -205,7 +232,16 @@ impl<'cache> Retriever<'cache> {
             }
         } else {
             Err(Error::from(ErrorKind::PackageNotFound))
-        }
+        };
+
+        debug!(
+            self.logger, "new chosen pkg";
+            "given" => pkg.to_string(),
+            "version" => res.as_ref().map(|x| x.to_string()).unwrap_or_else(|_| "err".to_string()),
+            "type" => "index"
+        );
+
+        res
     }
 
     /// Returns a `Vec<Incompatibility>` corresponding to the package's dependencies.
@@ -218,6 +254,12 @@ impl<'cache> Retriever<'cache> {
                     (dep.0.clone(), dep.1.complement()),
                 ));
             }
+            trace!(
+                self.logger, "pkg incompats";
+                "from" => "root",
+                "pkg" => pkg.to_string(),
+                "incompats" => format!("{:?}", res),
+            );
             return Ok(res);
         }
 
@@ -236,6 +278,12 @@ impl<'cache> Retriever<'cache> {
                     (dep.0.clone(), dep.1.complement()),
                 ));
             }
+            trace!(
+                self.logger, "pkg incompats";
+                "from" => "direct",
+                "pkg" => pkg.to_string(),
+                "incompats" => format!("{:?}", res),
+            );
             return Ok(res);
         }
 
@@ -319,6 +367,13 @@ impl<'cache> Retriever<'cache> {
 
             res.push(Incompatibility::new(cs, IncompatibilityCause::Dependency))
         }
+
+        trace!(
+            self.logger, "pkg incompats";
+            "from" => "index",
+            "pkg" => pkg.to_string(),
+            "incompats" => format!("{:?}", res),
+        );
 
         Ok(res)
     }
@@ -437,6 +492,7 @@ impl<'cache> Retriever<'cache> {
 
     fn get_indices(&mut self) {
         if !self.indices_set {
+            debug!(self.logger, "updating indices eagerly");
             self.indices = self
                 .cache
                 .get_indices(&self.reses, true, self.offline_cache.is_some());

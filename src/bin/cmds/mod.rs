@@ -13,10 +13,13 @@ use clap::{App, ArgMatches};
 use elba::util::{
     config::{Backend, Config},
     errors::Res,
+    shell::Verbosity,
 };
 use failure::{Error, ResultExt};
 use itertools::Itertools;
-use slog::{Discard, Logger};
+use slog::{Discard, Drain, Logger};
+use slog_async;
+use slog_term;
 use std::process::Command;
 
 pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
@@ -85,8 +88,16 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
     ))
 }
 
-pub fn logger(_c: &mut Config) -> Logger {
-    Logger::root(Discard, o!())
+pub fn match_logger(c: &mut Config, args: &ArgMatches) -> Logger {
+    if args.is_present("debug-log") {
+        c.term.verbosity = Verbosity::None;
+        let decorator = slog_term::TermDecorator::new().build();
+        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+        let drain = slog_async::Async::new(drain).build().fuse();
+        Logger::root(drain, o!())
+    } else {
+        Logger::root(Discard, o!())
+    }
 }
 
 pub fn match_backends(c: &mut Config, args: &ArgMatches) -> Backend {
@@ -196,5 +207,11 @@ mod args {
             .possible_values(&["none", "git"])
             .default_value("git")
             .help("The VCS template to use when initializing a new repo")
+    }
+
+    pub fn debug_log() -> Arg {
+        Arg::with_name("debug-log")
+            .long("debug-log")
+            .help("Print debug logs instead of prettified output")
     }
 }
