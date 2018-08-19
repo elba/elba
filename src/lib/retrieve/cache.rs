@@ -204,7 +204,7 @@ impl Cache {
                                 } else {
                                     Ok(())
                                 }
-                            },
+                            }
                         )
                     })
             } else {
@@ -225,7 +225,9 @@ impl Cache {
             true,
         ));
         let dir = if new_dir != dir.path() {
-            copy_dir_gitless(dir.path(), &new_dir)?;
+            if !new_dir.exists() {
+                copy_dir_gitless(dir.path(), &new_dir)?;
+            }
             DirLock::acquire(&new_dir)?
         } else {
             dir
