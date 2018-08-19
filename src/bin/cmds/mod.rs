@@ -3,11 +3,11 @@ mod clean;
 mod doc;
 mod init;
 mod install;
-mod lock;
 mod new;
 mod repl;
 mod test;
 mod uninstall;
+mod update;
 
 use clap::{App, ArgMatches};
 use elba::util::{
@@ -32,10 +32,10 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         init::cli(),
         install::cli(),
         new::cli(),
-        lock::cli(),
         repl::cli(),
         test::cli(),
         uninstall::cli(),
+        update::cli(),
     ]
 }
 
@@ -47,10 +47,10 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "init" => Some(init::exec),
         "install" => Some(install::exec),
         "new" => Some(new::exec),
-        "lock" => Some(lock::exec),
         "repl" => Some(repl::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),
+        "update" => Some(update::exec),
         _ => None,
     }
 }

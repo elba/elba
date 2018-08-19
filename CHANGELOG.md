@@ -4,6 +4,10 @@
 
 ### Added
 
+- The `update` command, which updates all of the packages in the
+  lockfile (or certain packages, based on a command line flag
+  `--package`)
+
 - More complex logic for dealing with binary target paths; the end
   result is that files which don't specify a `Main.main` function
   can now still be used as binary targets, since elba can generate
@@ -17,6 +21,9 @@
 - A flag `--vcs` for `elba new` and `elba init`, to determine if
   elba should automatically create a vcs repo when creating a
   project.
+  
+- A flag `--debug-log` to print not-pretty debug logs for build
+  commands.
 
 - Sensible defaults for target paths and tests (#17).
 
@@ -72,6 +79,10 @@
 
 - elba now takes the version of the current compiler into account
   when deciding if it needs to rebuild a package.
+  
+### Removed
+
+- The `lock` command, which has been superceded by `update`.
 
 ## [0.1.5]
 

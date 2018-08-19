@@ -115,10 +115,11 @@ impl Cache {
         &self,
         pkg: &PackageId,
         loc: &DirectRes,
+        eager: bool,
         offline: bool,
         dl_f: impl Fn(),
     ) -> Result<(Option<DirectRes>, Source), Error> {
-        let p = self.load_source(pkg, loc, offline, dl_f)?;
+        let p = self.load_source(pkg, loc, eager, offline, dl_f)?;
 
         Ok((p.0, Source::from_folder(pkg, p.1, loc.clone())?))
     }
@@ -143,6 +144,7 @@ impl Cache {
         &self,
         pkg: &PackageId,
         loc: &DirectRes,
+        eager: bool,
         offline: bool,
         dl_f: impl Fn(),
     ) -> Result<(Option<DirectRes>, DirLock), Error> {
@@ -151,17 +153,14 @@ impl Cache {
             return Ok((None, DirLock::acquire(&path)?));
         }
 
-        let p = self.layout.src.join(Self::get_source_dir(loc));
-
+        let dir = DirLock::acquire(&self.layout.src.join(Self::get_source_dir(loc, false)))?;
         // We record first if the directory existed before the retrieval process
-        let pre_exists = p.exists();
-        let dir = DirLock::acquire(&p)?;
 
         // If it does exist, we can stop immediately
-        if loc.is_tar() && pre_exists {
+        if loc.is_tar() && dir.path().exists() {
             debug!(
                 self.logger, "loaded source";
-                "cause" => "tar_exists",
+                "cause" => "exists",
                 "pkg" => pkg.to_string(),
                 "dir" => dir.path().display()
             );
@@ -191,7 +190,7 @@ impl Cache {
             // two fetch operations.
             if g.is_git() && g != loc {
                 debug_assert!(loc.is_git());
-                loc.retrieve(&self.client, &dir, false, new_f)
+                loc.retrieve(&self.client, &dir, eager, new_f)
                     .and_then(|_| {
                         pkg.resolution().direct().unwrap().retrieve(
                             &self.client,
@@ -201,14 +200,14 @@ impl Cache {
                         )
                     })
             } else {
-                loc.retrieve(&self.client, &dir, false, new_f)
+                loc.retrieve(&self.client, &dir, eager, new_f)
             }
         } else {
-            loc.retrieve(&self.client, &dir, false, new_f)
+            loc.retrieve(&self.client, &dir, eager, new_f)
         };
 
         if res.is_err() {
-            if let DirectRes::Git { .. } = loc {
+            if loc.is_git() {
                 if !offline {
                     self.shell.println(
                         style("[warn]").yellow().bold(),
@@ -222,6 +221,9 @@ impl Cache {
             }
         }
 
+        let old: Res<Option<DirectRes>> = Ok(None);
+        let new_res = res.or(old).unwrap();
+
         debug!(
             self.logger, "loaded source";
             "cause" => "retrieved_new",
@@ -230,22 +232,18 @@ impl Cache {
             "dir" => dir.path().display()
         );
 
-        let old: Res<Option<DirectRes>> = Ok(None);
-
-        Ok((res.or(old).unwrap(), dir))
+        Ok((new_res, dir))
     }
 
-    /// Gets the corresponding directory of a package. We need this because for packages which have
-    /// no associated version (i.e. git and local dependencies, where the constraints are inherent
-    /// in the resolution itself), we ignore a version specifier.
-    ///
-    /// Note: with regard to git repos, we treat the same repo with different checked out commits/
-    /// tags as the same repo. This runs the risk of breaking reproducible builds if commits are
-    /// changed/deleted during fetches.
-    pub fn get_source_dir(loc: &DirectRes) -> String {
+    /// Gets the corresponding directory of a package.
+    pub fn get_source_dir(loc: &DirectRes, include_tag: bool) -> String {
         let mut hasher = Sha256::default();
-        if let DirectRes::Git { repo, .. } = loc {
-            hasher.input(repo.to_string().as_bytes());
+        if !include_tag {
+            if let DirectRes::Git { repo, .. } = loc {
+                hasher.input(repo.to_string().as_bytes());
+            } else {
+                hasher.input(loc.to_string().as_bytes());
+            }
         } else {
             hasher.input(loc.to_string().as_bytes());
         }
@@ -525,7 +523,7 @@ impl Cache {
     }
 
     fn get_index_dir(loc: &DirectRes) -> String {
-        Self::get_source_dir(loc)
+        Self::get_source_dir(loc, false)
     }
 
     /// Returns all of the package hashes available in this cache.

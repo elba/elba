@@ -21,7 +21,7 @@ pub fn cli() -> App<'static, 'static> {
                 .number_of_values(1)
                 .help("The number of threads to use to simultaneously run test binaries"),
         ).arg(
-            Arg::with_name("target")
+            Arg::with_name("targets")
                 .multiple(true)
                 .help("The names of the tests to run (all tests are run if unspecified)"),
         )
@@ -47,7 +47,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     let backend = match_backends(c, args);
 
     let targets = args
-        .values_of("target")
+        .values_of("targets")
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
 

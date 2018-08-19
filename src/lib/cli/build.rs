@@ -12,7 +12,7 @@ use package::{
     resolution::{DirectRes, IndexRes},
     PackageId, Spec, Summary,
 };
-use petgraph::graph::NodeIndex;
+use petgraph::{graph::NodeIndex, visit::Dfs};
 use resolve::Resolver;
 use retrieve::{
     cache::{Cache, Layout, OutputLayout},
@@ -66,7 +66,7 @@ pub fn test(
         bail!("at least one test must be defined")
     }
 
-    solve_local(ctx, &project, 3, |cache, mut retriever, solve| {
+    solve_local(ctx, &project, 3, None, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -291,7 +291,7 @@ pub fn install(
 
     match name {
         Ok(name) => solve_remote(ctx, name, 3, f),
-        Err(path) => solve_local(ctx, &path, 3, f),
+        Err(path) => solve_local(ctx, &path, 3, None, f),
     }
 }
 
@@ -348,7 +348,7 @@ pub fn repl(
         }
     }
 
-    solve_local(ctx, &project, 3, |cache, mut retriever, solve| {
+    solve_local(ctx, &project, 3, None, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -460,7 +460,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
     }
     let root = Targets::new(root);
 
-    solve_local(ctx, &project, 2, |cache, mut retriever, solve| {
+    solve_local(ctx, &project, 2, None, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -555,7 +555,7 @@ pub fn build(
     }
 
     let root = Targets::new(root);
-    solve_local(ctx, &project, 2, |cache, mut retriever, solve| {
+    solve_local(ctx, &project, 2, None, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -593,9 +593,65 @@ pub fn build(
     })
 }
 
-pub fn lock(ctx: &BuildCtx, project: &Path) -> Res<String> {
-    solve_local(ctx, &project, 1, |_, _, _| {
-        Ok("lockfile created at `./elba.lock`".to_string())
+pub fn update(ctx: &BuildCtx, project: &Path, ignore: Option<&[Spec]>) -> Res<String> {
+    let project = find_manifest_root(project)?;
+
+    let op = || -> Res<Graph<Summary>> {
+        let mut f = fs::File::open(&project.join("elba.lock"))?;
+        let mut contents = String::new();
+        f.read_to_string(&mut contents)?;
+        let toml = LockfileToml::from_str(&contents)?;
+
+        Ok(toml.into())
+    };
+
+    let prev = op().ok();
+
+    solve_local(ctx, &project, 1, ignore, |_, _, solve| {
+        if let Some(prev) = prev.as_ref() {
+            for (_, old) in prev.sub_tree(NodeIndex::new(0)) {
+                if let Some(new) = solve.find_by(|sum| sum.id().lowkey_eq(old.id())) {
+                    if old.id() != new.id() {
+                        // This is a git repo or something
+                        ctx.shell.println(
+                            style("Updating").cyan(),
+                            format!("{} -> {}", old, new),
+                            Verbosity::Normal,
+                        );
+                    } else if old != new {
+                        ctx.shell.println(
+                            style("Updating").cyan(),
+                            format!(
+                                "{} ({}) {} -> {}",
+                                old.name(),
+                                old.resolution(),
+                                old.version(),
+                                new.version()
+                            ),
+                            Verbosity::Normal,
+                        );
+                    }
+                // Otherwise, the packages are exactly the same in both, and we don't do
+                // anything
+                } else {
+                    // It's in the old, but not the new. It was removed!
+                    ctx.shell
+                        .println(style("Removing").red(), old, Verbosity::Normal);
+                }
+            }
+
+            for (_, new) in prev.sub_tree(NodeIndex::new(0)) {
+                // At this point we just want to find packages which were added in the new lockfile
+                if solve.find_by(|sum| new.id().lowkey_eq(sum.id())).is_none() {
+                    ctx.shell
+                        .println(style("Adding").green(), new, Verbosity::Normal);
+                }
+            }
+
+            Ok("lockfile at ./elba.lock updated".to_string())
+        } else {
+            Ok("lockfile created at `./elba.lock`".to_string())
+        }
     })
 }
 
@@ -603,6 +659,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     ctx: &BuildCtx,
     project: &Path,
     total: u8,
+    ignore: Option<&[Spec]>,
     mut f: F,
 ) -> Res<String> {
     let project = find_manifest_root(project)?;
@@ -622,10 +679,42 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Ok(toml.into())
     };
 
-    let lock = if let Ok(solve) = op() {
-        solve
-    } else {
-        Graph::default()
+    let lock = match ignore {
+        None => if let Ok(solve) = op() {
+            solve
+        } else {
+            Graph::default()
+        },
+        Some(i) => if i.is_empty() {
+            Graph::default()
+        } else {
+            if let Ok(mut solve) = op() {
+                for spec in i {
+                    let mut chosen: Option<Summary> = None;
+                    let mut dfs = Dfs::new(&solve.inner, NodeIndex::new(0));
+                    while let Some(ix) = dfs.next(&solve.inner) {
+                        if spec.matches(&solve[ix]) {
+                            if let Some(already_chosen) = chosen {
+                                return Err(format_err!(
+                                    "spec {} is ambiguous: both {} and {} match",
+                                    spec,
+                                    &solve[ix],
+                                    already_chosen
+                                ));
+                            } else {
+                                chosen = Some(solve.inner.remove_node(ix).unwrap());
+                            }
+                        }
+                    }
+                    if chosen.is_none() {
+                        return Err(format_err!("spec {} not in lockfile", spec));
+                    }
+                }
+                solve
+            } else {
+                Graph::default()
+            }
+        },
     };
 
     let root = {

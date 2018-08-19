@@ -371,6 +371,28 @@ pub struct Spec {
     pub version: Option<Version>,
 }
 
+impl Spec {
+    pub fn matches(&self, sum: &Summary) -> bool {
+        if &self.name != sum.name() {
+            return false;
+        }
+
+        if let Some(res) = self.resolution.as_ref() {
+            if res != sum.resolution() {
+                return false;
+            }
+        }
+
+        if let Some(ver) = self.version.as_ref() {
+            if ver != sum.version() {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
 impl fmt::Display for Spec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)?;

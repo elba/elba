@@ -45,7 +45,7 @@ pub fn clone(url: &Url, into: &Path) -> Res<git2::Repository> {
         let repo = git2::build::RepoBuilder::new()
             .fetch_options(opts)
             .clone(url.as_str(), into)?;
-
+        
         Ok(repo)
     })
 }

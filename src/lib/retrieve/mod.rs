@@ -110,6 +110,10 @@ impl<'cache> Retriever<'cache> {
         // let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
         // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
+        // TODO: Potential retrieval error!
+        // If two different packages depend on the same git repo but with a different tag, only one
+        // of those tags will be used.
+
         info!(self.logger, "beginning bulk package retrieval");
 
         let sources = solve.map(
@@ -126,13 +130,19 @@ impl<'cache> Retriever<'cache> {
                 } else {
                     let source = self
                         .cache
-                        .checkout_source(sum.id(), &loc, self.offline_cache.is_some(), || {
-                            self.shell.println(
-                                style("Retrieving").cyan(),
-                                sum.to_string(),
-                                Verbosity::Normal,
-                            );
-                        }).context(format_err!("unable to retrieve package {}", sum))?;
+                        .checkout_source(
+                            sum.id(),
+                            &loc,
+                            false,
+                            self.offline_cache.is_some(),
+                            || {
+                                self.shell.println(
+                                    style("Retrieving").cyan(),
+                                    sum.to_string(),
+                                    Verbosity::Normal,
+                                );
+                            },
+                        ).context(format_err!("unable to retrieve package {}", sum))?;
                     // prg += 1;
                     // pb.set_position(prg);
                     Ok(source.1)
@@ -182,7 +192,7 @@ impl<'cache> Retriever<'cache> {
                         "type" => "direct"
                     );
                     let dir = dir.clone();
-                    if let Ok(src) = self.direct_checkout(pkg, Some(&dir)) {
+                    if let Ok(src) = self.direct_checkout(pkg, Some(&dir), false) {
                         return Ok(src.meta().version().clone());
                     }
                 } else {
@@ -205,7 +215,11 @@ impl<'cache> Retriever<'cache> {
                 "given" => pkg.to_string(),
                 "type" => "direct"
             );
-            return Ok(self.direct_checkout(pkg, None)?.meta().version().clone());
+            return Ok(self
+                .direct_checkout(pkg, None, true)?
+                .meta()
+                .version()
+                .clone());
         }
 
         self.get_indices();
@@ -268,7 +282,7 @@ impl<'cache> Retriever<'cache> {
         // If this is a DirectRes dep, we ask the cache for info.
         if pkg.resolution().direct().is_some() {
             let deps = self
-                .direct_checkout(pkg.id(), None)?
+                .direct_checkout(pkg.id(), None, false)?
                 .meta()
                 .deps(&def_index, false);
             let mut res = vec![];
@@ -386,7 +400,7 @@ impl<'cache> Retriever<'cache> {
                 .map(|x| {
                     x.iter()
                         .filter(|(_, e)| {
-                            let hash = Cache::get_source_dir(&e.location);
+                            let hash = Cache::get_source_dir(&e.location, false);
                             cache.contains(&hash)
                         }).count()
                 }).unwrap_or(0)
@@ -398,7 +412,7 @@ impl<'cache> Retriever<'cache> {
     pub fn select(&mut self, sum: &Summary) -> Res<Cow<ResolvedEntry>> {
         if let Some(cache) = self.offline_cache.as_ref() {
             let selected = self.indices.select(sum)?;
-            let hash = Cache::get_source_dir(&selected.location);
+            let hash = Cache::get_source_dir(&selected.location, false);
             if cache.contains(&hash) {
                 let mut selected = selected.clone();
                 selected.location = DirectRes::Dir {
@@ -424,7 +438,7 @@ impl<'cache> Retriever<'cache> {
         if let Some(cache) = self.offline_cache.as_ref() {
             let mut entries = self.indices.entries(pkg)?.clone();
             for (_, e) in entries.iter_mut() {
-                let hash = Cache::get_source_dir(&e.location);
+                let hash = Cache::get_source_dir(&e.location, false);
                 if cache.contains(&hash) {
                     e.location = DirectRes::Dir {
                         path: self.cache.layout.src.join(&hash),
@@ -451,22 +465,37 @@ impl<'cache> Retriever<'cache> {
         &self.root
     }
 
-    pub fn direct_checkout(&mut self, pkg: &PackageId, og: Option<&DirectRes>) -> Res<&Source> {
+    pub fn direct_checkout(
+        &mut self,
+        pkg: &PackageId,
+        og: Option<&DirectRes>,
+        eager: bool,
+    ) -> Res<&Source> {
+        trace!(
+            self.logger, "direct checkout";
+            "pkg" => pkg.to_string(),
+            "og" => format!("{:?}", og),
+            "eager" => eager.to_string()
+        );
         if self.res_mapping.contains_key(pkg) {
             Ok(&self.sources[&self.res_mapping[pkg]])
         } else if self.sources.contains_key(pkg) {
             Ok(&self.sources[pkg])
         } else {
             let loc = og.unwrap_or_else(|| pkg.resolution().direct().unwrap());
-            let (new_res, s) =
-                self.cache
-                    .checkout_source(&pkg, &loc, self.offline_cache.is_some(), || {
-                        self.shell.println(
-                            style("Retrieving").cyan(),
-                            format!("{} ({})", pkg.name(), pkg.resolution()),
-                            Verbosity::Normal,
-                        );
-                    })?;
+            let (new_res, s) = self.cache.checkout_source(
+                &pkg,
+                &loc,
+                eager,
+                self.offline_cache.is_some(),
+                || {
+                    self.shell.println(
+                        style("Retrieving").cyan(),
+                        format!("{} ({})", pkg.name(), pkg.resolution()),
+                        Verbosity::Normal,
+                    );
+                },
+            )?;
 
             let res = if let Some(delta) = new_res {
                 delta

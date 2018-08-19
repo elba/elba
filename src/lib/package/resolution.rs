@@ -228,7 +228,6 @@ impl DirectRes {
                 // Cache. If the Cache points to a directory that already exists, it means that the
                 // branch data or w/e is irrelevant.
                 let repo = Repository::open(target.path());
-
                 let repo = match repo {
                     Ok(r) => {
                         let mut repo = r;
@@ -334,10 +333,14 @@ impl DirectRes {
                     tag: id,
                 }))
             }
-            DirectRes::Dir { path: _path } => {
+            DirectRes::Dir { path } => {
                 // If this package is located on disk, we don't have to do anything...
                 dl_f(false)?;
-                Ok(None)
+                if path.exists() {
+                    Ok(None)
+                } else {
+                    Err(format_err!("can't find directory {}", path.display()))?
+                }
             }
         }
     }
