@@ -72,7 +72,7 @@ use std::{
 };
 use toml;
 use util::{
-    clear_dir, copy_dir,
+    clear_dir, copy_dir, copy_dir_gitless,
     errors::Res,
     graph::Graph,
     hexify_hash,
@@ -153,18 +153,20 @@ impl Cache {
             return Ok((None, DirLock::acquire(&path)?));
         }
 
-        let dir = DirLock::acquire(&self.layout.src.join(Self::get_source_dir(loc, false)))?;
+        let eager = if offline { false } else { eager };
+
+        let new_dir = self.layout.src.join(Self::get_source_dir(loc, true));
         // We record first if the directory existed before the retrieval process
 
         // If it does exist, we can stop immediately
-        if loc.is_tar() && dir.path().exists() {
+        if loc.is_tar() && new_dir.exists() {
             debug!(
                 self.logger, "loaded source";
                 "cause" => "exists",
                 "pkg" => pkg.to_string(),
-                "dir" => dir.path().display()
+                "dir" => new_dir.display()
             );
-            return Ok((None, dir));
+            return Ok((None, DirLock::acquire(&new_dir)?));
         }
 
         let new_f = |dl_online| {
@@ -176,10 +178,10 @@ impl Cache {
         };
 
         // At this point, we're only dealing with all git resolutions and tarball resolutions
-        // which don't exist yet. For git repositories, errors are recoverable. For tarball
-        // resolutions, they're not.
+        // which don't exist yet.
         // If we're in "offline" mode, we immediately return an error from here because we
         // won't be able to download anything anyways.
+        let dir = DirLock::acquire(&self.layout.src.join(Self::get_source_dir(loc, true)))?;
         let res = if let Resolution::Direct(g) = pkg.resolution() {
             // For a git repository, if the DirectRes and the PackageId don't match, we should try to
             // retrieve the locked variant (the DirectRes) and then update with the latest variant
@@ -196,7 +198,13 @@ impl Cache {
                             &self.client,
                             &dir,
                             false,
-                            |_| Ok(()),
+                            |dl_online| {
+                                if offline && dl_online {
+                                    Err(format_err!("Can't download package in offline mode"))
+                                } else {
+                                    Ok(())
+                                }
+                            },
                         )
                     })
             } else {
@@ -204,25 +212,24 @@ impl Cache {
             }
         } else {
             loc.retrieve(&self.client, &dir, eager, new_f)
-        };
+        }?;
 
-        if res.is_err() {
-            if loc.is_git() {
-                if !offline {
-                    self.shell.println(
-                        style("[warn]").yellow().bold(),
-                        format!("Couldn't update git repo {}", loc),
-                        Verbosity::Normal,
-                    );
-                }
+        let old: Option<DirectRes> = None;
+        let new_res = res.or(old);
+        let new_dir = self.layout.src.join(&Self::get_source_dir(
+            if let Some(r) = new_res.as_ref() {
+                r
             } else {
-                // This is a non-recoverable error when downloading a tarball for the first time.
-                return Err(res.unwrap_err());
-            }
-        }
-
-        let old: Res<Option<DirectRes>> = Ok(None);
-        let new_res = res.or(old).unwrap();
+                &loc
+            },
+            true,
+        ));
+        let dir = if new_dir != dir.path() {
+            copy_dir_gitless(dir.path(), &new_dir)?;
+            DirLock::acquire(&new_dir)?
+        } else {
+            dir
+        };
 
         debug!(
             self.logger, "loaded source";

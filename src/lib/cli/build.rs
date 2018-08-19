@@ -687,33 +687,31 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         },
         Some(i) => if i.is_empty() {
             Graph::default()
-        } else {
-            if let Ok(mut solve) = op() {
-                for spec in i {
-                    let mut chosen: Option<Summary> = None;
-                    let mut dfs = Dfs::new(&solve.inner, NodeIndex::new(0));
-                    while let Some(ix) = dfs.next(&solve.inner) {
-                        if spec.matches(&solve[ix]) {
-                            if let Some(already_chosen) = chosen {
-                                return Err(format_err!(
-                                    "spec {} is ambiguous: both {} and {} match",
-                                    spec,
-                                    &solve[ix],
-                                    already_chosen
-                                ));
-                            } else {
-                                chosen = Some(solve.inner.remove_node(ix).unwrap());
-                            }
+        } else if let Ok(mut solve) = op() {
+            for spec in i {
+                let mut chosen: Option<Summary> = None;
+                let mut dfs = Dfs::new(&solve.inner, NodeIndex::new(0));
+                while let Some(ix) = dfs.next(&solve.inner) {
+                    if spec.matches(&solve[ix]) {
+                        if let Some(already_chosen) = chosen {
+                            return Err(format_err!(
+                                "spec {} is ambiguous: both {} and {} match",
+                                spec,
+                                &solve[ix],
+                                already_chosen
+                            ));
+                        } else {
+                            chosen = Some(solve.inner.remove_node(ix).unwrap());
                         }
                     }
-                    if chosen.is_none() {
-                        return Err(format_err!("spec {} not in lockfile", spec));
-                    }
                 }
-                solve
-            } else {
-                Graph::default()
+                if chosen.is_none() {
+                    return Err(format_err!("spec {} not in lockfile", spec));
+                }
             }
+            solve
+        } else {
+            Graph::default()
         },
     };
 

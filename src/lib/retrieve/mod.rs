@@ -110,10 +110,6 @@ impl<'cache> Retriever<'cache> {
         // let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
         // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
 
-        // TODO: Potential retrieval error!
-        // If two different packages depend on the same git repo but with a different tag, only one
-        // of those tags will be used.
-
         info!(self.logger, "beginning bulk package retrieval");
 
         let sources = solve.map(

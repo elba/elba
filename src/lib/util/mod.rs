@@ -94,6 +94,31 @@ pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     Ok(())
 }
 
+// copy-paste-oriented programming
+pub fn copy_dir_gitless(from: &Path, to: &Path) -> Res<()> {
+    let walker = WalkDir::new(from)
+        .into_iter()
+        .filter_entry(|x| x.file_name() != ".git" && x.path() != to)
+        .filter(|x| x.is_ok() && valid_file(x.as_ref().unwrap()));
+    for entry in walker {
+        let entry = entry.unwrap();
+        let to_p = to.join(entry.path().strip_prefix(from).unwrap());
+        // Make sure that the file exists before we try copying
+        fs::create_dir_all(to_p.parent().unwrap())?;
+        fs::File::create(&to_p).context(format_err!("couldn't create file {}", to_p.display()))?;
+        let _ = fs::copy(entry.path(), &to_p).with_context(|e| {
+            format_err!(
+                "couldn't copy {} to {}:\n{}",
+                entry.path().display(),
+                to_p.display(),
+                e
+            )
+        })?;
+    }
+
+    Ok(())
+}
+
 pub fn clear_dir(dir: &Path) -> Res<()> {
     if dir.exists() {
         fs::remove_dir_all(dir)?;
