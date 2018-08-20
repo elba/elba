@@ -75,6 +75,7 @@ impl Indices {
 
     pub fn select_by_spec(&self, spec: Spec) -> Res<Summary> {
         // For simplicity's sake, we don't do any caching here. It's not really necessary.
+        let mut res = None;
         for (ir, ix) in &self.indices {
             if spec.resolution.is_none() || Some(&ir.clone().into()) == spec.resolution.as_ref() {
                 if let Ok(es) = ix.entries(&spec.name) {
@@ -87,16 +88,27 @@ impl Indices {
                                     || Some(&x.1.version) == spec.version.as_ref())
                         }).last()
                     {
-                        return Ok(Summary::new(
-                            PackageId::new(spec.name, ir.clone().into()),
-                            x.0,
-                        ));
+                        if let Some(existing) = res {
+                            return Err(format_err!(
+                                "spec `{}` is ambiguous, and matches both {} and {}@{}|{}",
+                                &spec,
+                                existing,
+                                &spec.name,
+                                ir,
+                                x.0
+                            ));
+                        } else {
+                            res = Some(Summary::new(
+                                PackageId::new(spec.name.clone(), ir.clone().into()),
+                                x.0,
+                            ));
+                        }
                     }
                 }
             }
         }
 
-        Err(ErrorKind::PackageNotFound)?
+        Ok(res.ok_or_else(|| ErrorKind::PackageNotFound)?)
     }
 
     pub fn select(&mut self, pkg: &Summary) -> Res<&ResolvedEntry> {

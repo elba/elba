@@ -6,6 +6,7 @@ use elba::{
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
+use itertools::Either::{Left, Right};
 use std::{env::current_dir, str::FromStr};
 
 pub fn cli() -> App<'static, 'static> {
@@ -30,9 +31,9 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         let spec = &*spec;
         let spec = Spec::from_str(spec)
             .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;
-        Ok(spec)
+        Left(spec)
     } else if let Ok(d) = current {
-        Err(d)
+        Right(d)
     } else {
         bail!("no package was specified to be installed and the current directory is inaccessible")
     };

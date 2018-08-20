@@ -4,6 +4,7 @@ mod doc;
 mod init;
 mod install;
 mod new;
+mod print_config;
 mod repl;
 mod test;
 mod uninstall;
@@ -32,6 +33,7 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         init::cli(),
         install::cli(),
         new::cli(),
+        print_config::cli(),
         repl::cli(),
         test::cli(),
         uninstall::cli(),
@@ -47,6 +49,7 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "init" => Some(init::exec),
         "install" => Some(install::exec),
         "new" => Some(new::exec),
+        "print-config" => Some(print_config::exec),
         "repl" => Some(repl::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),

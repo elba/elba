@@ -2,11 +2,23 @@
 
 ## [Unreleased]
 
+## [0.2.0]
+
+This is a major release of elba which polishes up the 0.1.x release
+series, fixing up a multitude of different bugs, adding commands
+where appropriate, and making major enhancements to ergonomics
+(most notably major improvements to how git dependencies work,
+the addition of an offline mode, functionality enhancements to
+binary targets, and added defaults for manifests).
+
 ### Added
 
 - The `update` command, which updates all of the packages in the
   lockfile (or certain packages, based on a command line flag
   `--package`)
+  
+- The `print-config` command, which does exactly what it says
+  on the tin
 
 - More complex logic for dealing with binary target paths; the end
   result is that files which don't specify a `Main.main` function
@@ -39,6 +51,9 @@
 - elba will now look through all of the current directory's
   ancestors for a manifest file, rather than just the current
   directory.
+  
+- When (un)installing packages, elba will now error if a spec
+  is ambiguous.
 
 - When generating lockfiles, for packages located at git repos,
   elba will lock the git repo to a specific commit, rather than
@@ -62,7 +77,7 @@
   would cause the build process to error.
 
 - Fixed bugs with config file parsing; elba can actually read
-  the term.verbosity key, and elba is more lenient when it
+  the `term.verbosity` key, and elba is more lenient when it
   comes to missing keys in configuration.
 
 - Fixed a bug with "unknown reference" errors when generating
@@ -82,7 +97,8 @@
   
 ### Removed
 
-- The `lock` command, which has been superceded by `update`.
+- **BREAKING CHANGE**: The `lock` command, which has been superseded
+  by `update`.
 
 ## [0.1.5]
 
@@ -150,7 +166,8 @@ other packages.
 - Commands for creating packages, building packages (generating a lockfile
   and building all targets), testing packages, and (un)installing packages.
 
-[Unreleased]: https://github.com/elba/elba/compare/0.1.5...HEAD
+[Unreleased]: https://github.com/elba/elba/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/elba/elba/compare/0.1.5...0.2.0
 [0.1.5]: https://github.com/elba/elba/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/elba/elba/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/elba/elba/compare/0.1.2...0.1.3

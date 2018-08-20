@@ -9,6 +9,7 @@ use elba::{
     retrieve::Retriever,
     util::graph::Graph,
 };
+use itertools::Either::Right;
 use semver::Version;
 use std::str::FromStr;
 
@@ -52,7 +53,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         &CACHE,
         root,
         root_deps,
-        Err(ixs),
+        Right(ixs),
         Graph::default(),
         def_ix,
         shell(),

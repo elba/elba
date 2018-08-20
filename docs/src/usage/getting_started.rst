@@ -66,6 +66,7 @@ that’s done, download elba’s source code and install it:
 .. code-block:: console
 
    $ git clone https://github.com/elba/elba
+   $ cd elba
    $ cargo +nightly install --release
    $ elba # should work!
 

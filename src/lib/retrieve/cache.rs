@@ -53,6 +53,7 @@ use console::style;
 use failure::{Error, ResultExt};
 use index::{Index, Indices};
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use package::{
     manifest::Manifest,
     resolution::{DirectRes, Resolution},
@@ -204,7 +205,7 @@ impl Cache {
                                 } else {
                                     Ok(())
                                 }
-                            }
+                            },
                         )
                     })
             } else {
@@ -394,6 +395,15 @@ impl Cache {
                 dot.into_iter().partition(|(bin, sum)| {
                     (bins.is_empty() || bins.contains(&bin.as_str())) && contains(sum, query)
                 });
+
+            let sums = discard.iter().dedup().collect::<Vec<_>>();
+            if sums.len() > 1 {
+                return Err(format_err!(
+                    "spec `{}` is ambiguous between {:?}",
+                    query,
+                    sums
+                ));
+            }
 
             for (bin, _) in discard {
                 fs::remove_file(self.layout.bin.join(&bin))

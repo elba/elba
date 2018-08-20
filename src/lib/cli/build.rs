@@ -6,6 +6,7 @@ use build::{
 use console::style;
 use crossbeam::queue::MsQueue;
 use failure::ResultExt;
+use itertools::Either::{self, Left, Right};
 use package::{
     lockfile::LockfileToml,
     manifest::{BinTarget, Manifest},
@@ -213,13 +214,9 @@ pub fn test(
     })
 }
 
-// The name argument is a Result because we want a generic Either type, but that's not in std
-// and I don't feel like making a new enum just for this
-// Also the Err variant is a PathBuf because I couldn't get it to take &Path without ownership
-// problems in the bin code.
 pub fn install(
     ctx: &BuildCtx,
-    name: Result<Spec, PathBuf>,
+    name: Either<Spec, PathBuf>,
     targets: &[&str],
     backend: &Backend,
     force: bool,
@@ -290,8 +287,8 @@ pub fn install(
     };
 
     match name {
-        Ok(name) => solve_remote(ctx, name, 3, f),
-        Err(path) => solve_local(ctx, &path, 3, None, f),
+        Left(name) => solve_remote(ctx, name, 3, f),
+        Right(path) => solve_local(ctx, &path, 3, None, f),
     }
 }
 
@@ -741,7 +738,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         &cache,
         root,
         deps,
-        Ok(ctx.indices.to_vec()),
+        Left(ctx.indices.to_vec()),
         lock,
         def_index,
         ctx.shell,
@@ -808,7 +805,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         &cache,
         root,
         deps,
-        Err(indices),
+        Right(indices),
         lock,
         def_index,
         ctx.shell,

@@ -11,6 +11,7 @@ use console::style;
 use failure::{Error, ResultExt};
 use index::{Indices, ResolvedEntry};
 use indexmap::{IndexMap, IndexSet};
+use itertools::Either::{self, Left, Right};
 use package::{
     resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
@@ -58,7 +59,7 @@ impl<'cache> Retriever<'cache> {
         cache: &'cache Cache,
         root: Summary,
         root_deps: Vec<(PackageId, Constraint)>,
-        reses: Result<Vec<DirectRes>, Indices>,
+        reses: Either<Vec<DirectRes>, Indices>,
         lockfile: Graph<Summary>,
         def_index: IndexRes,
         shell: Shell,
@@ -78,8 +79,8 @@ impl<'cache> Retriever<'cache> {
         };
 
         let (indices, indices_set, reses) = match reses {
-            Ok(v) => (cache.get_indices(&v, false, offline), false, v),
-            Err(e) => (e, true, vec![]),
+            Left(v) => (cache.get_indices(&v, false, offline), false, v),
+            Right(e) => (e, true, vec![]),
         };
 
         Retriever {
