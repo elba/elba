@@ -217,6 +217,7 @@ impl From<TestTarget> for BinTarget {
     fn from(t: TestTarget) -> Self {
         let default_name = format!("test-{}", &t.main)
             .trim_right_matches(".idr")
+            .trim_right_matches(".lidr")
             .replace("/", "_")
             .replace(".", "_");
 
@@ -248,6 +249,16 @@ impl BinTarget {
                 // This is the relative target path
                 let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
                 return Some((src_path.to_path_buf(), target_path));
+            } else if parent.join(&s.0).with_extension("lidr").exists() {
+                let target_path = if s.0.extension().is_none() {
+                    parent.join(&s.0).with_extension("lidr")
+                } else {
+                    parent.join(&s.0)
+                };
+                let src_path = target_path.parent().unwrap();
+                // This is the relative target path
+                let target_path: PathBuf = target_path.file_name().unwrap().to_os_string().into();
+                return Some((src_path.to_path_buf(), target_path));
             }
         }
 
@@ -267,6 +278,14 @@ impl BinTarget {
             {
                 // If a file corresponding to the whole module name exists, we use that.
                 Some((src_path, target_path.join(after).with_extension("idr")))
+            } else if src_path
+                .join(&target_path)
+                .join(after)
+                .with_extension("lidr")
+                .exists()
+            {
+                // If a literate file corresponding to the whole module name exists, we use that.
+                Some((src_path, target_path.join(after).with_extension("lidr")))
             } else if src_path.join(&target_path).with_extension("idr").exists() {
                 // Otherwise, if a file corresponding to the module name minus the last
                 // part exists, we assume that the last part refers to a function which
@@ -280,6 +299,8 @@ impl BinTarget {
             // Otherwise, if the name has no dots:
             if src_path.join(&target_path).with_extension("idr").exists() {
                 Some((src_path, target_path.with_extension("idr")))
+            } else if src_path.join(&target_path).with_extension("lidr").exists() {
+                Some((src_path, target_path.with_extension("lidr")))
             } else {
                 None
             }

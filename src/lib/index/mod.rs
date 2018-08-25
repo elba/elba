@@ -73,7 +73,7 @@ impl Indices {
         Indices { indices, cache }
     }
 
-    pub fn select_by_spec(&self, spec: Spec) -> Res<Summary> {
+    pub fn select_by_spec(&self, spec: &Spec) -> Res<Summary> {
         // For simplicity's sake, we don't do any caching here. It's not really necessary.
         let mut res = None;
         for (ir, ix) in &self.indices {

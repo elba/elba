@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Make elba check for literate Idris files when looking for modules
+  (#28).
+
 ## [0.2.0]
 
 This is a major release of elba which polishes up the 0.1.x release

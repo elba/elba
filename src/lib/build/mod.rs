@@ -128,8 +128,17 @@ pub fn compile_lib(
         .iter()
         .map(|mod_name| {
             let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
-            path.with_extension("idr")
-        }).collect::<Vec<_>>();
+            if path.with_extension("idr").exists() {
+                Ok(path.with_extension("idr"))
+            } else if path.with_extension("lidr").exists() {
+                Ok(path.with_extension("lidr"))
+            } else {
+                Err(format_err!(
+                    "Module at path {} doesn't exist",
+                    path.display()
+                ))
+            }
+        }).collect::<Result<Vec<_>, _>>()?;
 
     let mut args = vec![];
     if let Ok(val) = env::var("IDRIS_OPTS") {

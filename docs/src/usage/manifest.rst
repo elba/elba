@@ -91,7 +91,7 @@ below:
    # deps only used for the test targets
    [dev_dependencies]
    "git/master" = { git = "https://github.com/doesnt/exist" } # uses the master branch
-   "git/explicit" = { git = "https://github.com/doesnt/exist", branch = "beta" } # "branch" can be an arbitrary git ref: a tag, commit, etc.
+   "git/explicit" = { git = "https://github.com/doesnt/exist", tag = "beta" } # "tag" can be an arbitrary git ref: a tag, commit, etc.
 
 elba’s syntax for versioning has :doc:`several idiosyncrasies of its
 own <../reference/dependencies>`, but the tl;dr version is that
@@ -121,11 +121,12 @@ three types of targets which elba can build:
       path = "src"
       # The list of files which should be exported and made available for public use
       mods = [
-        "Awesome.A", # the file src/Awesome/A.idr
-        "Control.Zygohistomorphic.Prepromorphisms", # the file src/Control/Zygohistomorphic/Prepromorphisms.idr
+        "Awesome.A", # the file src/Awesome/A.idr, or src/Awesome/A.lidr
+        "Control.Zygohistomorphic.Prepromorphisms", # the file src/Control/Zygohistomorphic/Prepromorphisms.idr,
+                                                    # or src/Control/Zygohistomorphic/Prepromorphisms.lidr
       ]
       # Optional flags to pass to the compiler
-      idris_opts = ["--warnpartial"]
+      idris_opts = ["--warnpartial", "-p", "effects"]
 
    The ``path`` key should be a **sub-path** of the package; it cannot
    reference parent or absolute directories of the package. During the
@@ -150,7 +151,7 @@ three types of targets which elba can build:
       # The path to the Main module
       main = "Whatever" # corresponds to src/bin/Whatever.idr
       # Optional flags to pass to the compiler
-      idris_opts = ["--warnpartial"]
+      idris_opts = ["--warnpartial", "-p", "effects"]
 
    The ``name``, and ``idris_opts`` fields should be self-explanatory,
    but the ``path`` and ``main`` arguments have some more nuance to
@@ -164,9 +165,10 @@ three types of targets which elba can build:
       # Example 1: strict subpath specified in main, with folders separated by
       # slashes. extension left unspecified.
       main = "bin/Whatever/Module"
-      # corresponds to bin/Whatever/Module.idr if it exists, otherwise uses
-      # src/bin/Whatever/Module.idr because of the default `path` value; this file
-      # should have a function Main.main
+      # this corresponds to the first of the following files which exists:
+      # - bin/Whatever/Module.idr
+      # - bin/Whatever/Module.lidr
+      # - src/bin/Whatever/Module.idr (because of the default `path` value)
 
       # Example 2: main uses dots instead of slashes to separate folders, and
       # includes an idr extension
@@ -174,15 +176,19 @@ three types of targets which elba can build:
       # because this is not a valid subpath (uses dots instead of slashes),
       # this corresponds to the first of the following files which exists:
       # - src/Whatever/Module/idr.idr (treat the last section as a module)
+      # - src/Whatever/Module/idr.lidr (same, but literate file)
       # - src/Whatever/Module.idr (treat the last section as an extension:
       #                            applies to the "idr" extension only)
+      # - src/Whatever/Module.lidr (same, but literate file)
       # this file should have a function Main.main
 
       # Example 3: strict subpath specified with non-"idr" extension
       main = "bin/Whatever/Module.custom"
       # corresponds to the first of the following files which exists:
       # - bin/Whatever/Module.idr
+      # - bin/Whatever/Module.lidr
       # - src/bin/Whatever/Module.idr (due to the default `path` value)
+      # - src/bin/Whatever/Module.lidr
       # in both cases, this file should have a function `Module.custom : IO ()`,
       # which will be used as the main function
 
@@ -191,7 +197,9 @@ three types of targets which elba can build:
       main = "Whatever.Module.custom"
       # corresponds to the first of the following files which exists:
       # - bin/Whatever/Module/custom.idr (treat the last section as a module)
+      # - bin/Whatever/Module/custom.lidr
       # - bin/Whatever/Module.idr (treat the last section as a function in a parent module)
+      # - bin/Whatever/Module.lidr
       # if this corresponds to `bin/Whatever/Module.idr`, then the file should have a
       # function `Whatever.Module.custom : IO ()`, which will be used as the main
       # function
