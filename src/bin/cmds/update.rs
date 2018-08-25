@@ -1,4 +1,4 @@
-use super::{args, match_logger};
+use super::{args, match_logger, match_threads, match_idris_opts};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -11,6 +11,7 @@ use std::{env::current_dir, str::FromStr};
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("update")
         .arg(args::debug_log())
+        .arg(args::idris_opts())
         .arg(
             Arg::with_name("dependencies")
                 .multiple(true)
@@ -29,9 +30,10 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         indices: c.indices.to_vec(),
         global_cache: c.layout(),
         logger,
-        threads: 1, // irrelevant
+        threads: match_threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),
+        opts: match_idris_opts(c, args),
     };
 
     let packages = args

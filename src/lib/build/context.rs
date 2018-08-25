@@ -11,12 +11,8 @@ pub struct BuildContext<'a> {
     /// The global cache to use.
     pub cache: &'a Cache,
     pub threads: u32,
-    pub config: BuildConfig,
+    pub opts: &'a [String],
 }
-
-// TODO: Verbosity, totality checking
-#[derive(Debug)]
-pub struct BuildConfig {}
 
 /// Information on the compiler executable
 #[derive(Debug)]

@@ -6,10 +6,10 @@ pub mod job;
 
 use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
 use failure::ResultExt;
+use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use retrieve::cache::{Binary, OutputLayout, Source};
 use std::{
-    env,
     ffi::OsStr,
     fs,
     path::{Path, PathBuf},
@@ -141,10 +141,8 @@ pub fn compile_lib(
         }).collect::<Result<Vec<_>, _>>()?;
 
     let mut args = vec![];
-    if let Ok(val) = env::var("IDRIS_OPTS") {
-        args.extend(val.split(' ').map(|x| x.to_owned()));
-    }
     args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));
+    args.extend(bcx.opts.iter().cloned());
 
     clear_and_copy(&src_path, &layout.build.join("lib"))?;
     let invocation = CompileInvocation {
@@ -232,10 +230,8 @@ pub fn compile_bin(
     };
 
     let mut args = vec![];
-    if let Ok(val) = env::var("IDRIS_OPTS") {
-        args.extend(val.split(' ').map(|x| x.to_owned()));
-    }
     args.extend(bin_target.idris_opts.iter().map(|x| x.to_owned()));
+    args.extend(bcx.opts.iter().cloned());
 
     let compile_invoke = CompileInvocation {
         deps,
@@ -304,11 +300,7 @@ pub fn compile_doc(
         opts.push_str(format!("-i {}", &*binary.target.path().to_string_lossy()).as_ref());
     }
 
-    // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
-    // conflicting flags will be ignored (idris chooses the earliest flags first)
-    if let Ok(val) = env::var("IDRIS_OPTS") {
-        opts.push_str(&val);
-    }
+    opts.push_str(bcx.opts.iter().join(" ").as_str());
 
     let ipkg = generate_ipkg(&name, lib_path, &opts, &mods);
 

@@ -1,4 +1,4 @@
-use super::{args, match_backends, match_logger, match_threads};
+use super::{args, match_backends, match_idris_opts, match_logger, match_threads};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -15,6 +15,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::target_lib())
         .arg(args::offline())
         .arg(args::debug_log())
+        .arg(args::idris_opts())
         .arg(
             Arg::with_name("ide-mode")
                 .long("ide-mode")
@@ -43,6 +44,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         threads,
         shell: c.shell(),
         offline: args.is_present("offline"),
+        opts: match_idris_opts(c, args),
     };
 
     build::repl(&ctx, &project, &ts, &backend, args.is_present("ide-mode"))

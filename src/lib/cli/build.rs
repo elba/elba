@@ -1,5 +1,5 @@
 use build::{
-    context::{BuildConfig, BuildContext, Compiler},
+    context::{BuildContext, Compiler},
     job::{Job, JobQueue},
     Target, Targets,
 };
@@ -22,7 +22,7 @@ use retrieve::{
 use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
-    env, fs,
+    fs,
     io::prelude::*,
     path::{Path, PathBuf},
     process::Command,
@@ -47,6 +47,7 @@ pub struct BuildCtx {
     pub threads: u32,
     pub shell: Shell,
     pub offline: bool,
+    pub opts: Vec<String>,
 }
 
 pub fn test(
@@ -80,7 +81,7 @@ pub fn test(
         let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
-            config: BuildConfig {},
+            opts: &ctx.opts,
             cache,
             threads: ctx.threads,
         };
@@ -250,7 +251,7 @@ pub fn install(
         let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
-            config: BuildConfig {},
+            opts: &ctx.opts,
             cache,
             threads: ctx.threads,
         };
@@ -311,11 +312,21 @@ pub fn repl(
 
     if let Some(lib) = manifest.targets.lib {
         if targets.1.is_none() || targets.0 {
+            let new_paths = lib.mods.iter().map(|mod_name| {
+                let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
+                if path.with_extension("idr").exists() {
+                    Ok(path.with_extension("idr"))
+                } else if path.with_extension("lidr").exists() {
+                    Ok(path.with_extension("lidr"))
+                } else {
+                    Err(format_err!(
+                        "Module at path {} doesn't exist",
+                        path.display()
+                    ))
+                }
+            }).collect::<Result<Vec<_>, _>>()?;
             imports.push(lib.path.0.clone());
-            paths.extend(lib.mods.iter().map(|mod_name| {
-                let np: PathBuf = mod_name.replace(".", "/").into();
-                lib.path.0.join(np).with_extension("idr")
-            }));
+            paths.extend(new_paths);
         }
     }
 
@@ -363,7 +374,7 @@ pub fn repl(
         let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
-            config: BuildConfig {},
+            opts: &ctx.opts,
             cache,
             threads: ctx.threads,
         };
@@ -403,17 +414,18 @@ pub fn repl(
             process.arg("-i").arg(path);
         }
 
-        // We add the arguments passed by the environment variable IDRIS_OPTS at the end so that any
+        // We add the arguments in the build context at the end so that any
         // conflicting flags will be ignored (idris chooses the earliest flags first)
-        if let Ok(val) = env::var("IDRIS_OPTS") {
-            process.args(val.split(' ').collect::<Vec<_>>());
-        }
+        process.args(&ctx.opts);
+
         // Add the files we want to make available for the repl
         for target in &paths {
             process.arg(target);
         }
 
         if ide {
+            // In ide-mode, we only want to pass the current file as the arg.
+            // An editor should be in charge of dealing with this.
             process.arg("--ide-mode");
         }
 
@@ -473,7 +485,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
             compiler: Compiler::default(),
-            config: BuildConfig {},
+            opts: &ctx.opts,
             cache,
             threads: ctx.threads,
         };
@@ -565,7 +577,7 @@ pub fn build(
         let bctx = BuildContext {
             backend,
             compiler: Compiler::default(),
-            config: BuildConfig {},
+            opts: &ctx.opts,
             cache,
             threads: ctx.threads,
         };
@@ -787,7 +799,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         format!("indices at {}", cache.layout.indices.display()),
         Verbosity::Verbose,
     );
-    let root = indices.select_by_spec(name)?;
+    let root = indices.select_by_spec(&name)?;
 
     let deps = indices
         .select(&root)

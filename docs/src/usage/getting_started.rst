@@ -204,9 +204,14 @@ Building a package
 
 For all elba build-related commands, the ``IDRIS_OPTS`` environment
 variable will dictate additional arguments to pass to the Idris compiler
-(the flags passed by elba get higher priority). This can be helpful for
-packages which depend on base installed Idris packages (e.g. if you want
-to pass ``-p effects`` to the compiler).
+(the flags passed by elba get higher priority). Additionally, any args
+passed after a double-dash will be interpreted as arguments to the
+Idris compiler:
+
+.. code-block:: console
+                
+   $ # adds both the contrib and effects built-in packages
+   $ IDRIS_OPTS="-p contrib" elba build -- -p effects
 
 When building a local package, the output binaries are located at
 ``target/bin``, while the output library is placed at ``target/lib``.

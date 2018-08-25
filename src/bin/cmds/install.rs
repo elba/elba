@@ -1,4 +1,4 @@
-use super::{args, match_backends, match_logger, match_threads};
+use super::{args, match_backends, match_idris_opts, match_logger, match_threads};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -17,6 +17,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::target_bin())
         .arg(args::debug_log())
         .arg(args::offline())
+        .arg(args::idris_opts())
         .arg(
             Arg::with_name("force")
                 .long("force")
@@ -47,6 +48,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         threads: match_threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),
+        opts: match_idris_opts(c, args),
     };
 
     let targets = args
