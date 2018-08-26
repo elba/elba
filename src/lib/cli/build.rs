@@ -312,11 +312,12 @@ pub fn repl(
 
     if let Some(lib) = manifest.targets.lib {
         if targets.1.is_none() || targets.0 {
+            let src_path = lib.path.0.clone();
             let new_paths = lib.mods.iter().map(|mod_name| {
                 let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
-                if path.with_extension("idr").exists() {
+                if src_path.join(&path).with_extension("idr").exists() {
                     Ok(path.with_extension("idr"))
-                } else if path.with_extension("lidr").exists() {
+                } else if src_path.join(&path).with_extension("lidr").exists() {
                     Ok(path.with_extension("lidr"))
                 } else {
                     Err(format_err!(
@@ -325,7 +326,7 @@ pub fn repl(
                     ))
                 }
             }).collect::<Result<Vec<_>, _>>()?;
-            imports.push(lib.path.0.clone());
+            imports.push(src_path);
             paths.extend(new_paths);
         }
     }

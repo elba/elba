@@ -128,9 +128,9 @@ pub fn compile_lib(
         .iter()
         .map(|mod_name| {
             let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
-            if path.with_extension("idr").exists() {
+            if src_path.join(&path).with_extension("idr").exists() {
                 Ok(path.with_extension("idr"))
-            } else if path.with_extension("lidr").exists() {
+            } else if src_path.join(&path).with_extension("lidr").exists() {
                 Ok(path.with_extension("lidr"))
             } else {
                 Err(format_err!(
