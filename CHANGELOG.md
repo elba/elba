@@ -4,10 +4,14 @@
 
 ### Changed
 
-- Make elba check for literate Idris files when looking for modules
+- Made elba check for literate Idris files when looking for modules
   (#28).
 
-- Allow passing options to the Idris compiler with `--`.
+- Allowed passing options to the Idris compiler with `--`.
+
+- Fixed bug where `elba repl` wouldn't remove ibc files.
+
+- Added extra Idris and backend options as part of the build hash.
 
 ## [0.2.0]
 

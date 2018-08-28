@@ -1,4 +1,4 @@
-use super::{args, match_logger, match_idris_opts, match_threads};
+use super::{args, match_idris_opts, match_logger, match_threads};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,

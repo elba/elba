@@ -288,7 +288,7 @@ pub fn install(
     };
 
     match name {
-        Left(name) => solve_remote(ctx, name, 3, f),
+        Left(name) => solve_remote(ctx, &name, 3, f),
         Right(path) => solve_local(ctx, &path, 3, None, f),
     }
 }
@@ -307,26 +307,29 @@ pub fn repl(
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
-    let mut imports = vec![];
+    let mut parents = vec![];
     let mut paths = vec![];
 
     if let Some(lib) = manifest.targets.lib {
         if targets.1.is_none() || targets.0 {
             let src_path = lib.path.0.clone();
-            let new_paths = lib.mods.iter().map(|mod_name| {
-                let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
-                if src_path.join(&path).with_extension("idr").exists() {
-                    Ok(path.with_extension("idr"))
-                } else if src_path.join(&path).with_extension("lidr").exists() {
-                    Ok(path.with_extension("lidr"))
-                } else {
-                    Err(format_err!(
-                        "Module at path {} doesn't exist",
-                        path.display()
-                    ))
-                }
-            }).collect::<Result<Vec<_>, _>>()?;
-            imports.push(src_path);
+            let new_paths = lib
+                .mods
+                .iter()
+                .map(|mod_name| {
+                    let path: PathBuf = mod_name.trim_matches('.').replace(".", "/").into();
+                    if src_path.join(&path).with_extension("idr").exists() {
+                        Ok((parents.len(), path.with_extension("idr")))
+                    } else if src_path.join(&path).with_extension("lidr").exists() {
+                        Ok((parents.len(), path.with_extension("lidr")))
+                    } else {
+                        Err(format_err!(
+                            "Module at path {} doesn't exist",
+                            path.display()
+                        ))
+                    }
+                }).collect::<Result<Vec<_>, _>>()?;
+            parents.push(src_path);
             paths.extend(new_paths);
         }
     }
@@ -341,8 +344,8 @@ pub fn repl(
                         bin.path.0.display()
                     )
                 })?;
-                imports.push(resolved.0);
-                paths.push(resolved.1);
+                parents.push(resolved.0);
+                paths.push((parents.len() - 1, resolved.1));
             }
         } else if !targets.0 {
             let resolved = bin.resolve_bin(Path::new(".")).ok_or_else(|| {
@@ -352,8 +355,8 @@ pub fn repl(
                     bin.path.0.display()
                 )
             })?;
-            imports.push(resolved.0);
-            paths.push(resolved.1);
+            parents.push(resolved.0);
+            paths.push((parents.len() - 1, resolved.1));
         }
     }
 
@@ -411,7 +414,7 @@ pub fn repl(
             // We assume that the binary has already been compiled
             process.arg("-i").arg(binary);
         }
-        for path in &imports {
+        for path in &parents {
             process.arg("-i").arg(path);
         }
 
@@ -421,7 +424,7 @@ pub fn repl(
 
         // Add the files we want to make available for the repl
         for target in &paths {
-            process.arg(target);
+            process.arg(&target.1);
         }
 
         if ide {
@@ -439,7 +442,8 @@ pub fn repl(
 
         // Clean up after ourselves
         for target in &paths {
-            let bin = target.with_extension("ibc");
+            let src_path = &parents[target.0];
+            let bin = src_path.join(&target.1).with_extension("ibc");
             if bin.exists() {
                 fs::remove_file(&bin).with_context(|e| {
                     format_err!("couldn't remove ibc file {}:\n{}", bin.display(), e)
@@ -783,7 +787,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
 
 pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     ctx: &BuildCtx,
-    name: Spec,
+    name: &Spec,
     total: u8,
     mut f: F,
 ) -> Res<String> {

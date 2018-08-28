@@ -9,7 +9,6 @@ pub mod cache;
 pub use self::cache::{Cache, Source};
 use console::style;
 use failure::{Error, ResultExt};
-use index::{Indices, ResolvedEntry};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Either::{self, Left, Right};
 use package::{
@@ -17,6 +16,7 @@ use package::{
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
+use remote::{Indices, ResolvedEntry};
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;

@@ -59,6 +59,13 @@ impl Target {
             }
         }
     }
+
+    pub fn is_codegen(&self) -> bool {
+        match self {
+            Target::Bin(_) | Target::Test(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
@@ -104,6 +111,11 @@ impl Targets {
             .get(0)
             .map(|x| if let Target::Lib(_) = x { true } else { false })
             .unwrap_or(false)
+    }
+
+    // This makes doc targets part of the
+    pub fn is_codegen(&self) -> bool {
+        self.0.iter().any(|x| x.is_codegen())
     }
 }
 

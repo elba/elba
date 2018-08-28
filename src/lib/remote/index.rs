@@ -22,9 +22,6 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC enabling
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
-mod config;
-
-use self::config::IndexConfig;
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
@@ -39,10 +36,41 @@ use std::{
     io::{self, prelude::*, BufReader},
     str::FromStr,
 };
+use toml;
 use util::{
     errors::{ErrorKind, Res},
     lock::DirLock,
 };
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct IndexConfig {
+    pub index: IndexConfInner,
+}
+
+impl FromStr for IndexConfig {
+    type Err = Error;
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        toml::from_str(raw)
+            .context(format_err!("invalid index config"))
+            .map_err(Error::from)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct IndexConfInner {
+    pub secure: bool,
+    pub dependencies: IndexMap<String, IndexRes>,
+}
+
+impl Default for IndexConfInner {
+    fn default() -> Self {
+        IndexConfInner {
+            secure: false,
+            dependencies: indexmap!(),
+        }
+    }
+}
 
 /// A dependency.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

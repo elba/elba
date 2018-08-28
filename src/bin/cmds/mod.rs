@@ -140,15 +140,15 @@ pub fn match_threads(_c: &mut Config, args: &ArgMatches) -> u32 {
 
 pub fn match_idris_opts(_c: &mut Config, args: &ArgMatches) -> Vec<String> {
     let mut res = vec![];
-    
+
     if let Ok(val) = env::var("IDRIS_OPTS") {
         res.extend(val.split(' ').map(|x| x.to_string()));
     }
-    
+
     if let Some(vals) = args.values_of("idris-opts") {
         res.extend(vals.map(|x| x.to_string()));
     }
-    
+
     res
 }
 
@@ -231,10 +231,8 @@ mod args {
             .long("debug-log")
             .help("Print debug logs instead of prettified output")
     }
-    
+
     pub fn idris_opts() -> Arg {
-        Arg::with_name("idris-opts")
-            .last(true)
-            .min_values(0)
+        Arg::with_name("idris-opts").last(true).min_values(0)
     }
 }

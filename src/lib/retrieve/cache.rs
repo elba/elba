@@ -48,10 +48,9 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use build::Targets;
+use build::{context::BuildContext, Targets};
 use console::style;
 use failure::{Error, ResultExt};
-use index::{Index, Indices};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use package::{
@@ -59,6 +58,7 @@ use package::{
     resolution::{DirectRes, Resolution},
     PackageId, Spec,
 };
+use remote::{Index, Indices};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use slog::Logger;
@@ -818,24 +818,46 @@ pub struct BuildHash(pub String);
 impl BuildHash {
     pub fn new(
         root: &Source,
-        compiler_ver: Option<&str>,
         sources: &Graph<Source>,
         targets: &Targets,
+        ctx: &BuildContext,
+        codegen: bool,
     ) -> Self {
         let mut hasher = Sha256::default();
         for (_, src) in sources.sub_tree(sources.find_id(root).unwrap()) {
             hasher.input(&src.hash().as_bytes());
         }
-        if let Some(ver) = compiler_ver {
+
+        // Take into account the build context
+        // YET
+        if let Ok(ver) = ctx.compiler.version() {
             hasher.input(ver.as_bytes());
         }
-        // We also hash the targets because if we change the taregets for a package, we want to
+        for opt in ctx.opts {
+            hasher.input(opt.as_bytes());
+        }
+        if codegen {
+            hasher.input(ctx.backend.name.as_bytes());
+            for opt in &ctx.backend.opts {
+                hasher.input(opt.as_bytes());
+            }
+            hasher.input(
+                ctx.backend
+                    .extension
+                    .as_ref()
+                    .map(|x| x.as_bytes())
+                    .unwrap_or(&[]),
+            );
+        }
+
+        // We also hash the targets because if we change the targets for a package, we want to
         // rebuild it
         for t in &targets.0 {
             let bytes: [u8; 5] = t.as_bytes();
             hasher.input(&bytes);
         }
         let hash = hexify_hash(hasher.result().as_slice());
+
         BuildHash(hash)
     }
 }

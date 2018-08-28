@@ -41,8 +41,8 @@ extern crate walkdir;
 
 pub mod build;
 pub mod cli;
-pub mod index;
 pub mod package;
+pub mod remote;
 pub mod resolve;
 pub mod retrieve;
 pub mod util;
