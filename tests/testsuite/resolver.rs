@@ -1,10 +1,10 @@
 use super::util::{shell, CACHE, INDEX_DIR};
 use elba::{
-    index::Indices,
     package::{
         resolution::{DirectRes, IndexRes, Resolution},
         Name, PackageId, Summary,
     },
+    remote::Indices,
     resolve::Resolver,
     retrieve::Retriever,
     util::graph::Graph,

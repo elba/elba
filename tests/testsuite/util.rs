@@ -1,6 +1,6 @@
 use elba::{
-    index::Index,
     package::resolution::DirectRes,
+    remote::Index,
     retrieve::cache::{Cache, Layout},
     util::{copy_dir, lock::DirLock, shell::Shell},
 };
