@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- New fields to the manifest for use with package repos: `description`,
+  `homepage`, `repository`, and `readme` (#30).
+
 ### Changed
 
 - Made elba check for literate Idris files when looking for modules
@@ -10,6 +15,8 @@
 - Allowed passing options to the Idris compiler with `--`.
 
 - Fixed bug where `elba repl` wouldn't remove ibc files.
+
+- Fixed bug where elba would allow an empty group and/or name.
 
 - Added extra Idris and backend options as part of the build hash.
 

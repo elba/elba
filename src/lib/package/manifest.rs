@@ -108,6 +108,9 @@ pub struct PackageInfo {
     pub version: Version,
     pub authors: Vec<String>,
     pub description: Option<String>,
+    pub homepage: Option<String>,
+    pub repository: Option<String>,
+    pub readme: Option<SubPath>,
     pub license: Option<String>,
 }
 

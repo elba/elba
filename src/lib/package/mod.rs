@@ -64,21 +64,28 @@ impl Name {
         s.push_str(&name);
 
         let mut n = String::with_capacity(group.len() + 2 + name.len());
-        n.push_str(
-            &group
-                .to_ascii_lowercase()
-                .drain(..)
-                .map(|c| if c == '_' { '-' } else { c })
-                .collect::<String>(),
-        );
+        let pre = &group
+            .to_ascii_lowercase()
+            .drain(..)
+            .map(|c| if c == '_' { '-' } else { c })
+            .collect::<String>();
+        if pre.is_empty() {
+            bail!("group cannot be empty")
+        }
+        n.push_str(pre);
+
         n.push('/');
-        n.push_str(
-            &name
-                .to_ascii_lowercase()
-                .drain(..)
-                .map(|c| if c == '_' { '-' } else { c })
-                .collect::<String>(),
-        );
+        
+        let post = &name
+            .to_ascii_lowercase()
+            .drain(..)
+            .map(|c| if c == '_' { '-' } else { c })
+            .collect::<String>();
+        if post.is_empty() {
+            bail!("name cannot be empty")
+        }
+        n.push_str(post);
+
         Ok(Name {
             inner: Arc::new(NameInner {
                 serialization: s,
@@ -120,8 +127,6 @@ impl Hash for NameInner {
     }
 }
 
-// TODO: Should "test" desugar to "test/test"? Should this desugar be allowed when defining the
-//       name of a package?
 impl FromStr for Name {
     type Err = Error;
 
