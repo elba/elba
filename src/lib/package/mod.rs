@@ -2,10 +2,9 @@
 
 pub mod lockfile;
 pub mod manifest;
-pub mod resolution;
 pub mod version;
 
-use self::resolution::Resolution;
+use remote::resolution::Resolution;
 use failure::Error;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -75,7 +74,7 @@ impl Name {
         n.push_str(pre);
 
         n.push('/');
-        
+
         let post = &name
             .to_ascii_lowercase()
             .drain(..)

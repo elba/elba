@@ -12,11 +12,10 @@ use failure::{Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Either::{self, Left, Right};
 use package::{
-    resolution::{DirectRes, IndexRes, Resolution},
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
-use remote::{Indices, ResolvedEntry};
+use remote::{Indices, ResolvedEntry, resolution::{DirectRes, IndexRes, Resolution}};
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;
@@ -46,7 +45,7 @@ pub struct Retriever<'cache> {
     indices_set: bool,
     lockfile: Graph<Summary>,
     pub logger: Logger,
-    pub def_index: IndexRes,
+    pub ixmap: &'cache IndexMap<String, IndexRes>,
     pub shell: Shell,
     offline_cache: Option<IndexSet<String>>,
     sources: IndexMap<PackageId, Source>,
@@ -61,7 +60,7 @@ impl<'cache> Retriever<'cache> {
         root_deps: Vec<(PackageId, Constraint)>,
         reses: Either<Vec<DirectRes>, Indices>,
         lockfile: Graph<Summary>,
-        def_index: IndexRes,
+        ixmap: &'cache IndexMap<String, IndexRes>,
         shell: Shell,
         offline: bool,
     ) -> Self {
@@ -92,7 +91,7 @@ impl<'cache> Retriever<'cache> {
             reses,
             lockfile,
             logger,
-            def_index,
+            ixmap,
             shell,
             offline_cache,
             sources: indexmap!(),
@@ -274,14 +273,14 @@ impl<'cache> Retriever<'cache> {
             return Ok(res);
         }
 
-        let def_index = self.def_index.clone();
-
         // If this is a DirectRes dep, we ask the cache for info.
         if pkg.resolution().direct().is_some() {
+            let ixmap = self.ixmap.clone();
             let deps = self
                 .direct_checkout(pkg.id(), None, false)?
                 .meta()
-                .deps(&def_index, false);
+                .deps(&ixmap, false)?;
+
             let mut res = vec![];
             for dep in deps {
                 res.push(Incompatibility::from_dep(

@@ -6,14 +6,15 @@ use build::{
 use console::style;
 use crossbeam::queue::MsQueue;
 use failure::ResultExt;
+use indexmap::IndexMap;
 use itertools::Either::{self, Left, Right};
 use package::{
     lockfile::LockfileToml,
     manifest::{BinTarget, Manifest},
-    resolution::{DirectRes, IndexRes},
     PackageId, Spec, Summary,
 };
 use petgraph::{graph::NodeIndex, visit::Dfs};
+use remote::resolution::{DirectRes, IndexRes, Resolution};
 use resolve::Resolver;
 use retrieve::{
     cache::{Cache, Layout, OutputLayout},
@@ -41,7 +42,7 @@ use util::{
 // TODO: In all commands, pick a better compiler than `Compiler::default()`
 
 pub struct BuildCtx {
-    pub indices: Vec<DirectRes>,
+    pub indices: IndexMap<String, IndexRes>,
     pub global_cache: Layout,
     pub logger: Logger,
     pub threads: u32,
@@ -80,6 +81,7 @@ pub fn test(
 
         let bctx = BuildContext {
             backend,
+            codegen: true,
             compiler: Compiler::default(),
             opts: &ctx.opts,
             cache,
@@ -250,6 +252,7 @@ pub fn install(
 
         let bctx = BuildContext {
             backend,
+            codegen: true,
             compiler: Compiler::default(),
             opts: &ctx.opts,
             cache,
@@ -377,6 +380,7 @@ pub fn repl(
 
         let bctx = BuildContext {
             backend,
+            codegen: true,
             compiler: Compiler::default(),
             opts: &ctx.opts,
             cache,
@@ -489,6 +493,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
         let bctx = BuildContext {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
+            codegen: true,
             compiler: Compiler::default(),
             opts: &ctx.opts,
             cache,
@@ -519,6 +524,7 @@ pub fn build(
     ctx: &BuildCtx,
     project: &Path,
     targets: &(bool, bool, Option<Vec<&str>>, Option<Vec<&str>>),
+    codegen: bool,
     backend: &Backend,
 ) -> Res<String> {
     let mut contents = String::new();
@@ -581,6 +587,7 @@ pub fn build(
 
         let bctx = BuildContext {
             backend,
+            codegen: codegen,
             compiler: Compiler::default(),
             opts: &ctx.opts,
             cache,
@@ -735,12 +742,20 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Summary::new(pid, manifest.version().clone())
     };
 
-    let def_index = def_index(ctx);
-
     let deps = manifest
-        .deps(&def_index, true)
+        .deps(&ctx.indices, true)?
         .into_iter()
         .collect::<Vec<_>>();
+
+    let dreses = deps
+        .iter()
+        .filter_map(|(p, _)| {
+            if let Resolution::Index(IndexRes { res }) = p.resolution() {
+                Some(res.clone())
+            } else {
+                None
+            }
+        }).collect::<Vec<_>>();
 
     let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
 
@@ -755,9 +770,9 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         &cache,
         root,
         deps,
-        Left(ctx.indices.to_vec()),
+        Left(dreses),
         lock,
-        def_index,
+        &ctx.indices,
         ctx.shell,
         ctx.offline,
     );
@@ -791,14 +806,15 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     total: u8,
     mut f: F,
 ) -> Res<String> {
-    let def_index = def_index(ctx);
     let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
     ctx.shell.println(
         style(format!("[1/{}]", total)).dim().bold(),
         "Resolving dependencies...",
         Verbosity::Quiet,
     );
-    let mut indices = cache.get_indices(&ctx.indices, true, ctx.offline);
+    // For remote packages, we check the config for the indices we can load from
+    let indices = ctx.indices.values().cloned().map(|x| x.res).collect::<Vec<_>>();
+    let mut indices = cache.get_indices(&indices, true, ctx.offline);
     ctx.shell.println(
         style("Cached").dim(),
         format!("indices at {}", cache.layout.indices.display()),
@@ -824,7 +840,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         deps,
         Right(indices),
         lock,
-        def_index,
+        &ctx.indices,
         ctx.shell,
         ctx.offline,
     );
@@ -835,15 +851,7 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     f(&cache, retriever, solve)
 }
 
-fn def_index(ctx: &BuildCtx) -> IndexRes {
-    if ctx.indices.is_empty() {
-        IndexRes::from_str("index+dir+none").unwrap()
-    } else {
-        ctx.indices[0].clone().into()
-    }
-}
-
-fn find_manifest_root(path: &Path) -> Res<PathBuf> {
+pub fn find_manifest_root(path: &Path) -> Res<PathBuf> {
     for p in path.ancestors() {
         if p.join("elba.toml").exists() {
             return Ok(p.to_path_buf());

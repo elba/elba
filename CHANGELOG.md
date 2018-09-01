@@ -4,8 +4,17 @@
 
 ### Added
 
-- New fields to the manifest for use with package repos: `description`,
+- New commands for interacting with package backends: `package` for
+  creating tested tarballs of packages, `publish` for publishing a
+  package to an index, `yank` for disallowing new packages to
+  depend on a published package, and `login` for saving credentials
+  for an index (#31).
+
+- New fields to the manifest for use with package backends: `description`,
   `homepage`, `repository`, and `readme` (#30).
+
+- **BREAKING CHANGE**: The ability to specify index aliases in elba's
+  configuration.
 
 ### Changed
 

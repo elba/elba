@@ -1,10 +1,9 @@
-use super::util::{shell, CACHE, INDEX_DIR};
+use super::util::{shell, CACHE, IXMAP, INDEX_DIR};
 use elba::{
     package::{
-        resolution::{DirectRes, IndexRes, Resolution},
         Name, PackageId, Summary,
     },
-    remote::Indices,
+    remote::{Indices, resolution::{DirectRes, IndexRes, Resolution}},
     resolve::Resolver,
     retrieve::Retriever,
     util::graph::Graph,
@@ -44,10 +43,6 @@ fn retriever(root: Summary) -> Retriever<'static> {
         .map(|d| (PackageId::new(d.name, Resolution::Index(d.index)), d.req))
         .collect::<Vec<_>>();
 
-    let def_ix = IndexRes {
-        res: DirectRes::from_str("dir+data/index/").unwrap(),
-    };
-
     Retriever::new(
         &CACHE.logger.clone(),
         &CACHE,
@@ -55,7 +50,7 @@ fn retriever(root: Summary) -> Retriever<'static> {
         root_deps,
         Right(ixs),
         Graph::default(),
-        def_ix,
+        &IXMAP,
         shell(),
         false,
     )

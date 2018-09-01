@@ -1,19 +1,16 @@
 use super::{args, get};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
-    cli::build,
+    cli::{backend, build},
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
 use std::env::current_dir;
 
 pub fn cli() -> App<'static, 'static> {
-    SubCommand::with_name("doc")
-        .about("Builds the docs for the root package")
-        .arg(args::build_threads())
-        .arg(args::debug_log())
-        .arg(args::offline())
-        .arg(args::idris_opts())
+    SubCommand::with_name("package")
+        .arg(args::no_verify())
+        .about("Compiles the package and packages it into a nice tarball")
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
@@ -30,8 +27,8 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         threads: get::threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),
-        opts: get::idris_opts(c, args),
+        opts: vec![],
     };
 
-    build::doc(&ctx, &project)
+    backend::package(&ctx, &project, !args.is_present("no-verify"))
 }

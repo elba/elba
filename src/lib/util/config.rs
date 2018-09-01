@@ -10,7 +10,7 @@ use super::shell::{Shell, Verbosity};
 use config;
 use directories::{BaseDirs, ProjectDirs};
 use indexmap::IndexMap;
-use package::resolution::DirectRes;
+use remote::resolution::{DirectRes, IndexRes};
 use retrieve::cache::Layout;
 use std::{env, path::PathBuf};
 use url::Url;
@@ -25,8 +25,9 @@ pub struct Config {
     pub alias: IndexMap<String, String>,
     #[serde(default)]
     pub directories: Directories,
+    // The purpose of the mapping is to allow for index aliases.
     #[serde(default = "default_indices")]
-    pub indices: Vec<DirectRes>,
+    pub indices: IndexMap<String, IndexRes>,
     #[serde(default)]
     pub backend: Vec<Backend>,
 }
@@ -114,8 +115,8 @@ impl Default for Config {
             term: Term::default(),
             alias: default_aliases(),
             directories: Directories::default(),
-            indices: Vec::default(),
-            backend: Vec::new(),
+            indices: IndexMap::default(),
+            backend: Vec::default(),
         }
     }
 }
@@ -128,10 +129,10 @@ fn default_aliases() -> IndexMap<String, String> {
     )
 }
 
-fn default_indices() -> Vec<DirectRes> {
+fn default_indices() -> IndexMap<String, IndexRes> {
     let repo = Url::parse("https://github.com/elba/index").unwrap();
     let tag = "master".to_string();
-    vec![DirectRes::Git { repo, tag }]
+    indexmap!("official".to_string() => DirectRes::Git { repo, tag }.into())
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -164,6 +165,7 @@ impl Default for Term {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Directories {
     pub bin: PathBuf,
+    pub data: PathBuf,
     pub cache: PathBuf,
 }
 
@@ -172,6 +174,7 @@ impl Default for Directories {
         let proj = ProjectDirs::from("", "", "elba").unwrap();
         Directories {
             bin: BaseDirs::new().unwrap().home_dir().join(".elba/bin"),
+            data: proj.data_dir().to_path_buf(),
             cache: proj.cache_dir().to_path_buf(),
         }
     }

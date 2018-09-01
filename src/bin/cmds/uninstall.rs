@@ -1,4 +1,4 @@
-use super::{args, match_logger};
+use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     package::Spec,
@@ -26,7 +26,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
 
-    let logger = match_logger(c, args);
+    let logger = get::logger(c, args);
     let shell = c.shell();
 
     let cache = Cache::from_disk(&logger, c.layout(), shell)?;

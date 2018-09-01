@@ -204,6 +204,7 @@ pub fn compile_lib(
     Ok((comp_res, gen_res))
 }
 
+// TODO: Use bcx.codegen
 pub fn compile_bin(
     source: &Source,
     target: Target,

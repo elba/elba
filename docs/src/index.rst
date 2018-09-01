@@ -21,6 +21,7 @@ to be a mostly comprehensive guide on actually using it.
              
    reference/resolutions
    reference/indices
+   reference/backends
    reference/dependencies
    reference/cache
    

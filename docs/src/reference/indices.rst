@@ -25,6 +25,9 @@ pull from. Additionally, packages in package indices can have arbitrary
 direct resolutions as their actual location. This makes elba’s package
 indices extremely powerful as a consequence.
 
+Users can have their packages appear in indices by uploading them to
+:doc:`index backends <./backends>`.
+
 Index Resolutions
 ~~~~~~~~~~~~~~~~~
 
@@ -93,6 +96,8 @@ be how the index will be referred to within metadata files. Every other
 index which the packages of this index need to build properly must be
 specified in this field, or else package building will fail during
 dependency resolution.
+
+An additional key, ``backend``, should be the url of the backend API.
 
 Metadata structure
 ~~~~~~~~~~~~~~~~~~

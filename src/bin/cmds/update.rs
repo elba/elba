@@ -1,4 +1,4 @@
-use super::{args, match_idris_opts, match_logger, match_threads};
+use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -24,16 +24,16 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
-    let logger = match_logger(c, args);
+    let logger = get::logger(c, args);
 
     let ctx = build::BuildCtx {
-        indices: c.indices.to_vec(),
+        indices: c.indices.to_owned(),
         global_cache: c.layout(),
         logger,
-        threads: match_threads(c, args),
+        threads: get::threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),
-        opts: match_idris_opts(c, args),
+        opts: get::idris_opts(c, args),
     };
 
     let packages = args

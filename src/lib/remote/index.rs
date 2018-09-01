@@ -22,13 +22,15 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC enabling
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
+use super::backend::Backend;
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use package::{
-    resolution::{DirectRes, IndexRes, Resolution},
+    
     version::Constraint,
     *,
 };
+use remote::resolution::{DirectRes, IndexRes, Resolution};
 use semver::Version;
 use serde_json;
 use std::{
@@ -61,6 +63,7 @@ impl FromStr for IndexConfig {
 pub struct IndexConfInner {
     pub secure: bool,
     pub dependencies: IndexMap<String, IndexRes>,
+    pub backend: Option<Backend>,
 }
 
 impl Default for IndexConfInner {
@@ -68,6 +71,7 @@ impl Default for IndexConfInner {
         IndexConfInner {
             secure: false,
             dependencies: indexmap!(),
+            backend: None,
         }
     }
 }
@@ -262,5 +266,9 @@ impl Index {
 
     pub fn depends(&self) -> impl Iterator<Item = &IndexRes> {
         self.config.index.dependencies.iter().map(|x| x.1)
+    }
+
+    pub fn backend(&self) -> Option<&Backend> {
+        self.config.index.backend.as_ref()
     }
 }

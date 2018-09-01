@@ -2,11 +2,11 @@
 
 use self::version::Constraint;
 use super::{
-    resolution::{DirectRes, IndexRes},
     *,
 };
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
+use remote::resolution::{DirectRes, IndexRes};
 use semver::Version;
 use std::{
     path::{Path, PathBuf},
@@ -66,23 +66,27 @@ impl Manifest {
         &self.package.name
     }
 
-    pub fn deps(&self, def_index: &IndexRes, dev_deps: bool) -> IndexMap<PackageId, Constraint> {
+    pub fn deps(
+        &self,
+        ixmap: &IndexMap<String, IndexRes>,
+        dev_deps: bool,
+    ) -> Res<IndexMap<PackageId, Constraint>> {
         let mut deps = indexmap!();
         for (n, dep) in &self.dependencies {
             let dep = dep.clone();
-            let (pid, c) = dep.into_dep(def_index.clone(), n.clone());
+            let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
             deps.insert(pid, c);
         }
 
         if dev_deps {
             for (n, dep) in &self.dev_dependencies {
                 let dep = dep.clone();
-                let (pid, c) = dep.into_dep(def_index.clone(), n.clone());
+                let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
                 deps.insert(pid, c);
             }
         }
 
-        deps
+        Ok(deps)
     }
 }
 
@@ -120,7 +124,7 @@ pub enum DepReq {
     Registry(Constraint),
     RegLong {
         con: Constraint,
-        registry: IndexRes,
+        registry: String,
     },
     Local {
         path: PathBuf,
@@ -138,25 +142,38 @@ fn default_tag() -> String {
 }
 
 impl DepReq {
-    pub fn into_dep(self, def_index: IndexRes, n: Name) -> (PackageId, Constraint) {
+    pub fn into_dep(
+        self,
+        ixmap: &IndexMap<String, IndexRes>,
+        n: Name,
+    ) -> Res<(PackageId, Constraint)> {
         match self {
             DepReq::Registry(c) => {
-                let pi = PackageId::new(n, def_index.into());
-                (pi, c)
+                let def_index = ixmap
+                    .get_index(0)
+                    .ok_or_else(|| format_err!("no default index"))?;
+                let pi = PackageId::new(n, def_index.1.clone().into());
+                Ok((pi, c))
             }
             DepReq::RegLong { con, registry } => {
-                let pi = PackageId::new(n, registry.into());
-                (pi, con)
+                if let Some(mapped) = ixmap.get(&registry) {
+                    let pi = PackageId::new(n, mapped.clone().into());
+                    Ok((pi, con))
+                } else {
+                    let ix = IndexRes::from_str(&registry)?;
+                    let pi = PackageId::new(n, ix.into());
+                    Ok((pi, con))
+                }
             }
             DepReq::Local { path } => {
                 let res = DirectRes::Dir { path };
                 let pi = PackageId::new(n, res.into());
-                (pi, Constraint::any())
+                Ok((pi, Constraint::any()))
             }
             DepReq::Git { git, tag } => {
                 let res = DirectRes::Git { repo: git, tag };
                 let pi = PackageId::new(n, res.into());
-                (pi, Constraint::any())
+                Ok((pi, Constraint::any()))
             }
         }
     }

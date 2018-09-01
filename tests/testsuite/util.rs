@@ -1,9 +1,9 @@
 use elba::{
-    package::resolution::DirectRes,
-    remote::Index,
+    remote::{Index, resolution::{DirectRes, IndexRes}},
     retrieve::cache::{Cache, Layout},
     util::{copy_dir, lock::DirLock, shell::Shell},
 };
+use indexmap::IndexMap;
 use slog::{self, Logger};
 use std::{path::PathBuf, str::FromStr};
 use tempdir::TempDir;
@@ -13,6 +13,10 @@ lazy_static! {
     pub static ref CACHE_DIR: TempDir = cache_dir();
     pub static ref LOGGER: Logger = new_logger();
     pub static ref CACHE: Cache = cache();
+    pub static ref IXMAP: IndexMap<String, IndexRes> = indexmap!("testing".to_string() => IndexRes {
+        res: DirectRes::from_str("dir+data/index/").unwrap(),
+    });
+
 }
 
 fn new_logger() -> Logger {

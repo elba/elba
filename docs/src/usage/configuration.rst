@@ -38,9 +38,8 @@ which are not assigned to will carry the default value instead.
 
 .. code-block:: toml
 
-   indices = [
-       "git+https://github.com/elba/elba"
-   ]
+   [indices]
+   "official" = "index+git+https://github.com/elba/elba"
 
    [term]
    verbosity = "normal"
@@ -73,12 +72,25 @@ which are not assigned to will carry the default value instead.
 ``indices``
 ~~~~~~~~~~~
 
-This key specifies all of the indices that should be made available to
-packages being built. Any dependent indices of these indices will also
-be retrieved. The first index specified in this list will be used as the
-default index for packages which don’t specify an index. This key should
-be a list of index urls; for more information on those, see the chapter
-on :doc:`../reference/indices`.
+This key plays a few different roles based on the context of the elba
+operation:
+
+-  When building a local package or running a command which takes a
+   ``--index`` command-line flag, this key defines aliases for indices;
+   this way, you don't have to completely write out the resolution of
+   an index to refer to it (but you can if you want).
+
+   For both the command-line flag and when building a package, if an
+   index is specified, elba will first see if it's an alias for another
+   index. If not, it will try to parse the index as an index resolution.
+
+   The first index specified is set as the default index when building
+   a package. For commands with an ``--index`` flag, elba will require
+   that you specify what index you're referring to if the config lists
+   multiple indices.
+
+-  When building a package which originates from an index, this key
+   defines all the indices that will be searched for the package.
 
 By default, the first and only index available to elba is the `official
 package index <https://github.com/elba/index>`__.

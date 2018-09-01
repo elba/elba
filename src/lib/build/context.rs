@@ -7,6 +7,8 @@ use util::{config::Backend, errors::Res, fmt_output};
 #[derive(Debug)]
 pub struct BuildContext<'a> {
     pub backend: &'a Backend,
+    /// Whether to actually generate code or only check for errors
+    pub codegen: bool,
     pub compiler: Compiler,
     /// The global cache to use.
     pub cache: &'a Cache,

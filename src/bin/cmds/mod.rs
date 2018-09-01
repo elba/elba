@@ -3,12 +3,16 @@ mod clean;
 mod doc;
 mod init;
 mod install;
+mod login;
 mod new;
+mod package;
 mod print_config;
+mod publish;
 mod repl;
 mod test;
 mod uninstall;
 mod update;
+mod yank;
 
 use clap::{App, ArgMatches};
 use elba::util::{
@@ -18,7 +22,7 @@ use elba::util::{
 };
 use failure::{Error, ResultExt};
 use itertools::Itertools;
-use slog::{Discard, Drain, Logger};
+use slog::{Discard, Logger};
 use slog_async;
 use slog_term;
 use std::{env, process::Command};
@@ -32,12 +36,16 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         doc::cli(),
         init::cli(),
         install::cli(),
+        login::cli(),
         new::cli(),
+        package::cli(),
         print_config::cli(),
+        publish::cli(),
         repl::cli(),
         test::cli(),
         uninstall::cli(),
         update::cli(),
+        yank::cli(),
     ]
 }
 
@@ -48,12 +56,16 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "doc" => Some(doc::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
+        "login" => Some(login::exec),
         "new" => Some(new::exec),
+        "package" => Some(package::exec),
         "print-config" => Some(print_config::exec),
+        "publish" => Some(publish::exec),
         "repl" => Some(repl::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),
         "update" => Some(update::exec),
+        "yank" => Some(yank::exec),
         _ => None,
     }
 }
@@ -91,65 +103,94 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
     ))
 }
 
-pub fn match_logger(c: &mut Config, args: &ArgMatches) -> Logger {
-    if args.is_present("debug-log") {
-        c.term.verbosity = Verbosity::None;
-        let decorator = slog_term::TermDecorator::new().build();
-        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-        let drain = slog_async::Async::new(drain).build().fuse();
-        Logger::root(drain, o!())
-    } else {
-        Logger::root(Discard, o!())
-    }
-}
+mod get {
+    use super::*;
+    use elba::remote::resolution::IndexRes;
+    use slog::Drain;
+    use std::str::FromStr;
 
-pub fn match_backends(c: &mut Config, args: &ArgMatches) -> Backend {
-    let mut backend = args
-        .value_of_lossy("backend")
-        .and_then(|x| {
-            let x = x.into_owned();
-            c.get_backend(&x)
-        }).unwrap_or_else(|| c.default_backend());
-
-    // We do this because we want to preserve the name of the backend, even if it wasn't in the
-    // config
-    if let Some(x) = args.value_of_lossy("backend") {
-        backend.name = x.into_owned();
+    pub fn logger(c: &mut Config, args: &ArgMatches) -> Logger {
+        if args.is_present("debug-log") {
+            c.term.verbosity = Verbosity::None;
+            let decorator = slog_term::TermDecorator::new().build();
+            let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+            let drain = slog_async::Async::new(drain).build().fuse();
+            Logger::root(drain, o!())
+        } else {
+            Logger::root(Discard, o!())
+        }
     }
 
-    backend.portable = if args.is_present("portable") {
-        true
-    } else if args.is_present("non-portable") {
-        false
-    } else {
-        backend.portable
-    };
+    pub fn backends(c: &mut Config, args: &ArgMatches) -> Backend {
+        let mut backend = args
+            .value_of_lossy("backend")
+            .and_then(|x| {
+                let x = x.into_owned();
+                c.get_backend(&x)
+            }).unwrap_or_else(|| c.default_backend());
 
-    if let Some(x) = args.values_of_lossy("be-opts") {
-        backend.opts = x;
+        // We do this because we want to preserve the name of the backend, even if it wasn't in the
+        // config
+        if let Some(x) = args.value_of_lossy("backend") {
+            backend.name = x.into_owned();
+        }
+
+        backend.portable = if args.is_present("portable") {
+            true
+        } else if args.is_present("non-portable") {
+            false
+        } else {
+            backend.portable
+        };
+
+        if let Some(x) = args.values_of_lossy("be-opts") {
+            backend.opts = x;
+        }
+
+        backend
     }
 
-    backend
-}
-
-pub fn match_threads(_c: &mut Config, args: &ArgMatches) -> u32 {
-    args.value_of("build-threads")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(1)
-}
-
-pub fn match_idris_opts(_c: &mut Config, args: &ArgMatches) -> Vec<String> {
-    let mut res = vec![];
-
-    if let Ok(val) = env::var("IDRIS_OPTS") {
-        res.extend(val.split(' ').map(|x| x.to_string()));
+    pub fn threads(_c: &mut Config, args: &ArgMatches) -> u32 {
+        args.value_of("build-threads")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1)
     }
 
-    if let Some(vals) = args.values_of("idris-opts") {
-        res.extend(vals.map(|x| x.to_string()));
+    pub fn idris_opts(_c: &mut Config, args: &ArgMatches) -> Vec<String> {
+        let mut res = vec![];
+
+        if let Ok(val) = env::var("IDRIS_OPTS") {
+            res.extend(val.split(' ').map(|x| x.to_string()));
+        }
+
+        if let Some(vals) = args.values_of("idris-opts") {
+            res.extend(vals.map(|x| x.to_string()));
+        }
+
+        res
     }
 
-    res
+    pub fn index(c: &mut Config, args: &ArgMatches) -> Res<IndexRes> {
+        if let Some(x) = args.value_of("index") {
+            if let Some(mapped) = c.indices.get(x) {
+                Ok(mapped.clone())
+            } else {
+                IndexRes::from_str(x)
+            }
+        } else {
+            match c.indices.len() {
+                0 => Err(format_err!(
+                    "no indices in configuration and none specified at the CLI"
+                )),
+                1 => {
+                    Ok(c.indices.get_index(0).unwrap().1.clone())
+                },
+                _ => Err(format_err!(
+                    "> 1 index in configuration and none specified at the CLI"
+                )),
+            }
+        }
+    }
 }
 
 mod args {
@@ -234,5 +275,18 @@ mod args {
 
     pub fn idris_opts() -> Arg {
         Arg::with_name("idris-opts").last(true).min_values(0)
+    }
+
+    pub fn no_verify() -> Arg {
+        Arg::with_name("no-verify")
+            .long("no-verify")
+            .help("Skip building the package to test for validity")
+    }
+
+    pub fn index() -> Arg {
+        Arg::with_name("index")
+            .long("index")
+            .takes_value(true)
+            .help("The index which the command should apply to")
     }
 }

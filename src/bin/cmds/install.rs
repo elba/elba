@@ -1,4 +1,4 @@
-use super::{args, match_backends, match_idris_opts, match_logger, match_threads};
+use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
@@ -8,6 +8,8 @@ use elba::{
 use failure::ResultExt;
 use itertools::Either::{Left, Right};
 use std::{env::current_dir, str::FromStr};
+
+// TODO: Don't use specs; use --index and --ver ?
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("install")
@@ -39,16 +41,16 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         bail!("no package was specified to be installed and the current directory is inaccessible")
     };
 
-    let logger = match_logger(c, args);
+    let logger = get::logger(c, args);
 
     let ctx = build::BuildCtx {
-        indices: c.indices.to_vec(),
+        indices: c.indices.to_owned(),
         global_cache: c.layout(),
         logger,
-        threads: match_threads(c, args),
+        threads: get::threads(c, args),
         shell: c.shell(),
         offline: args.is_present("offline"),
-        opts: match_idris_opts(c, args),
+        opts: get::idris_opts(c, args),
     };
 
     let targets = args
@@ -56,7 +58,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|x| x.collect())
         .unwrap_or_else(|| vec![]);
 
-    let backend = match_backends(c, args);
+    let backend = get::backends(c, args);
 
     build::install(&ctx, proj, &targets, &backend, args.is_present("force"))
 }

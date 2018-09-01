@@ -55,10 +55,9 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use package::{
     manifest::Manifest,
-    resolution::{DirectRes, Resolution},
     PackageId, Spec,
 };
-use remote::{Index, Indices};
+use remote::{Index, Indices, resolution::{DirectRes, Resolution}};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use slog::Logger;

@@ -1,5 +1,6 @@
+mod backend;
 mod index;
-mod repo;
+pub mod resolution;
 
+pub use self::backend::*;
 pub use self::index::*;
-pub use self::repo::*;

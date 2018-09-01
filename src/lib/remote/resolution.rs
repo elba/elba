@@ -1,4 +1,4 @@
-use super::Checksum;
+use package::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
@@ -434,6 +434,12 @@ pub struct IndexRes {
 impl From<DirectRes> for IndexRes {
     fn from(d: DirectRes) -> Self {
         IndexRes { res: d }
+    }
+}
+
+impl From<IndexRes> for DirectRes {
+    fn from(i: IndexRes) -> Self {
+        i.res
     }
 }
 
