@@ -1,5 +1,8 @@
 use elba::{
-    remote::{Index, resolution::{DirectRes, IndexRes}},
+    remote::{
+        resolution::{DirectRes, IndexRes},
+        Index,
+    },
     retrieve::cache::{Cache, Layout},
     util::{copy_dir, lock::DirLock, shell::Shell},
 };
@@ -16,7 +19,6 @@ lazy_static! {
     pub static ref IXMAP: IndexMap<String, IndexRes> = indexmap!("testing".to_string() => IndexRes {
         res: DirectRes::from_str("dir+data/index/").unwrap(),
     });
-
 }
 
 fn new_logger() -> Logger {

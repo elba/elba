@@ -1,9 +1,7 @@
 //! Package manifest files.
 
 use self::version::Constraint;
-use super::{
-    *,
-};
+use super::*;
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
 use remote::resolution::{DirectRes, IndexRes};

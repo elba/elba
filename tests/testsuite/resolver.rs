@@ -1,9 +1,10 @@
-use super::util::{shell, CACHE, IXMAP, INDEX_DIR};
+use super::util::{shell, CACHE, INDEX_DIR, IXMAP};
 use elba::{
-    package::{
-        Name, PackageId, Summary,
+    package::{Name, PackageId, Summary},
+    remote::{
+        resolution::{DirectRes, IndexRes, Resolution},
+        Indices,
     },
-    remote::{Indices, resolution::{DirectRes, IndexRes, Resolution}},
     resolve::Resolver,
     retrieve::Retriever,
     util::graph::Graph,

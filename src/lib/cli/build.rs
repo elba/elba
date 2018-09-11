@@ -39,9 +39,10 @@ use util::{
     shell::{Shell, Verbosity},
 };
 
-// TODO: In all commands, pick a better compiler than `Compiler::default()`
+// TODO: In all commands, pick a better compiler than `Compiler::new(&ctx.compiler)`
 
 pub struct BuildCtx {
+    pub compiler: String,
     pub indices: IndexMap<String, IndexRes>,
     pub global_cache: Layout,
     pub logger: Logger,
@@ -82,7 +83,7 @@ pub fn test(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::default(),
+            compiler: Compiler::new(&ctx.compiler),
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -253,7 +254,7 @@ pub fn install(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::default(),
+            compiler: Compiler::new(&ctx.compiler),
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -381,7 +382,7 @@ pub fn repl(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::default(),
+            compiler: Compiler::new(&ctx.compiler),
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -494,7 +495,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
             codegen: true,
-            compiler: Compiler::default(),
+            compiler: Compiler::new(&ctx.compiler),
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -588,7 +589,7 @@ pub fn build(
         let bctx = BuildContext {
             backend,
             codegen: codegen,
-            compiler: Compiler::default(),
+            compiler: Compiler::new(&ctx.compiler),
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -813,7 +814,12 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         Verbosity::Quiet,
     );
     // For remote packages, we check the config for the indices we can load from
-    let indices = ctx.indices.values().cloned().map(|x| x.res).collect::<Vec<_>>();
+    let indices = ctx
+        .indices
+        .values()
+        .cloned()
+        .map(|x| x.res)
+        .collect::<Vec<_>>();
     let mut indices = cache.get_indices(&indices, true, ctx.offline);
     ctx.shell.println(
         style("Cached").dim(),

@@ -25,11 +25,7 @@
 use super::backend::Backend;
 use failure::{Error, ResultExt};
 use indexmap::IndexMap;
-use package::{
-    
-    version::Constraint,
-    *,
-};
+use package::{version::Constraint, *};
 use remote::resolution::{DirectRes, IndexRes, Resolution};
 use semver::Version;
 use serde_json;

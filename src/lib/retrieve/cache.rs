@@ -53,11 +53,11 @@ use console::style;
 use failure::{Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use package::{
-    manifest::Manifest,
-    PackageId, Spec,
+use package::{manifest::Manifest, PackageId, Spec};
+use remote::{
+    resolution::{DirectRes, Resolution},
+    Index, Indices,
 };
-use remote::{Index, Indices, resolution::{DirectRes, Resolution}};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
 use slog::Logger;

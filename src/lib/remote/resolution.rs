@@ -1,7 +1,7 @@
-use package::Checksum;
 use failure::{Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
+use package::Checksum;
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};

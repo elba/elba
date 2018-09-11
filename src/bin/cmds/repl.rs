@@ -28,24 +28,13 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
-    let logger = get::logger(c, args);
-    let threads = get::threads(c, args);
-    let backend = get::backends(c, args);
-
     let ts = (
         args.is_present("lib"),
         args.values_of("bin").map(|x| x.collect::<Vec<_>>()),
     );
 
-    let ctx = build::BuildCtx {
-        indices: c.indices.to_owned(),
-        global_cache: c.layout(),
-        logger,
-        threads,
-        shell: c.shell(),
-        offline: args.is_present("offline"),
-        opts: get::idris_opts(c, args),
-    };
+    let backend = get::backends(c, args);
+    let ctx = get::build_ctx(c, args);
 
     build::repl(&ctx, &project, &ts, &backend, args.is_present("ide-mode"))
 }

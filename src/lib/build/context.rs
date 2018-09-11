@@ -25,8 +25,10 @@ pub struct Compiler {
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    pub fn new() -> Compiler {
-        Compiler::default()
+    pub fn new(name: &str) -> Compiler {
+        Compiler {
+            path: PathBuf::from(name),
+        }
     }
 
     /// Get a process set up to use the found compiler

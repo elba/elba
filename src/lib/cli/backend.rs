@@ -3,15 +3,36 @@
 use super::build;
 use failure::ResultExt;
 use flate2::{write::GzEncoder, Compression};
-use package::manifest::Manifest;
-use remote::{self, resolution::DirectRes};
+use indexmap::IndexMap;
+use package::{manifest::Manifest, Name};
+use remote::{
+    self,
+    resolution::{DirectRes, IndexRes},
+};
 use retrieve::Cache;
-use std::{env::set_current_dir, fs::File, io::Read, path::Path, str::FromStr};
+use semver::Version;
+use std::{
+    env::set_current_dir,
+    fs::{self, File},
+    io::Read,
+    path::{Path, PathBuf},
+    str::{self, FromStr},
+};
 use tar;
+use toml;
 use util::{config, errors::Res};
 use walkdir::WalkDir;
 
-pub fn package(ctx: &build::BuildCtx, project: &Path, verify: bool) -> Res<String> {
+pub struct BackendCtx {
+    pub index: IndexRes,
+    pub data_dir: PathBuf,
+}
+
+pub fn package(
+    ctx: &build::BuildCtx,
+    project: &Path,
+    verify: bool,
+) -> Res<(PathBuf, Name, Version)> {
     if verify {
         build::build(
             &ctx,
@@ -59,7 +80,76 @@ pub fn package(ctx: &build::BuildCtx, project: &Path, verify: bool) -> Res<Strin
     // Finish writing to the tarball
     drop(tar);
 
-    Ok(format!("created compressed tarball at `{}`", gz_name))
+    Ok((
+        nproj.join(&gz_name),
+        manifest.name().clone(),
+        manifest.version().clone(),
+    ))
+}
+
+pub fn login(ctx: &BackendCtx, token: &str) -> Res<String> {
+    let (mut logins, logins_file) = get_logins(ctx)?;
+    logins.insert(ctx.index.clone(), token.to_owned());
+    fs::write(&logins_file, toml::to_string(&logins).unwrap()).context(format_err!(
+        "couldn't write to logins file {}",
+        logins_file.display()
+    ))?;
+    Ok(format!("successfully logged into index {}", &ctx.index))
+}
+
+pub fn yank(bcx: &build::BuildCtx, ctx: &BackendCtx, name: &Name, ver: &Version) -> Res<()> {
+    let token = get_token(ctx)?;
+    let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
+    let backend = get_backend(&mut cache, ctx.index.res.clone())?;
+    backend.yank(name, ver, &token)?;
+    Ok(())
+}
+
+pub fn publish(bcx: &build::BuildCtx, ctx: &BackendCtx, project: &Path, verify: bool) -> Res<()> {
+    let token = get_token(ctx)?;
+    let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
+    let backend = get_backend(&mut cache, ctx.index.res.clone())?;
+
+    let (tar, name, ver) = package(bcx, project, verify)?;
+    let tar = File::open(tar)?;
+
+    backend.publish(tar, &name, &ver, &token)?;
+
+    Ok(())
+}
+
+fn get_logins(ctx: &BackendCtx) -> Res<(IndexMap<IndexRes, String>, PathBuf)> {
+    let logins_file = ctx.data_dir.join("logins.toml");
+
+    if !logins_file.exists() {
+        File::create(&logins_file).with_context(|e| {
+            format_err!(
+                "couldn't create logins file {}: {}",
+                logins_file.display(),
+                e
+            )
+        })?;
+    }
+
+    let logins = fs::read(&logins_file).with_context(|e| {
+        format_err!("couldn't open logins file {}: {}", logins_file.display(), e)
+    })?;
+    let logins: IndexMap<IndexRes, String> = toml::from_slice(&logins).with_context(|e| {
+        format_err!("invalid logins format for {}: {}", logins_file.display(), e)
+    })?;
+
+    Ok((logins, logins_file))
+}
+
+fn get_token(ctx: &BackendCtx) -> Res<String> {
+    let (logins, logins_file) = get_logins(&ctx)?;
+    logins.get(&ctx.index).cloned().ok_or_else(|| {
+        format_err!(
+            "login for {} not found in logins file {}",
+            &ctx.index,
+            logins_file.display()
+        )
+    })
 }
 
 fn get_backend(c: &mut Cache, d: DirectRes) -> Res<remote::Backend> {

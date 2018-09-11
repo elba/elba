@@ -41,17 +41,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         bail!("no package was specified to be installed and the current directory is inaccessible")
     };
 
-    let logger = get::logger(c, args);
-
-    let ctx = build::BuildCtx {
-        indices: c.indices.to_owned(),
-        global_cache: c.layout(),
-        logger,
-        threads: get::threads(c, args),
-        shell: c.shell(),
-        offline: args.is_present("offline"),
-        opts: get::idris_opts(c, args),
-    };
+    let ctx = get::build_ctx(c, args);
 
     let targets = args
         .values_of("bin")

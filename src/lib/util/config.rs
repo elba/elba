@@ -17,6 +17,8 @@ use url::Url;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    #[serde(default = "default_compiler")]
+    pub compiler: String,
     #[serde(default)]
     pub profile: Option<Profile>,
     #[serde(default)]
@@ -30,6 +32,10 @@ pub struct Config {
     pub indices: IndexMap<String, IndexRes>,
     #[serde(default)]
     pub backend: Vec<Backend>,
+}
+
+fn default_compiler() -> String {
+    "idris".to_string()
 }
 
 impl Config {
@@ -111,6 +117,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            compiler: default_compiler(),
             profile: None,
             term: Term::default(),
             alias: default_aliases(),
@@ -164,18 +171,38 @@ impl Default for Term {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Directories {
+    #[serde(default = "default_bin_dir")]
     pub bin: PathBuf,
+    #[serde(default = "default_data_dir")]
     pub data: PathBuf,
+    #[serde(default = "default_cache_dir")]
     pub cache: PathBuf,
+}
+
+fn default_bin_dir() -> PathBuf {
+    BaseDirs::new().unwrap().home_dir().join(".elba/bin")
+}
+
+fn default_data_dir() -> PathBuf {
+    ProjectDirs::from("", "", "elba")
+        .unwrap()
+        .data_dir()
+        .to_path_buf()
+}
+
+fn default_cache_dir() -> PathBuf {
+    ProjectDirs::from("", "", "elba")
+        .unwrap()
+        .cache_dir()
+        .to_path_buf()
 }
 
 impl Default for Directories {
     fn default() -> Self {
-        let proj = ProjectDirs::from("", "", "elba").unwrap();
         Directories {
-            bin: BaseDirs::new().unwrap().home_dir().join(".elba/bin"),
-            data: proj.data_dir().to_path_buf(),
-            cache: proj.cache_dir().to_path_buf(),
+            bin: default_bin_dir(),
+            data: default_data_dir(),
+            cache: default_cache_dir(),
         }
     }
 }

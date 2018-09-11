@@ -273,6 +273,7 @@ pub fn compile_bin(
     };
 
     // The output exectable will always go in target/bin
+    // TODO: Don't ignore this output
     codegen_invoke.exec(bcx)?;
 
     let out = layout.bin.join(name);

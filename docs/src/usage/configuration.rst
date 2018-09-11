@@ -38,6 +38,8 @@ which are not assigned to will carry the default value instead.
 
 .. code-block:: toml
 
+   compiler = "idris"
+                
    [indices]
    "official" = "index+git+https://github.com/elba/elba"
 
@@ -68,6 +70,14 @@ which are not assigned to will carry the default value instead.
    replace the “dots” of the option with underscores, and prefix with
    ``ELBA_``. So the option ``term.verbosity`` becomes
    ``ELBA_TERM_VERBOSITY``.
+   
+``compiler``
+~~~~~~~~~~~~
+
+The compiler key specifies the name of the executable of the Idris
+compiler. By default it is set to "idris". You should **not** pass
+any command line options in this string, as elba will search the
+path for an executable with the name of this string.
 
 ``indices``
 ~~~~~~~~~~~

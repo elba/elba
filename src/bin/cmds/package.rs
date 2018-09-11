@@ -1,7 +1,7 @@
 use super::{args, get};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
-    cli::{backend, build},
+    cli::backend,
     util::{config::Config, errors::Res},
 };
 use failure::ResultExt;
@@ -18,17 +18,12 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
-    let logger = get::logger(c, args);
+    let ctx = get::build_ctx(c, args);
 
-    let ctx = build::BuildCtx {
-        indices: c.indices.to_owned(),
-        global_cache: c.layout(),
-        logger,
-        threads: get::threads(c, args),
-        shell: c.shell(),
-        offline: args.is_present("offline"),
-        opts: vec![],
-    };
+    let (gz_name, _, _) = backend::package(&ctx, &project, !args.is_present("no-verify"))?;
 
-    backend::package(&ctx, &project, !args.is_present("no-verify"))
+    Ok(format!(
+        "created compressed tarball at `{}`",
+        gz_name.display()
+    ))
 }

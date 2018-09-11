@@ -13,8 +13,15 @@
 - New fields to the manifest for use with package backends: `description`,
   `homepage`, `repository`, and `readme` (#30).
 
-- **BREAKING CHANGE**: The ability to specify index aliases in elba's
-  configuration.
+- **BREAKING CHANGE**: A new format for the `indices` key: index aliases
+  can now be specified in elba's configuration, which propagate to
+  packages and commands which take an `--index` flag.
+
+- A new config key `directories.data` which specifies the folder where
+  elba will store data files.
+  
+- A new config key `compiler` to specify the name of the compiler
+  executable.
 
 ### Changed
 

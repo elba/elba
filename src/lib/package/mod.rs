@@ -4,8 +4,8 @@ pub mod lockfile;
 pub mod manifest;
 pub mod version;
 
-use remote::resolution::Resolution;
 use failure::Error;
+use remote::resolution::Resolution;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -101,6 +101,14 @@ impl Name {
 
     pub fn name(&self) -> &str {
         &self.inner.name
+    }
+
+    pub fn normalized_group(&self) -> &str {
+        self.inner.normalization.splitn(2, "/").next().unwrap()
+    }
+
+    pub fn normalized_name(&self) -> &str {
+        self.inner.normalization.rsplitn(2, "/").next().unwrap()
     }
 
     pub fn as_str(&self) -> &str {
@@ -330,6 +338,11 @@ pub struct Summary {
 impl Summary {
     pub fn new(id: PackageId, version: Version) -> Self {
         Summary { id, version }
+    }
+
+    pub fn from_comps(name: Name, res: Resolution, version: Version) -> Self {
+        let pid = PackageId::new(name, res);
+        Self::new(pid, version)
     }
 
     pub fn id(&self) -> &PackageId {

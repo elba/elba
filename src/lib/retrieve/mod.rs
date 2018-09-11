@@ -15,7 +15,10 @@ use package::{
     version::{Constraint, Interval, Range, Relation},
     PackageId, Summary,
 };
-use remote::{Indices, ResolvedEntry, resolution::{DirectRes, IndexRes, Resolution}};
+use remote::{
+    resolution::{DirectRes, IndexRes, Resolution},
+    Indices, ResolvedEntry,
+};
 use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
 use slog::Logger;

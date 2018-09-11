@@ -105,9 +105,24 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
 
 mod get {
     use super::*;
-    use elba::remote::resolution::IndexRes;
+    use elba::{cli::build::BuildCtx, remote::resolution::IndexRes};
     use slog::Drain;
     use std::str::FromStr;
+
+    pub fn build_ctx(c: &mut Config, args: &ArgMatches) -> BuildCtx {
+        let logger = get::logger(c, args);
+
+        BuildCtx {
+            compiler: c.compiler.clone(),
+            indices: c.indices.to_owned(),
+            global_cache: c.layout(),
+            logger,
+            threads: get::threads(c, args),
+            shell: c.shell(),
+            offline: args.is_present("offline"),
+            opts: get::idris_opts(c, args),
+        }
+    }
 
     pub fn logger(c: &mut Config, args: &ArgMatches) -> Logger {
         if args.is_present("debug-log") {
@@ -182,9 +197,7 @@ mod get {
                 0 => Err(format_err!(
                     "no indices in configuration and none specified at the CLI"
                 )),
-                1 => {
-                    Ok(c.indices.get_index(0).unwrap().1.clone())
-                },
+                1 => Ok(c.indices.get_index(0).unwrap().1.clone()),
                 _ => Err(format_err!(
                     "> 1 index in configuration and none specified at the CLI"
                 )),
