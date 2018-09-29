@@ -33,7 +33,7 @@ itertools = "0.7"
 nom = "4.0"
 petgraph = "0.4"
 rand = "0.5"
-reqwest = "0.8"
+reqwest = "0.9"
 scoped_threadpool = "0.1"
 semver = { version = "0.9", features = ["serde"] }
 serde = "1.0"
