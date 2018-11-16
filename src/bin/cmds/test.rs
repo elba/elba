@@ -14,7 +14,6 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::build_threads())
         .arg(args::offline())
         .arg(args::debug_log())
-        .arg(args::idris_opts())
         .arg(
             Arg::with_name("test-threads")
                 .long("test-threads")
@@ -25,7 +24,7 @@ pub fn cli() -> App<'static, 'static> {
             Arg::with_name("targets")
                 .multiple(true)
                 .help("The names of the tests to run (all tests are run if unspecified)"),
-        )
+        ).arg(args::idris_opts())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {

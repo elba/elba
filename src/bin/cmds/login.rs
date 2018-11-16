@@ -1,6 +1,9 @@
 use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
-use elba::{cli::backend, util::{config::Config, errors::Res}};
+use elba::{
+    cli::backend,
+    util::{config::Config, errors::Res},
+};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("login")

@@ -11,12 +11,12 @@ use std::{env::current_dir, str::FromStr};
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("update")
         .arg(args::debug_log())
-        .arg(args::idris_opts())
         .arg(
             Arg::with_name("dependencies")
                 .multiple(true)
                 .help("The dependencies of the package to update (default is all packages)"),
         ).about("Generates or updates elba.lock according to the manifest")
+        .arg(args::idris_opts())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {

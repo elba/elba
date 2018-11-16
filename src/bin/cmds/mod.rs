@@ -287,7 +287,10 @@ mod args {
     }
 
     pub fn idris_opts() -> Arg {
-        Arg::with_name("idris-opts").last(true).min_values(0)
+        Arg::with_name("idris-opts")
+            .multiple(true)
+            .last(true)
+            .min_values(0)
     }
 
     pub fn no_verify() -> Arg {
