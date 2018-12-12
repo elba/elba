@@ -23,6 +23,7 @@ use retrieve::{
 use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
+    env,
     fs,
     io::prelude::*,
     path::{Path, PathBuf},
@@ -311,6 +312,8 @@ pub fn repl(
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
 
+    env::set_current_dir(&project)?;
+
     let mut parents = vec![];
     let mut paths = vec![];
 
@@ -416,10 +419,12 @@ pub fn repl(
 
         let mut process = bctx.compiler.process();
         for binary in deps {
-            // We assume that the binary has already been compiled
+            // We assume that deps have already been compiled
             process.arg("-i").arg(binary);
         }
+
         for path in &parents {
+            process.arg("--sourcepath").arg(path);
             process.arg("-i").arg(path);
         }
 
