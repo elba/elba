@@ -1,13 +1,14 @@
 //! Package repositories that can be published/yanked to.
 //! elba reads from indices and writes to repos.
 
-use package::Name;
+use crate::{package::Name, util::errors::Res};
+use failure::format_err;
 use reqwest::Client;
 use semver::Version;
+use serde_derive::{Deserialize, Serialize};
 use std::{fs::File, time::Duration};
 use url::Url;
 use url_serde;
-use util::errors::Res;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Backend(#[serde(with = "url_serde")] pub Url);
@@ -23,7 +24,8 @@ impl Backend {
                 ("semver", &version.to_string()),
                 ("yanked", "true"),
                 ("token", token),
-            ]).send()?;
+            ])
+            .send()?;
 
         if resp.status().is_success() {
             Ok(())
@@ -41,7 +43,8 @@ impl Backend {
                 ("package_name", name.name()),
                 ("semver", &version.to_string()),
                 ("token", token),
-            ]).body(tar)
+            ])
+            .body(tar)
             .send()?;
 
         if resp.status().is_success() {

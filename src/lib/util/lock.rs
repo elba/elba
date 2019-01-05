@@ -3,7 +3,7 @@
 //! As it is currently designed, `elba` doesn't need to lock individual files. It does, however,
 //! need to lock directories to prevent other processes from using them.
 
-use failure::{Error, ResultExt};
+use failure::{bail, format_err, Error, ResultExt};
 use fs2::FileExt;
 use std::{
     fs,

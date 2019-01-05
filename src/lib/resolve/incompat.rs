@@ -1,8 +1,8 @@
 //! Incompatibilities for the dependency resolver.
 
-use indexmap::IndexMap;
+use crate::package::{version::Constraint, PackageId, Summary};
+use indexmap::{indexmap, IndexMap};
 use itertools::Itertools;
-use package::{version::Constraint, PackageId, Summary};
 use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

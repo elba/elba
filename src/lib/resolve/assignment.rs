@@ -1,6 +1,6 @@
 //! Assignments for the dependency resolver.
 
-use package::{version::Constraint, PackageId};
+use crate::package::{version::Constraint, PackageId};
 use semver::Version;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

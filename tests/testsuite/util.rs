@@ -6,8 +6,9 @@ use elba::{
     retrieve::cache::{Cache, Layout},
     util::{copy_dir, lock::DirLock, shell::Shell},
 };
-use indexmap::IndexMap;
-use slog::{self, Logger};
+use indexmap::{indexmap, IndexMap};
+use lazy_static::lazy_static;
+use slog::{self, o, Logger};
 use std::{path::PathBuf, str::FromStr};
 use tempdir::TempDir;
 

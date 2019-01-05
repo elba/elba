@@ -5,6 +5,7 @@ use elba::{
     package::Spec,
     util::{config::Config, errors::Res},
 };
+use failure::format_err;
 use std::str::FromStr;
 
 pub fn cli() -> App<'static, 'static> {
@@ -14,7 +15,8 @@ pub fn cli() -> App<'static, 'static> {
             Arg::with_name("package")
                 .takes_value(true)
                 .help("The package spec to yank (name:version)"),
-        ).arg(args::index())
+        )
+        .arg(args::index())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {

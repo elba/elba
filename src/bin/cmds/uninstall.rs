@@ -5,7 +5,7 @@ use elba::{
     retrieve::cache::Cache,
     util::{config::Config, errors::Res},
 };
-use failure::ResultExt;
+use failure::{format_err, ResultExt};
 use std::str::FromStr;
 
 pub fn cli() -> App<'static, 'static> {

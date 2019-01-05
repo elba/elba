@@ -1,16 +1,5 @@
 #[macro_use]
 extern crate clap;
-extern crate console;
-extern crate elba;
-#[macro_use]
-extern crate failure;
-// extern crate indicatif;
-extern crate itertools;
-extern crate toml;
-#[macro_use]
-extern crate slog;
-extern crate slog_async;
-extern crate slog_term;
 
 mod cmds;
 
@@ -37,23 +26,27 @@ fn cli() -> App<'static, 'static> {
                 .help("Verbose output")
                 .global(true)
                 .conflicts_with("quiet"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("quiet")
                 .long("quiet")
                 .help("Quiet output")
                 .global(true),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("color")
                 .long("color")
                 .help("Force-enable color output")
                 .global(true)
                 .conflicts_with("no-color"),
-        ).arg(
+        )
+        .arg(
             Arg::with_name("no-color")
                 .long("no-color")
                 .help("Disable color output")
                 .global(true),
-        ).subcommands(cmds::subcommands())
+        )
+        .subcommands(cmds::subcommands())
 }
 
 fn unalias(c: &Config, cmd: &str) -> Option<String> {

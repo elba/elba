@@ -48,19 +48,29 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
-use build::{context::BuildContext, Targets};
+use crate::{
+    build::{context::BuildContext, Targets},
+    package::{manifest::Manifest, PackageId, Spec},
+    remote::{
+        resolution::{DirectRes, Resolution},
+        Index, Indices,
+    },
+    util::{
+        clear_dir, copy_dir, copy_dir_gitless,
+        errors::Res,
+        graph::Graph,
+        hexify_hash,
+        lock::DirLock,
+        shell::{Shell, Verbosity},
+    },
+};
 use console::style;
-use failure::{Error, ResultExt};
+use failure::{bail, format_err, Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use package::{manifest::Manifest, PackageId, Spec};
-use remote::{
-    resolution::{DirectRes, Resolution},
-    Index, Indices,
-};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
-use slog::Logger;
+use slog::{debug, o, Logger};
 use std::{
     collections::VecDeque,
     fs,
@@ -71,14 +81,6 @@ use std::{
     time::Duration,
 };
 use toml;
-use util::{
-    clear_dir, copy_dir, copy_dir_gitless,
-    errors::Res,
-    graph::Graph,
-    hexify_hash,
-    lock::DirLock,
-    shell::{Shell, Verbosity},
-};
 use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
@@ -323,7 +325,8 @@ impl Cache {
         fs::write(
             self.layout.bin.join(".bins"),
             toml::to_string(&dot).unwrap().as_bytes(),
-        ).with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
+        )
+        .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
 
         Ok(())
     }
@@ -417,7 +420,8 @@ impl Cache {
             fs::write(
                 self.layout.bin.join(".bins"),
                 toml::to_string(&dot).unwrap().as_bytes(),
-            ).with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
+            )
+            .with_context(|e| format_err!("could not write to .bins file:\n{}", e))?;
         }
 
         Ok(c)
@@ -552,7 +556,7 @@ impl Cache {
             .into_iter()
             .filter_map(|e| e.ok());
 
-        let mut res = indexset!();
+        let mut res = IndexSet::new();
 
         for dir in walker {
             let fname = dir
@@ -732,12 +736,14 @@ impl Source {
         let walker = WalkDir::new(path.path())
             .into_iter()
             .filter_entry(|entry| {
-                entry.file_name() != "target" && entry
-                    .file_name()
-                    .to_str()
-                    .map(|s| !s.starts_with('.'))
-                    .unwrap_or(false)
-            }).filter(|e| e.as_ref().unwrap().file_type().is_file());
+                entry.file_name() != "target"
+                    && entry
+                        .file_name()
+                        .to_str()
+                        .map(|s| !s.starts_with('.'))
+                        .unwrap_or(false)
+            })
+            .filter(|e| e.as_ref().unwrap().file_type().is_file());
 
         let mut hash = Sha256::new();
         for f in walker {

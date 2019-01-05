@@ -5,7 +5,7 @@ use elba::{
     package::Spec,
     util::{config::Config, errors::Res},
 };
-use failure::ResultExt;
+use failure::{bail, format_err, ResultExt};
 use itertools::Either::{Left, Right};
 use std::{env::current_dir, str::FromStr};
 

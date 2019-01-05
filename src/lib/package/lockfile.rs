@@ -2,12 +2,13 @@
 //!
 //! Lockfiles are created based on dependency constraints, and ensure that builds are repeatable
 
+use crate::util::graph::Graph;
 use failure::{Error, ResultExt};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use petgraph::{self, graph::NodeIndex};
+use serde_derive::{Deserialize, Serialize};
 use std::iter::FromIterator;
 use toml;
-use util::graph::Graph;
 
 use super::*;
 
@@ -58,7 +59,7 @@ impl Into<LockfileToml> for Graph<Summary> {
 impl From<LockfileToml> for Graph<Summary> {
     fn from(f: LockfileToml) -> Self {
         let mut tree = petgraph::Graph::new();
-        let mut set = indexmap!();
+        let mut set = IndexMap::new();
 
         // We don't assume that nix 0 is root here.
         for pkg in f.packages {

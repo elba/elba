@@ -7,15 +7,15 @@ pub mod graph;
 pub mod lock;
 pub mod shell;
 
-use failure::ResultExt;
+use crate::util::errors::{Error, Res};
+use failure::{bail, format_err, ResultExt};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fs, path::Path};
 use std::{
-    path::{Component, PathBuf},
+    fs,
+    path::{Component, Path, PathBuf},
     process::Output,
     str::FromStr,
 };
-use util::errors::{Error, Res};
 use walkdir::{DirEntry, WalkDir};
 
 /// Turns an SHA2 hash into a nice hexified string.

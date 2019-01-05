@@ -7,11 +7,14 @@
 //! Environment variables (.env files?) should also be able to modify the configuration.
 
 use super::shell::{Shell, Verbosity};
+use crate::{
+    remote::resolution::{DirectRes, IndexRes},
+    retrieve::cache::Layout,
+};
 use config;
 use directories::{BaseDirs, ProjectDirs};
-use indexmap::IndexMap;
-use remote::resolution::{DirectRes, IndexRes};
-use retrieve::cache::Layout;
+use indexmap::{indexmap, IndexMap};
+use serde_derive::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
 use url::Url;
 
@@ -56,7 +59,8 @@ impl Config {
                     .unwrap()
                     .config_dir()
                     .join("config"),
-            ).format(config::FileFormat::Toml)
+            )
+            .format(config::FileFormat::Toml)
             .required(false),
         )?;
 

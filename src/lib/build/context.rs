@@ -1,7 +1,9 @@
-use failure::ResultExt;
-use retrieve::cache::Cache;
+use crate::{
+    retrieve::cache::Cache,
+    util::{config::Backend, errors::Res, fmt_output},
+};
+use failure::{format_err, ResultExt};
 use std::{path::PathBuf, process::Command};
-use util::{config::Backend, errors::Res, fmt_output};
 
 // TODO: triple target
 #[derive(Debug)]

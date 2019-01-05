@@ -23,11 +23,18 @@
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
 use super::backend::Backend;
-use failure::{Error, ResultExt};
+use crate::{
+    package::{version::Constraint, *},
+    remote::resolution::{DirectRes, IndexRes, Resolution},
+    util::{
+        errors::{ErrorKind, Res},
+        lock::DirLock,
+    },
+};
+use failure::{format_err, Error, ResultExt};
 use indexmap::IndexMap;
-use package::{version::Constraint, *};
-use remote::resolution::{DirectRes, IndexRes, Resolution};
 use semver::Version;
+use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{
     fs,
@@ -35,10 +42,6 @@ use std::{
     str::FromStr,
 };
 use toml;
-use util::{
-    errors::{ErrorKind, Res},
-    lock::DirLock,
-};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct IndexConfig {
@@ -66,7 +69,7 @@ impl Default for IndexConfInner {
     fn default() -> Self {
         IndexConfInner {
             secure: false,
-            dependencies: indexmap!(),
+            dependencies: IndexMap::new(),
             backend: None,
         }
     }
@@ -96,7 +99,7 @@ pub struct Indices {
 impl Indices {
     pub fn new(indices: Vec<Index>) -> Self {
         let indices = indices.into_iter().map(|i| (i.id.clone(), i)).collect();
-        let cache = indexmap!();
+        let cache = IndexMap::new();
 
         Indices { indices, cache }
     }
@@ -114,7 +117,8 @@ impl Indices {
                             !x.1.yanked
                                 && (spec.version.is_none()
                                     || Some(&x.1.version) == spec.version.as_ref())
-                        }).last()
+                        })
+                        .last()
                     {
                         if let Some(existing) = res {
                             return Err(format_err!(
@@ -218,7 +222,7 @@ impl Index {
     }
 
     pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, ResolvedEntry>> {
-        let mut res = indexmap!();
+        let mut res = IndexMap::new();
         let path = self.path.path().join(name.as_normalized());
         let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
         let r = io::BufReader::new(&file);
@@ -244,7 +248,8 @@ impl Index {
                         name: x.name,
                         req: x.req,
                     }
-                }).collect::<Vec<_>>();
+                })
+                .collect::<Vec<_>>();
 
             let entry: ResolvedEntry = IndexEntry {
                 name: entry.name,

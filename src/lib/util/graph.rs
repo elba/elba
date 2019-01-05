@@ -1,12 +1,14 @@
+use crate::util::errors::Res;
 use petgraph::{
     self,
     graph::NodeIndex,
     visit::{Bfs, EdgeRef, IntoNodeReferences, Walker},
     Direction,
 };
-use std::collections::HashMap;
-use std::ops::{Index, IndexMut};
-use util::errors::Res;
+use std::{
+    collections::HashMap,
+    ops::{Index, IndexMut},
+};
 
 /// A wrapper for `petgraph::Graph`.
 ///

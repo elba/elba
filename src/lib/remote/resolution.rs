@@ -1,20 +1,22 @@
-use failure::{Error, ResultExt};
+use crate::{
+    package::Checksum,
+    util::{
+        clear_dir,
+        errors::{ErrorKind, Res},
+        git::{clone, fetch, reset, update_submodules},
+        hexify_hash,
+        lock::DirLock,
+    },
+};
+use failure::{format_err, Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
-use package::Checksum;
 use reqwest::Client;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
 use tar::Archive;
 use url::Url;
-use util::{
-    clear_dir,
-    errors::{ErrorKind, Res},
-    git::{clone, fetch, reset, update_submodules},
-    hexify_hash,
-    lock::DirLock,
-};
 
 /// The possible places from which a package can be resolved.
 ///

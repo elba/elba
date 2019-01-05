@@ -1,22 +1,22 @@
 use super::{compile_bin, compile_doc, compile_lib, context::BuildContext, Target, Targets};
+use crate::{
+    retrieve::cache::{Binary, BuildHash, OutputLayout, Source},
+    util::{
+        clear_dir,
+        errors::Res,
+        fmt_output,
+        graph::Graph,
+        lock::DirLock,
+        shell::{Shell, Verbosity},
+    },
+};
 use console::style;
 use crossbeam::queue::MsQueue;
-use failure::ResultExt;
+use failure::{bail, ResultExt};
 use petgraph::graph::NodeIndex;
-use retrieve::cache::OutputLayout;
-use retrieve::cache::{Binary, BuildHash, Source};
 use scoped_threadpool::Pool;
-use slog::Logger;
-use std::iter::FromIterator;
-use std::{collections::HashSet, path::PathBuf};
-use util::{
-    clear_dir,
-    errors::Res,
-    fmt_output,
-    graph::Graph,
-    lock::DirLock,
-    shell::{Shell, Verbosity},
-};
+use slog::{debug, o, Logger};
+use std::{collections::HashSet, iter::FromIterator, path::PathBuf};
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -135,10 +135,11 @@ impl JobQueue {
 
         // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
         let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
-            self.graph[index].work.is_dirty() && self
-                .graph
-                .children(index)
-                .all(|(child, _)| self.graph[child].work.is_fresh())
+            self.graph[index].work.is_dirty()
+                && self
+                    .graph
+                    .children(index)
+                    .all(|(child, _)| self.graph[child].work.is_fresh())
         });
 
         // this queue only contains dirty jobs.
@@ -177,7 +178,8 @@ impl JobQueue {
                             .map(|(_, job)| match &job.work {
                                 Work::Fresh(binary) => binary,
                                 _ => unreachable!(),
-                            }).collect::<Vec<_>>();
+                            })
+                            .collect::<Vec<_>>();
 
                         let ts = &self.graph[job_index].targets;
 
@@ -267,7 +269,8 @@ impl JobQueue {
                                                 &deps,
                                                 &layout,
                                                 bcx,
-                                            ).with_context(|e| {
+                                            )
+                                            .with_context(|e| {
                                                 format!(
                                                     "Couldn't build binary {} for {}\n{}",
                                                     ix,
@@ -309,7 +312,8 @@ impl JobQueue {
                                                 &deps,
                                                 &layout,
                                                 bcx,
-                                            ).with_context(|e| {
+                                            )
+                                            .with_context(|e| {
                                                 format!(
                                                     "Couldn't build test {} for {}\n{}",
                                                     ix,
@@ -461,7 +465,8 @@ impl JobQueue {
                 } else {
                     None
                 }
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         Ok((root_children, bins_vec))
     }

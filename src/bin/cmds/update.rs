@@ -5,7 +5,7 @@ use elba::{
     package::Spec,
     util::{config::Config, errors::Res},
 };
-use failure::ResultExt;
+use failure::{format_err, ResultExt};
 use std::{env::current_dir, str::FromStr};
 
 pub fn cli() -> App<'static, 'static> {
@@ -15,7 +15,8 @@ pub fn cli() -> App<'static, 'static> {
             Arg::with_name("dependencies")
                 .multiple(true)
                 .help("The dependencies of the package to update (default is all packages)"),
-        ).about("Generates or updates elba.lock according to the manifest")
+        )
+        .about("Generates or updates elba.lock according to the manifest")
         .arg(args::idris_opts())
 }
 
@@ -34,7 +35,8 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|spec| {
             Spec::from_str(spec)
                 .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))
-        }).collect::<Result<Vec<_>, _>>()?;
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     build::update(&ctx, &project, Some(&packages))
 }

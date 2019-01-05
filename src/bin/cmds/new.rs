@@ -5,7 +5,7 @@ use elba::{
     package::Name,
     util::{config::Config, errors::Res},
 };
-use failure::ResultExt;
+use failure::{format_err, ResultExt};
 use std::{env::current_dir, str::FromStr};
 
 pub fn cli() -> App<'static, 'static> {

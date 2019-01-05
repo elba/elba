@@ -1,13 +1,16 @@
 //! Utilities for interacting with the Idris compiler
 
-use build::context::BuildContext;
+use crate::{
+    build::context::BuildContext,
+    retrieve::cache::{Binary, OutputLayout},
+    util::{errors::Res, fmt_output},
+};
+use failure::bail;
 use itertools::Itertools;
-use retrieve::cache::{Binary, OutputLayout};
 use std::{
     path::{Path, PathBuf},
     process::Output,
 };
-use util::{errors::Res, fmt_output};
 
 // CompileInvocation is responsible for dealing with ibc stuff
 #[derive(Debug)]
@@ -75,7 +78,8 @@ impl<'a> CodegenInvocation<'a> {
                 &cwd
             } else {
                 &self.layout.bin
-            }).args(&["-o", &self.output])
+            })
+            .args(&["-o", &self.output])
             .args(&[
                 if bcx.backend.portable {
                     "--portable-codegen"

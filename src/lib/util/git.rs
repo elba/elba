@@ -28,11 +28,11 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use failure::ResultExt;
+use crate::util::errors::Res;
+use failure::{format_err, ResultExt};
 use git2;
 use std::{env, fs, path::Path};
 use url::Url;
-use util::errors::Res;
 
 pub fn init(path: &Path) -> Res<()> {
     git2::Repository::init(path)?;

@@ -7,27 +7,29 @@
 pub mod cache;
 
 pub use self::cache::{Cache, Source};
+use crate::{
+    package::{
+        version::{Constraint, Interval, Range, Relation},
+        PackageId, Summary,
+    },
+    remote::{
+        resolution::{DirectRes, IndexRes, Resolution},
+        Indices, ResolvedEntry,
+    },
+    resolve::incompat::{Incompatibility, IncompatibilityCause},
+    util::{
+        errors::{ErrorKind, Res},
+        graph::Graph,
+        shell::{Shell, Verbosity},
+    },
+};
 use console::style;
-use failure::{Error, ResultExt};
-use indexmap::{IndexMap, IndexSet};
+use failure::{format_err, Error, ResultExt};
+use indexmap::{indexmap, IndexMap, IndexSet};
 use itertools::Either::{self, Left, Right};
-use package::{
-    version::{Constraint, Interval, Range, Relation},
-    PackageId, Summary,
-};
-use remote::{
-    resolution::{DirectRes, IndexRes, Resolution},
-    Indices, ResolvedEntry,
-};
-use resolve::incompat::{Incompatibility, IncompatibilityCause};
 use semver::Version;
-use slog::Logger;
+use slog::{debug, info, o, trace, Logger};
 use std::borrow::Cow;
-use util::{
-    errors::{ErrorKind, Res},
-    graph::Graph,
-    shell::{Shell, Verbosity},
-};
 
 // TODO: Generalized patching and source replacement
 // Right now, when using the `--offline` flag, we replace all locations of all index entries with
@@ -141,7 +143,8 @@ impl<'cache> Retriever<'cache> {
                                     Verbosity::Normal,
                                 );
                             },
-                        ).context(format_err!("unable to retrieve package {}", sum))?;
+                        )
+                        .context(format_err!("unable to retrieve package {}", sum))?;
                     // prg += 1;
                     // pb.set_position(prg);
                     Ok(source.1)
@@ -401,8 +404,10 @@ impl<'cache> Retriever<'cache> {
                         .filter(|(_, e)| {
                             let hash = Cache::get_source_dir(&e.location, false);
                             cache.contains(&hash)
-                        }).count()
-                }).unwrap_or(0)
+                        })
+                        .count()
+                })
+                .unwrap_or(0)
         } else {
             self.indices.count_versions(pkg)
         }

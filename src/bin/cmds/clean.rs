@@ -1,6 +1,6 @@
 use clap::{App, ArgMatches, SubCommand};
 use elba::util::{clear_dir, config::Config, errors::Res};
-use failure::ResultExt;
+use failure::{format_err, ResultExt};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("clean").about("Cleans the global cache")

@@ -1,6 +1,7 @@
 //! Because nothing ever works correctly...
 
 pub use failure::Error;
+use failure_derive::Fail;
 
 pub type Res<T> = Result<T, Error>;
 

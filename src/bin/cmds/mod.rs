@@ -20,9 +20,9 @@ use elba::util::{
     errors::Res,
     shell::Verbosity,
 };
-use failure::{Error, ResultExt};
+use failure::{format_err, Error, ResultExt};
 use itertools::Itertools;
-use slog::{Discard, Logger};
+use slog::{o, Discard, Logger};
 use slog_async;
 use slog_term;
 use std::{env, process::Command};
@@ -86,7 +86,8 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
                 ext_args.iter().join(" "),
                 e
             )
-        })?.wait_with_output()
+        })?
+        .wait_with_output()
         .with_context(|e| {
             format_err!(
                 "failed to get output of external command `elba-{} {}`:\n{}",
@@ -142,7 +143,8 @@ mod get {
             .and_then(|x| {
                 let x = x.into_owned();
                 c.get_backend(&x)
-            }).unwrap_or_else(|| c.default_backend());
+            })
+            .unwrap_or_else(|| c.default_backend());
 
         // We do this because we want to preserve the name of the backend, even if it wasn't in the
         // config

@@ -1,15 +1,18 @@
 //! Repository-related commands: publishing, yanking, etc.
 
 use super::build;
-use failure::ResultExt;
+use crate::{
+    package::{manifest::Manifest, Name},
+    remote::{
+        self,
+        resolution::{DirectRes, IndexRes},
+    },
+    retrieve::Cache,
+    util::{config, errors::Res},
+};
+use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
 use indexmap::IndexMap;
-use package::{manifest::Manifest, Name};
-use remote::{
-    self,
-    resolution::{DirectRes, IndexRes},
-};
-use retrieve::Cache;
 use semver::Version;
 use std::{
     env::set_current_dir,
@@ -20,7 +23,6 @@ use std::{
 };
 use tar;
 use toml;
-use util::{config, errors::Res};
 use walkdir::WalkDir;
 
 pub struct BackendCtx {

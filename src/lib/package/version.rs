@@ -25,8 +25,8 @@
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
 
 use self::Interval::{Closed, Open, Unbounded};
-use failure::Error;
-use indexmap::IndexSet;
+use failure::{format_err, Error};
+use indexmap::{indexset, IndexSet};
 use itertools::Itertools;
 use nom::types::CompleteStr;
 use semver::Version;
@@ -55,16 +55,20 @@ impl Interval {
     pub fn cmp(&self, other: &Interval, lower: bool) -> cmp::Ordering {
         match (self, other) {
             (Interval::Unbounded, Interval::Unbounded) => cmp::Ordering::Equal,
-            (Interval::Unbounded, _) => if lower {
-                cmp::Ordering::Less
-            } else {
-                cmp::Ordering::Greater
-            },
-            (_, Interval::Unbounded) => if lower {
-                cmp::Ordering::Greater
-            } else {
-                cmp::Ordering::Less
-            },
+            (Interval::Unbounded, _) => {
+                if lower {
+                    cmp::Ordering::Less
+                } else {
+                    cmp::Ordering::Greater
+                }
+            }
+            (_, Interval::Unbounded) => {
+                if lower {
+                    cmp::Ordering::Greater
+                } else {
+                    cmp::Ordering::Less
+                }
+            }
             (Interval::Open(a, ap), Interval::Open(b, bp)) => {
                 let c = a.cmp(&b);
                 if c == cmp::Ordering::Equal {
@@ -245,11 +249,13 @@ impl Range {
                     }
                 }
             }
-            (a, b) => if a.cmp(&b, true) != cmp::Ordering::Greater {
-                Some(Range { lower: a, upper: b })
-            } else {
-                None
-            },
+            (a, b) => {
+                if a.cmp(&b, true) != cmp::Ordering::Greater {
+                    Some(Range { lower: a, upper: b })
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -449,7 +455,8 @@ impl Constraint {
                         Err((a2, b2))
                     }
                 }
-            }).collect();
+            })
+            .collect();
     }
 
     pub fn is_empty(&self) -> bool {
@@ -742,7 +749,11 @@ impl<'de> Deserialize<'de> for Constraint {
 
 mod parse {
     use super::*;
-    use nom::{digit, types::CompleteStr};
+    use nom::{
+        alt, alt_complete, call, complete, digit, do_parse, do_parse_sep, error_position, map,
+        map_res, named, opt, sep, separated_list, tag, tag_s, take_while1, take_while1_s,
+        types::CompleteStr, wrap_sep, ws,
+    };
     use semver::Version;
     use std::str::FromStr;
 
@@ -878,8 +889,7 @@ mod parse {
 
 #[cfg(test)]
 mod tests {
-    use super::parse::*;
-    use super::*;
+    use super::{parse::*, *};
     use semver::Version;
 
     macro_rules! new_range {
@@ -887,25 +897,29 @@ mod tests {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap()),
                 Interval::Open(Version::parse($b).unwrap()),
-            ).unwrap()
+            )
+            .unwrap()
         };
         ($a:tt ~ .. $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap(), false),
                 Interval::Open(Version::parse($b).unwrap(), false),
-            ).unwrap()
+            )
+            .unwrap()
         };
         ($a:tt.. ~ $b:tt) => {
             Range::new(
                 Interval::Open(Version::parse($a).unwrap(), false),
                 Interval::Closed(Version::parse($b).unwrap(), false),
-            ).unwrap()
+            )
+            .unwrap()
         };
         ($a:tt ~ . ~ $b:tt) => {
             Range::new(
                 Interval::Closed(Version::parse($a).unwrap(), false),
                 Interval::Closed(Version::parse($b).unwrap(), false),
-            ).unwrap()
+            )
+            .unwrap()
         };
     }
 
@@ -918,7 +932,8 @@ mod tests {
             "1.0.0-alpha.1",
             "1.0.0+b1231231",
             "1.0.0-alpha.1+b1231231",
-        ].into_iter()
+        ]
+        .into_iter()
         .map(|v| CompleteStr(v))
         .collect::<Vec<_>>();
 
@@ -979,11 +994,13 @@ mod tests {
             Range::new(
                 Interval::Closed(Version::parse("1.0.0").unwrap(), false),
                 Interval::Unbounded,
-            ).unwrap(),
+            )
+            .unwrap(),
             Range::new(
                 Interval::Unbounded,
                 Interval::Open(Version::parse("2.0.0").unwrap(), false),
-            ).unwrap(),
+            )
+            .unwrap(),
         ];
 
         assert_eq!(ns, vs);

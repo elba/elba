@@ -2,10 +2,14 @@
 
 use self::version::Constraint;
 use super::*;
-use failure::{Error, ResultExt};
+use crate::{
+    remote::resolution::{DirectRes, IndexRes},
+    util::SubPath,
+};
+use failure::{bail, format_err, Error, ResultExt};
 use indexmap::IndexMap;
-use remote::resolution::{DirectRes, IndexRes};
 use semver::Version;
+use serde_derive::Deserialize;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -13,7 +17,6 @@ use std::{
 use toml;
 use url::Url;
 use url_serde;
-use util::SubPath;
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
 //
@@ -69,7 +72,7 @@ impl Manifest {
         ixmap: &IndexMap<String, IndexRes>,
         dev_deps: bool,
     ) -> Res<IndexMap<PackageId, Constraint>> {
-        let mut deps = indexmap!();
+        let mut deps = IndexMap::new();
         for (n, dep) in &self.dependencies {
             let dep = dep.clone();
             let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
@@ -234,8 +237,8 @@ fn default_test_subpath() -> SubPath {
 impl From<TestTarget> for BinTarget {
     fn from(t: TestTarget) -> Self {
         let default_name = format!("test-{}", &t.main)
-            .trim_right_matches(".idr")
-            .trim_right_matches(".lidr")
+            .trim_end_matches(".idr")
+            .trim_end_matches(".lidr")
             .replace("/", "_")
             .replace(".", "_");
 

@@ -13,28 +13,30 @@ use self::{
     assignment::{Assignment, AssignmentType},
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
-use console::style;
-use failure::Error;
-use indexmap::IndexMap;
-use package::{
-    version::{Constraint, Relation},
-    PackageId, Summary,
+use crate::{
+    package::{
+        version::{Constraint, Relation},
+        PackageId, Summary,
+    },
+    retrieve::Retriever,
+    util::{
+        errors::ErrorKind,
+        graph::Graph,
+        shell::{Shell, Verbosity},
+    },
 };
+use console::style;
+use failure::{bail, Error};
+use indexmap::{indexmap, indexset, IndexMap};
 use petgraph::{
     self,
     graphmap::{DiGraphMap, NodeTrait},
     Direction,
 };
-use retrieve::Retriever;
 use semver::Version;
-use slog::Logger;
+use slog::{error, info, o, trace, Logger};
 use std::{cmp, collections::VecDeque};
 use textwrap::fill;
-use util::{
-    errors::ErrorKind,
-    graph::Graph,
-    shell::{Shell, Verbosity},
-};
 
 #[derive(Debug)]
 pub struct Resolver<'ret, 'cache: 'ret> {
@@ -311,13 +313,15 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                         .clone()
                         .into_iter()
                         .filter(|t| (&t.0, &t.1) != most_recent_term),
-                ).chain(
+                )
+                .chain(
                     cause
                         .deps()
                         .clone()
                         .into_iter()
                         .filter(|t| &t.0 != most_recent_satisfier.pkg()),
-                ).collect();
+                )
+                .collect();
 
             if let Some((pkg, diff)) = difference {
                 new_terms.insert(pkg.clone(), diff.complement());
@@ -408,14 +412,16 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                     let incompats = self.retriever.incompats(&sum).unwrap();
                     let mut conflict = false;
                     for ic in incompats {
-                        conflict = conflict || ic
-                            .deps
-                            .iter()
-                            .map(|(k, v)| {
-                                k == sum.id()
-                                    || self.relation(k, v) == Relation::Subset
-                                    || self.relation(k, v) == Relation::Equal
-                            }).all(|b| b);
+                        conflict = conflict
+                            || ic
+                                .deps
+                                .iter()
+                                .map(|(k, v)| {
+                                    k == sum.id()
+                                        || self.relation(k, v) == Relation::Subset
+                                        || self.relation(k, v) == Relation::Equal
+                                })
+                                .all(|b| b);
                         self.incompatibility(ic.deps, ic.cause);
                     }
                     if !conflict {

@@ -4,18 +4,23 @@ pub mod context;
 pub mod invoke;
 pub mod job;
 
-use self::{context::BuildContext, invoke::CodegenInvocation, invoke::CompileInvocation};
-use failure::ResultExt;
+use self::{
+    context::BuildContext,
+    invoke::{CodegenInvocation, CompileInvocation},
+};
+use crate::{
+    retrieve::cache::{Binary, OutputLayout, Source},
+    util::{clear_dir, copy_dir, errors::Res, generate_ipkg},
+};
+use failure::{bail, format_err, ResultExt};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use retrieve::cache::{Binary, OutputLayout, Source};
 use std::{
     ffi::OsStr,
     fs,
     path::{Path, PathBuf},
     process::Output,
 };
-use util::{clear_dir, copy_dir, errors::Res, generate_ipkg};
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -150,7 +155,8 @@ pub fn compile_lib(
                     path.display()
                 ))
             }
-        }).collect::<Result<Vec<_>, _>>()?;
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut args = vec![];
     args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));

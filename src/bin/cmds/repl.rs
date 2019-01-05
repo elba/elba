@@ -4,7 +4,7 @@ use elba::{
     cli::build,
     util::{config::Config, errors::Res},
 };
-use failure::ResultExt;
+use failure::{format_err, ResultExt};
 use std::env::current_dir;
 
 pub fn cli() -> App<'static, 'static> {
@@ -20,7 +20,8 @@ pub fn cli() -> App<'static, 'static> {
             Arg::with_name("ide-mode")
                 .long("ide-mode")
                 .help("Launches the interactive IDE backend instead of a normal REPL"),
-        ).args(&args::backends())
+        )
+        .args(&args::backends())
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {

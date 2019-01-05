@@ -1,44 +1,45 @@
-use build::{
-    context::{BuildContext, Compiler},
-    job::{Job, JobQueue},
-    Target, Targets,
+use crate::{
+    build::{
+        context::{BuildContext, Compiler},
+        job::{Job, JobQueue},
+        Target, Targets,
+    },
+    package::{
+        lockfile::LockfileToml,
+        manifest::{BinTarget, Manifest},
+        PackageId, Spec, Summary,
+    },
+    remote::resolution::{DirectRes, IndexRes, Resolution},
+    resolve::Resolver,
+    retrieve::{
+        cache::{Cache, Layout, OutputLayout},
+        Retriever,
+    },
+    util::{
+        config::Backend,
+        errors::Res,
+        fmt_output,
+        graph::Graph,
+        lock::DirLock,
+        shell::{Shell, Verbosity},
+    },
 };
 use console::style;
 use crossbeam::queue::MsQueue;
-use failure::ResultExt;
+use failure::{bail, format_err, ResultExt};
 use indexmap::IndexMap;
 use itertools::Either::{self, Left, Right};
-use package::{
-    lockfile::LockfileToml,
-    manifest::{BinTarget, Manifest},
-    PackageId, Spec, Summary,
-};
 use petgraph::{graph::NodeIndex, visit::Dfs};
-use remote::resolution::{DirectRes, IndexRes, Resolution};
-use resolve::Resolver;
-use retrieve::{
-    cache::{Cache, Layout, OutputLayout},
-    Retriever,
-};
 use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
-    env,
-    fs,
+    env, fs,
     io::prelude::*,
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
 };
 use toml;
-use util::{
-    config::Backend,
-    errors::Res,
-    fmt_output,
-    graph::Graph,
-    lock::DirLock,
-    shell::{Shell, Verbosity},
-};
 
 // TODO: In all commands, pick a better compiler than `Compiler::new(&ctx.compiler)`
 
@@ -141,7 +142,8 @@ pub fn test(
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
 
         // Until pb.println gets added, we can't use progress bars
         // let pb = ProgressBar::new(root.len() as u64);
@@ -335,7 +337,8 @@ pub fn repl(
                             path.display()
                         ))
                     }
-                }).collect::<Result<Vec<_>, _>>()?;
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             parents.push(src_path);
             paths.extend(new_paths);
         }
@@ -707,39 +710,43 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
     };
 
     let lock = match ignore {
-        None => if let Ok(solve) = op() {
-            solve
-        } else {
-            Graph::default()
-        },
-        Some(i) => if i.is_empty() {
-            Graph::default()
-        } else if let Ok(mut solve) = op() {
-            for spec in i {
-                let mut chosen: Option<Summary> = None;
-                let mut dfs = Dfs::new(&solve.inner, NodeIndex::new(0));
-                while let Some(ix) = dfs.next(&solve.inner) {
-                    if spec.matches(&solve[ix]) {
-                        if let Some(already_chosen) = chosen {
-                            return Err(format_err!(
-                                "spec {} is ambiguous: both {} and {} match",
-                                spec,
-                                &solve[ix],
-                                already_chosen
-                            ));
-                        } else {
-                            chosen = Some(solve.inner.remove_node(ix).unwrap());
+        None => {
+            if let Ok(solve) = op() {
+                solve
+            } else {
+                Graph::default()
+            }
+        }
+        Some(i) => {
+            if i.is_empty() {
+                Graph::default()
+            } else if let Ok(mut solve) = op() {
+                for spec in i {
+                    let mut chosen: Option<Summary> = None;
+                    let mut dfs = Dfs::new(&solve.inner, NodeIndex::new(0));
+                    while let Some(ix) = dfs.next(&solve.inner) {
+                        if spec.matches(&solve[ix]) {
+                            if let Some(already_chosen) = chosen {
+                                return Err(format_err!(
+                                    "spec {} is ambiguous: both {} and {} match",
+                                    spec,
+                                    &solve[ix],
+                                    already_chosen
+                                ));
+                            } else {
+                                chosen = Some(solve.inner.remove_node(ix).unwrap());
+                            }
                         }
                     }
+                    if chosen.is_none() {
+                        return Err(format_err!("spec {} not in lockfile", spec));
+                    }
                 }
-                if chosen.is_none() {
-                    return Err(format_err!("spec {} not in lockfile", spec));
-                }
+                solve
+            } else {
+                Graph::default()
             }
-            solve
-        } else {
-            Graph::default()
-        },
+        }
     };
 
     let root = {
@@ -761,7 +768,8 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
             } else {
                 None
             }
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
     let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
 

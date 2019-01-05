@@ -4,17 +4,20 @@ pub mod lockfile;
 pub mod manifest;
 pub mod version;
 
-use failure::Error;
-use remote::resolution::Resolution;
+use crate::{
+    remote::resolution::Resolution,
+    util::errors::{ErrorKind, Res},
+};
+use failure::{bail, format_err, Error};
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt,
     hash::{Hash, Hasher},
     str::FromStr,
     sync::Arc,
 };
-use util::errors::{ErrorKind, Res};
 
 /// Struct `Name` represents the name of a package. All packages in elba are namespaced, so all
 /// packages have to have a group (pre-slash) and a name (post-slash).

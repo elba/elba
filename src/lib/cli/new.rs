@@ -1,8 +1,10 @@
-use failure::ResultExt;
+use crate::{
+    package::Name,
+    util::{errors::Res, git},
+};
+use failure::{bail, format_err, ResultExt};
 use inflector::Inflector;
-use package::Name;
 use std::{fs, path::PathBuf};
-use util::{errors::Res, git};
 
 pub struct NewCtx {
     pub path: PathBuf,
@@ -73,7 +75,8 @@ authors = [{}]
 
 {}"#,
                 name, author, target
-            ).as_bytes(),
+            )
+            .as_bytes(),
         )?;
     } else {
         bail!("elba project already exists in this directory")
@@ -95,7 +98,8 @@ hello = do
   print "Hello, world!"
 "#,
                 name.name().to_pascal_case()
-            ).as_bytes(),
+            )
+            .as_bytes(),
         )?;
     } else if !path.join("src/Main.idr").exists() {
         fs::write(
