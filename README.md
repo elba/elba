@@ -6,7 +6,8 @@ Status](https://travis-ci.com/elba/elba.svg?branch=master)](https://travis-ci.co
 Status](https://ci.appveyor.com/api/projects/status/j2pk9krx63o1dpdv?svg=true)](https://ci.appveyor.com/project/dcao/elba)
 
 A modern and (hopefully!) fast package manager for
-[Idris](https://www.idris-lang.org).
+[Idris](https://www.idris-lang.org). Supplemental information and alternatives
+can be found at [this blog post](http://cao.st/post/elba/).
 
 ## Installation
 
@@ -27,6 +28,18 @@ functionality.
 
 Documentation for elba-the-Rust-library is hosted at
 [docs.rs/elba](https://docs.rs/elba).
+
+## Contributing
+
+Contributions are welcome; you can create an issue if you have a
+feature request or a bug report, and you can submit a pull request if you'd like
+to address a sore spot yourself. If you'd like to implement a large feature,
+please either leave a comment on an existing issue or create a new issue for
+that feature.
+
+Discussion happens on the [Matrix channels](https://matrix.to/#/+elba:matrix.org) 
+of the elba community; discussion about this command-line utility specifically happen
+in the [relevant channel](https://matrix.to/#/#elba-cli:matrix.org).
 
 ## License
 
