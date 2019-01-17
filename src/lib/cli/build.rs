@@ -41,8 +41,6 @@ use std::{
 };
 use toml;
 
-// TODO: In all commands, pick a better compiler than `Compiler::new(&ctx.compiler)`
-
 pub struct BuildCtx {
     pub compiler: String,
     pub indices: IndexMap<String, IndexRes>,
@@ -85,7 +83,7 @@ pub fn test(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::new(&ctx.compiler),
+            compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -257,7 +255,7 @@ pub fn install(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::new(&ctx.compiler),
+            compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -388,7 +386,7 @@ pub fn repl(
         let bctx = BuildContext {
             backend,
             codegen: true,
-            compiler: Compiler::new(&ctx.compiler),
+            compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -419,6 +417,10 @@ pub fn repl(
             Verbosity::Quiet,
         );
         ctx.shell.println_empty(Verbosity::Quiet);
+
+        if bctx.compiler.flavor().is_idris2() {
+            bail!("The Idris 2 compiler doesn't currently support custom import paths, needed for the REPL.")
+        }
 
         let mut process = bctx.compiler.process();
         for binary in deps {
@@ -503,7 +505,7 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
             // We just use the default backend cause it doesn't matter for this case
             backend: &backend,
             codegen: true,
-            compiler: Compiler::new(&ctx.compiler),
+            compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,
@@ -597,7 +599,7 @@ pub fn build(
         let bctx = BuildContext {
             backend,
             codegen: codegen,
-            compiler: Compiler::new(&ctx.compiler),
+            compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,
             threads: ctx.threads,

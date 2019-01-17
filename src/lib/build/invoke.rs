@@ -1,7 +1,7 @@
 //! Utilities for interacting with the Idris compiler
 
 use crate::{
-    build::context::BuildContext,
+    build::context::{BuildContext, CompilerFlavor},
     retrieve::cache::{Binary, OutputLayout},
     util::{errors::Res, fmt_output},
 };
@@ -25,10 +25,14 @@ impl<'a> CompileInvocation<'a> {
     pub fn exec(&self, bcx: &BuildContext) -> Res<Output> {
         // invoke compiler
         let mut process = bcx.compiler.process();
+        let flavor = bcx.compiler.flavor();
         process.current_dir(&self.build).arg("--check");
 
         // Include dependencies
         for binary in self.deps {
+            if flavor.is_idris2() {
+                bail!("The Idris 2 compiler currently doesn't support custom import paths")
+            }
             // We assume that the binary has already been compiled
             process.arg("-i").arg(binary.target.path());
         }
@@ -66,10 +70,15 @@ impl<'a> CodegenInvocation<'a> {
     pub fn exec(self, bcx: &BuildContext) -> Res<Output> {
         // Invoke the compiler.
         let mut process = bcx.compiler.process();
+        let flavor = bcx.compiler.flavor();
         let cwd;
 
         if self.is_artifact {
-            process.arg("--interface");
+            if flavor.is_idris1() {
+                process.arg("--interface");
+            } else {
+                bail!("Only the Idris 1 compiler supports library artifacts")
+            }
         }
 
         process
@@ -81,7 +90,7 @@ impl<'a> CodegenInvocation<'a> {
             })
             .args(&["-o", &self.output])
             .args(&[
-                if bcx.backend.portable {
+                if bcx.backend.portable && flavor.is_idris1() {
                     "--portable-codegen"
                 } else {
                     "--codegen"
@@ -90,14 +99,19 @@ impl<'a> CodegenInvocation<'a> {
             ]);
 
         if !bcx.backend.opts.is_empty() {
-            process
-                .arg("--cg-opt")
-                .arg(bcx.backend.opts.iter().join(" "));
+            if flavor.is_idris1() {
+                process
+                    .arg("--cg-opt")
+                    .arg(bcx.backend.opts.iter().join(" "));
+            }
         }
 
         process.args(self.args);
 
         for bin in self.binary {
+            if flavor.is_idris2() {
+                bail!("The Idris 2 compiler currently doesn't support custom import paths")
+            }
             process.arg("-i");
             process.arg(bin.parent().unwrap());
             process.arg(bin);

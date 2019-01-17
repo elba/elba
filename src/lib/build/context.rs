@@ -3,7 +3,7 @@ use crate::{
     util::{config::Backend, errors::Res, fmt_output},
 };
 use failure::{format_err, ResultExt};
-use std::{path::PathBuf, process::Command};
+use std::{path::{Path, PathBuf}, process::Command};
 
 // TODO: triple target
 #[derive(Debug)]
@@ -22,20 +22,35 @@ pub struct BuildContext<'a> {
 #[derive(Debug)]
 pub struct Compiler {
     /// The location of the exe
-    pub path: PathBuf,
+    path: PathBuf,
+    flavor: CompilerFlavor,
 }
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    pub fn new(name: &str) -> Compiler {
-        Compiler {
-            path: PathBuf::from(name),
-        }
+    pub fn new(name: &str) -> Res<Compiler> {
+        let c = Compiler { path: PathBuf::from(name), flavor: CompilerFlavor::Idris1 };
+
+        let flavor = if c.version()?.starts_with("Blodwen") {
+            CompilerFlavor::Idris2
+        } else {
+            CompilerFlavor::Idris1
+        };
+
+        Ok(Compiler { flavor, ..c })
     }
 
     /// Get a process set up to use the found compiler
     pub fn process(&self) -> Command {
         Command::new(&self.path)
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn flavor(&self) -> CompilerFlavor {
+        self.flavor
     }
 
     /// Get the version of the compiler
@@ -59,6 +74,30 @@ impl Default for Compiler {
     fn default() -> Self {
         Compiler {
             path: PathBuf::from("idris"),
+            flavor: CompilerFlavor::Idris1,
+        }
+    }
+}
+
+/// The type of compiler we're dealing with.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CompilerFlavor {
+    Idris1,
+    Idris2,
+}
+
+impl CompilerFlavor {
+    pub fn is_idris1(&self) -> bool {
+        match self {
+            CompilerFlavor::Idris1 => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_idris2(&self) -> bool {
+        match self {
+            CompilerFlavor::Idris2 => true,
+            _ => false,
         }
     }
 }

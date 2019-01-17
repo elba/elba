@@ -188,7 +188,7 @@ impl Cache {
             // For a git repository, if the DirectRes and the PackageId don't match, we should try to
             // retrieve the locked variant (the DirectRes) and then update with the latest variant
             // (the PackageId).
-            // The only different between the two should be the `tag`.
+            // The only difference between the two should be the `tag`.
             // The worst case performance-wise for this operation is if a repository doesn't exist
             // in the cache and the lockfile and manifest are out-of-sync, which will result in
             // two fetch operations.
@@ -196,7 +196,7 @@ impl Cache {
                 debug_assert!(loc.is_git());
                 loc.retrieve(&self.client, &dir, eager, new_f)
                     .and_then(|_| {
-                        pkg.resolution().direct().unwrap().retrieve(
+                        g.retrieve(
                             &self.client,
                             &dir,
                             false,
@@ -216,10 +216,8 @@ impl Cache {
             loc.retrieve(&self.client, &dir, eager, new_f)
         }?;
 
-        let old: Option<DirectRes> = None;
-        let new_res = res.or(old);
         let new_dir = self.layout.src.join(&Self::get_source_dir(
-            if let Some(r) = new_res.as_ref() {
+            if let Some(r) = res.as_ref() {
                 r
             } else {
                 &loc
@@ -243,7 +241,7 @@ impl Cache {
             "dir" => dir.path().display()
         );
 
-        Ok((new_res, dir))
+        Ok((res, dir))
     }
 
     /// Gets the corresponding directory of a package.
@@ -261,7 +259,7 @@ impl Cache {
         hexify_hash(hasher.result().as_slice())
     }
 
-    /// If the build directory exists, returns it. Otherwise, give up and return None
+    /// Return the build directory exists, else None.
     pub fn checkout_build(&self, hash: &BuildHash) -> Res<Option<Binary>> {
         if let Some(path) = self.check_build(&hash) {
             Ok(Some(Binary {
@@ -552,7 +550,6 @@ impl Cache {
     pub fn cached_packages(&self) -> IndexSet<String> {
         let walker = WalkDir::new(&self.layout.src)
             .min_depth(1)
-            .max_depth(1)
             .into_iter()
             .filter_map(|e| e.ok());
 
@@ -834,7 +831,6 @@ impl BuildHash {
         }
 
         // Take into account the build context
-        // YET
         if let Ok(ver) = ctx.compiler.version() {
             hasher.input(ver.as_bytes());
         }

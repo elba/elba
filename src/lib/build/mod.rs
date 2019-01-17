@@ -178,8 +178,16 @@ pub fn compile_lib(
     let mut lib_files = vec![];
 
     for target in targets {
-        let target_bin = target.with_extension("ibc");
-        let from = layout.build.join("lib").join(&target_bin);
+        let target_bin = if bcx.compiler.flavor().is_idris2() {
+            target.with_extension("ibc")
+        } else {
+            target.with_extension("ttc")
+        };
+        let from = if bcx.compiler.flavor().is_idris2() {
+            layout.build.join("lib/build").join(&target_bin)
+        } else {
+            layout.build.join("lib").join(&target_bin)
+        };
         // We strip the library prefix before copying
         // target_bin is something like src/Test.ibc
         // we want to move build/src/Test.ibc to lib/Test.ibc
@@ -188,7 +196,14 @@ pub fn compile_lib(
         fs::create_dir_all(to.parent().unwrap())?;
         fs::copy(&from, &to)?;
 
+        if bcx.compiler.flavor().is_idris2() {
+            fs::copy(from.with_extension("ttm"), to.with_extension("ttm"))?;
+        }
+
         if codegen {
+            if bcx.compiler.flavor().is_idris2() {
+                lib_files.push(to.with_extension("ttm"));
+            }
             lib_files.push(to);
         }
     }
@@ -218,6 +233,10 @@ pub fn compile_bin(
     layout: &OutputLayout,
     bcx: &BuildContext,
 ) -> Res<(Output, PathBuf)> {
+    if bcx.compiler.flavor().is_idris2() {
+        bail!("The Idris 2 compiler currently can't build executables")
+    }
+
     let bin_target = match target {
         Target::Bin(ix) => source.meta().targets.bin[ix].clone(),
         Target::Test(ix) => source.meta().targets.test[ix].clone().into(),
@@ -299,6 +318,10 @@ pub fn compile_doc(
     layout: &OutputLayout,
     bcx: &BuildContext,
 ) -> Res<Output> {
+    if bcx.compiler.flavor().is_idris2() {
+        bail!("The Idris 2 compiler currently can't build documentation")
+    }
+
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
             "package {} doesn't contain a lib target, which is needed to build docs",

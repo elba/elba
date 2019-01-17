@@ -22,6 +22,10 @@
   
 - A new config key `compiler` to specify the name of the compiler
   executable.
+  
+- Preliminary support for the Blodwen compiler. (Note that because the
+  compiler is still so barebones, it can't build any packages with
+  dependencies or executables)
 
 ### Changed
 
@@ -33,6 +37,9 @@
 - Fixed bug where `elba repl` wouldn't remove ibc files.
 
 - Fixed bug where elba would allow an empty group and/or name.
+
+- Fixed bug where, in offline mode, elba would not find packages which
+  were a subfolder of another package.
 
 - Added extra Idris and backend options as part of the build hash.
 
