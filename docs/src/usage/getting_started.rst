@@ -36,19 +36,15 @@ Because elba is written in Rust, it is available as an installable crate
 from `crates.io <https://crates.io>`__. In order to install elba this
 way, you should have a copy of the Rust toolchain installed on your
 computer first. The process for this is explained on `the Rust
-website <https://www.rust-lang.org/en-US/install.html>`__. Note that
-during installation, when prompted for which version of Rust should be
-installed, you should choose the **nightly version** of Rust. elba
-depends on certain features which can only be enabled in the nightly
-build of Rust.
+website <https://www.rust-lang.org/en-US/install.html>`__. The minimum
+stable version of Rust elba has successfully been built on is **1.31**.
 
-Once you have Rust installed, installing elba is pretty
-self-explanatory:
+Once you have Rust installed, installing elba is self-explanatory:
 
 .. code-block:: console
 
-   $ cargo +nightly install elba
-   $ elba # should work!
+   $ cargo install elba
+   $ elba # should work
 
 Remember to add ``~/.elba/bin`` to your PATH to be able to run
 elba-installed packages.
@@ -59,15 +55,14 @@ Building elba
 Building elba from source is much the same process as installing it
 using cargo; the only difference is that instead of using a stable,
 versioned-crate available from crates.io, elba’s source code is used
-directly. You’ll still need to have the nightly version of the Rust
-toolchain installed (see the above section for more details). After
-that’s done, download elba’s source code and install it:
+directly. You’ll still need to have Rust **1.31** or later installed.
+After that’s done, download elba’s source code and install it:
 
 .. code-block:: console
 
    $ git clone https://github.com/elba/elba
    $ cd elba
-   $ cargo +nightly install --release
+   $ cargo install --release
    $ elba # should work!
 
 Remember to add ``~/.elba/bin`` to your PATH to be able to run
@@ -87,7 +82,7 @@ Creating a package is easy with elba: all you need is a package name.
 Note that names in elba are special in that they are *always
 namespaced*; every name in elba comes with a group part and a name part,
 separated with a slash. For more information, see the information on
-names in the :doc:`manifest chapter <../usage/manifest>`.
+names in the :doc:`manifest chapter <../reference/manifest>`.
 
 .. code-block:: console
 
@@ -184,7 +179,7 @@ built for your package. There are three types of targets:
 
    Note: the format of the binary target has some nuance to it, so for
    more information, see the docs on :doc:`the manifest format
-   <../usage/manifest>`.
+   <../reference/manifest>`.
 
 -  A **test target** specifies a test binary to build. It uses the same
    syntax as a bin target, with the difference that we use
@@ -229,4 +224,5 @@ Instead of placing the build outputs in a ``target/`` folder, the
 any build files after execution.
 
 elba uses an ``elba.lock`` lockfile to ensure that these builds are
-reproducible.
+reproducible. This should be committed to repositories for libraries,
+but not for binaries.

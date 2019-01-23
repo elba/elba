@@ -17,9 +17,9 @@ package. A complete example of a ``[package]`` section is shown below:
 .. code-block:: toml
 
    [package]
-   name = "jsmith/elba"
+   name = "dcao/elba"
    version = "0.1.0"
-   authors = ["John Smith <dcao@example.com>"]
+   authors = ["David Cao <dcao@example.com>"]
    description = "The best package ever released"
    license = "MIT"
 

@@ -9,8 +9,6 @@ use failure::{bail, format_err, ResultExt};
 use itertools::Either::{Left, Right};
 use std::{env::current_dir, str::FromStr};
 
-// TODO: Don't use specs; use --index and --ver ?
-
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("install")
         .about("Installs a package's artifacts")

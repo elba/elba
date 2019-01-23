@@ -196,18 +196,13 @@ impl Cache {
                 debug_assert!(loc.is_git());
                 loc.retrieve(&self.client, &dir, eager, new_f)
                     .and_then(|_| {
-                        g.retrieve(
-                            &self.client,
-                            &dir,
-                            false,
-                            |dl_online| {
-                                if offline && dl_online {
-                                    Err(format_err!("Can't download package in offline mode"))
-                                } else {
-                                    Ok(())
-                                }
-                            },
-                        )
+                        g.retrieve(&self.client, &dir, false, |dl_online| {
+                            if offline && dl_online {
+                                Err(format_err!("Can't download package in offline mode"))
+                            } else {
+                                Ok(())
+                            }
+                        })
                     })
             } else {
                 loc.retrieve(&self.client, &dir, eager, new_f)
@@ -217,11 +212,7 @@ impl Cache {
         }?;
 
         let new_dir = self.layout.src.join(&Self::get_source_dir(
-            if let Some(r) = res.as_ref() {
-                r
-            } else {
-                &loc
-            },
+            if let Some(r) = res.as_ref() { r } else { &loc },
             true,
         ));
         let dir = if new_dir != dir.path() {
@@ -600,6 +591,8 @@ impl Layout {
     }
 }
 
+// TODO: Somehow keep track of which targets have been built, so that if a rebuild needs to happen,
+//       it doesn't rebuild already built targets, and it reuses the same build dir
 /// The Layout of an output directory. This is used either as the `target` directory or one of the
 /// folders in a temporary build directory in the global cache.
 #[derive(Debug)]

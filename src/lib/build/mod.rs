@@ -3,6 +3,7 @@
 pub mod context;
 pub mod invoke;
 pub mod job;
+pub mod script;
 
 use self::{
     context::BuildContext,
@@ -10,7 +11,7 @@ use self::{
 };
 use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
-    util::{clear_dir, copy_dir, errors::Res, generate_ipkg},
+    util::{clear_dir, copy_dir, errors::Res, generate_ipkg, shell::OutputGroup},
 };
 use failure::{bail, format_err, ResultExt};
 use itertools::Itertools;
@@ -19,7 +20,6 @@ use std::{
     ffi::OsStr,
     fs,
     path::{Path, PathBuf},
-    process::Output,
 };
 
 /// A type of Target that should be built
@@ -130,7 +130,7 @@ pub fn compile_lib(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<(Output, Option<Output>)> {
+) -> Res<OutputGroup> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
             "package {} doesn't contain a lib target",
@@ -170,11 +170,9 @@ pub fn compile_lib(
         args: &args,
     };
 
-    let comp_res = invocation.exec(bcx)?;
-    let mut gen_res = None;
+    let mut res = OutputGroup::from(invocation.exec(bcx)?);
 
     clear_dir(&layout.lib)?;
-
     let mut lib_files = vec![];
 
     for target in targets {
@@ -219,20 +217,19 @@ pub fn compile_lib(
             args: &args,
         };
 
-        gen_res = Some(codegen_invoke.exec(&bcx)?);
+        res.push(codegen_invoke.exec(&bcx)?);
     }
 
-    Ok((comp_res, gen_res))
+    Ok(res)
 }
 
-// TODO: Use bcx.codegen
 pub fn compile_bin(
     source: &Source,
     target: Target,
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<(Output, PathBuf)> {
+) -> Res<(OutputGroup, Option<PathBuf>)> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build executables")
     }
@@ -278,7 +275,7 @@ pub fn compile_bin(
         args: &args,
     };
 
-    let res = compile_invoke.exec(bcx)?;
+    let mut res = OutputGroup::from(compile_invoke.exec(bcx)?);
 
     let target_bin = target_path.with_extension("ibc");
 
@@ -289,6 +286,10 @@ pub fn compile_bin(
         bin_target.name.into()
     };
 
+    if !bcx.codegen {
+        return Ok((res, None))
+    }
+
     let codegen_invoke = CodegenInvocation {
         binary: &[layout.build.join("bin").join(&target_bin)],
         output: &*name.to_string_lossy(),
@@ -298,15 +299,14 @@ pub fn compile_bin(
     };
 
     // The output exectable will always go in target/bin
-    // TODO: Don't ignore this output
-    codegen_invoke.exec(bcx)?;
+    res.push(codegen_invoke.exec(bcx)?);
 
     let out = layout.bin.join(name);
 
     if out.exists() {
-        Ok((res, out))
+        Ok((res, Some(out)))
     } else if out.with_extension("exe").exists() {
-        Ok((res, out.with_extension("exe")))
+        Ok((res, Some(out.with_extension("exe"))))
     } else {
         bail!("couldn't locate codegen output file: {}", out.display())
     }
@@ -317,7 +317,7 @@ pub fn compile_doc(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
-) -> Res<Output> {
+) -> Res<OutputGroup> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build documentation")
     }
@@ -330,6 +330,11 @@ pub fn compile_doc(
     })?;
 
     // If we're compiling docs, we assume that we've already built the lib
+
+    // If we're just running a "check" command, we should never build docs
+    if !bcx.codegen {
+        return Ok(OutputGroup::new());
+    }
 
     // Generate IPKG file
     let name = source.meta().name().name();
@@ -379,7 +384,7 @@ pub fn compile_doc(
         )
     })?;
 
-    Ok(res)
+    Ok(res.into())
 }
 
 fn clear_and_copy(from: &Path, to: &Path) -> Res<()> {

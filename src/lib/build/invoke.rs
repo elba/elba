@@ -1,7 +1,7 @@
 //! Utilities for interacting with the Idris compiler
 
 use crate::{
-    build::context::{BuildContext, CompilerFlavor},
+    build::context::BuildContext,
     retrieve::cache::{Binary, OutputLayout},
     util::{errors::Res, fmt_output},
 };

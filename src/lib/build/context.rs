@@ -3,7 +3,10 @@ use crate::{
     util::{config::Backend, errors::Res, fmt_output},
 };
 use failure::{format_err, ResultExt};
-use std::{path::{Path, PathBuf}, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 // TODO: triple target
 #[derive(Debug)]
@@ -29,7 +32,10 @@ pub struct Compiler {
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
     pub fn new(name: &str) -> Res<Compiler> {
-        let c = Compiler { path: PathBuf::from(name), flavor: CompilerFlavor::Idris1 };
+        let c = Compiler {
+            path: PathBuf::from(name),
+            flavor: CompilerFlavor::Idris1,
+        };
 
         let flavor = if c.version()?.starts_with("Blodwen") {
             CompilerFlavor::Idris2

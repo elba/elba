@@ -4,18 +4,21 @@
 
 ### Added
 
+- **BREAKING CHANGE**: A new format for the `indices` key: index aliases
+  can now be specified in elba's configuration, which propagate to
+  packages and commands which take an `--index` flag.
+
 - New commands for interacting with package backends: `package` for
   creating tested tarballs of packages, `publish` for publishing a
   package to an index, `yank` for disallowing new packages to
   depend on a published package, and `login` for saving credentials
   for an index (#31).
-
+  
+- A new command `check`, along with associated alias `c`, which checks all
+  Idris source files but doesn't build any artifacts for them.
+  
 - New fields to the manifest for use with package backends: `description`,
   `homepage`, `repository`, and `readme` (#30).
-
-- **BREAKING CHANGE**: A new format for the `indices` key: index aliases
-  can now be specified in elba's configuration, which propagate to
-  packages and commands which take an `--index` flag.
 
 - A new config key `directories.data` which specifies the folder where
   elba will store data files.

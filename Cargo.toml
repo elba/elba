@@ -32,6 +32,7 @@ indexmap = { version = "1", features = ["serde-1"] }
 # We'll add this dep back in once it does
 Inflector = "0.11"
 itertools = "0.7"
+libc = "0.2"
 nom = "4.0"
 petgraph = "0.4"
 rand = "0.5"

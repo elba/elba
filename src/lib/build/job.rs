@@ -4,7 +4,7 @@ use crate::{
     util::{
         clear_dir,
         errors::Res,
-        fmt_output,
+        fmt_multiple,
         graph::Graph,
         lock::DirLock,
         shell::{Shell, Verbosity},
@@ -71,8 +71,9 @@ impl JobQueue {
                 } else {
                     Targets::new(vec![Target::Lib(false)])
                 };
+
                 let build_hash =
-                    BuildHash::new(source, &solve, &targets, &bcx, targets.is_codegen());
+                    BuildHash::new(source, &solve, &targets, &bcx, (!(node == NodeIndex::new(0)) || bcx.codegen) && targets.is_codegen());
 
                 let root_ol = root_ol.as_ref();
                 let job = if node == NodeIndex::new(0)
@@ -149,17 +150,6 @@ impl JobQueue {
         // We also store the locations and summaries of our binaries
         let bins = &MsQueue::new();
 
-        // let mut prg = 0;
-        // Until pb.println is added, we can't use a progress bar
-        // let pb = ProgressBar::new(
-        //     self.graph
-        //         .inner
-        //         .node_indices()
-        //         .filter(|&index| self.graph[index].work.is_dirty())
-        //         .count() as u64,
-        // );
-        // pb.set_style(ProgressStyle::default_bar().template("  [-->] {bar} {pos}/{len}"));
-
         loop {
             // break if the job queue is complete
             if queue.is_empty() {
@@ -188,8 +178,6 @@ impl JobQueue {
                             format!("{} [{}..]", source.pretty_summary(), &build_hash.0[0..8]),
                             Verbosity::Normal,
                         );
-
-                        // let pb = &pb;
 
                         let shell = self.shell;
 
@@ -220,31 +208,21 @@ impl JobQueue {
                                                 "target" => cg,
                                                 "summary" => source.summary()
                                             );
-                                            let (cmp, cdg) =
-                                                compile_lib(&source, cg, &deps, &layout, bcx)
-                                                    .with_context(|e| {
-                                                        format!(
+                                            let out = compile_lib(&source, cg, &deps, &layout, bcx)
+                                                .with_context(|e| {
+                                                    format!(
                                                         "Couldn't build library target for {}\n{}",
                                                         source.pretty_summary(),
                                                         e
                                                     )
-                                                    })?;
+                                                })?;
 
                                             res = if job_index == NodeIndex::new(0)
                                                 && root_ol.is_some()
                                             {
-                                                let cmp_out = fmt_output(&cmp);
-                                                if !cmp_out.is_empty() {
-                                                    shell.println_plain(cmp_out, Verbosity::Normal);
-                                                }
-                                                if let Some(cdg) = cdg {
-                                                    let cdg_out = fmt_output(&cdg);
-                                                    if !cdg_out.is_empty() {
-                                                        shell.println_plain(
-                                                            cdg_out,
-                                                            Verbosity::Normal,
-                                                        );
-                                                    }
+                                                let out = fmt_multiple(&out);
+                                                if !out.is_empty() {
+                                                    shell.println_plain(out, Verbosity::Normal);
                                                 }
 
                                                 let target = DirLock::acquire(&layout.lib)?;
@@ -279,12 +257,14 @@ impl JobQueue {
                                                 )
                                             })?;
 
-                                            bins.push((path, source.summary()));
+                                            if let Some(p) = path {
+                                                bins.push((p, source.summary()));
+                                            }
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out_str = fmt_output(&out);
-                                                if !out_str.is_empty() {
-                                                    shell.println_plain(out_str, Verbosity::Normal);
+                                                let out = fmt_multiple(&out);
+                                                if !out.is_empty() {
+                                                    shell.println_plain(out, Verbosity::Normal);
                                                 }
                                             }
                                         }
@@ -323,9 +303,9 @@ impl JobQueue {
                                             })?;
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out_str = fmt_output(&out);
-                                                if !out_str.is_empty() {
-                                                    shell.println_plain(out_str, Verbosity::Normal);
+                                                let out = fmt_multiple(&out);
+                                                if !out.is_empty() {
+                                                    shell.println_plain(out, Verbosity::Normal);
                                                 }
                                             }
 
@@ -348,7 +328,7 @@ impl JobQueue {
                                                 })?;
 
                                             if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out_str = fmt_output(&out);
+                                                let out_str = fmt_multiple(&out);
                                                 if !out_str.is_empty() {
                                                     shell.println_plain(out_str, Verbosity::Normal);
                                                 }

@@ -5,10 +5,14 @@ pub mod errors;
 pub mod git;
 pub mod graph;
 pub mod lock;
+pub mod read2;
 pub mod shell;
+
+pub use crate::util::read2::read2;
 
 use crate::util::errors::{Error, Res};
 use failure::{bail, format_err, ResultExt};
+use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fs,
@@ -142,18 +146,22 @@ modules = {}
     )
 }
 
+pub fn fmt_multiple(c: &shell::OutputGroup) -> String {
+    c.0.iter().map(|x| fmt_output(&x)).join("\n")
+}
+
 pub fn fmt_output(c: &Output) -> String {
     let mut res = String::new();
     if !c.stderr.is_empty() {
         if !c.stdout.is_empty() {
-            res.push_str("[stderr]\n");
+            res.push_str("--- stdout\n");
         }
         res.push_str(format!("{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
-        res.push_str(format!("[stderr]\n{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
+        res.push_str(format!("--- stderr\n{}\n", String::from_utf8_lossy(&c.stderr)).as_ref());
     }
     if !c.stdout.is_empty() {
         if !c.stderr.is_empty() {
-            res.push_str("[stdout]\n");
+            res.push_str("--- stdout\n");
         }
         res.push_str(format!("{}\n", String::from_utf8_lossy(&c.stdout)).as_ref());
     }

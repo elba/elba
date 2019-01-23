@@ -1,5 +1,5 @@
 //! Utilities for dealing with git repos.
-//!
+
 // Much of this code is taken from Cargo's git utilities, which are available are the following link:
 // https://github.com/rust-lang/cargo/blob/master/src/cargo/sources/git/utils.rs
 // As such, the MIT license under which Cargo is licensed is provided in full:
@@ -259,7 +259,7 @@ where
             return git2::Cred::default();
         }
 
-        // Whelp, we tried our best
+        // Welp, we tried our best
         Err(git2::Error::from_str("no authentication available"))
     });
 

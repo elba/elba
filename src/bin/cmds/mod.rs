@@ -1,4 +1,5 @@
 mod build;
+mod check;
 mod clean;
 mod doc;
 mod init;
@@ -32,6 +33,7 @@ pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
         build::cli(),
+        check::cli(),
         clean::cli(),
         doc::cli(),
         init::cli(),
@@ -52,6 +54,7 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
 pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
         "build" => Some(build::exec),
+        "check" => Some(check::exec),
         "clean" => Some(clean::exec),
         "doc" => Some(doc::exec),
         "init" => Some(init::exec),

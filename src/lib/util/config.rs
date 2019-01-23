@@ -136,6 +136,7 @@ fn default_aliases() -> IndexMap<String, String> {
     indexmap!(
         "i".to_owned() => "install".to_owned(),
         "b".to_owned() => "build".to_owned(),
+        "c".to_owned() => "check".to_owned(),
         "t".to_owned() => "test".to_owned(),
     )
 }
