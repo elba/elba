@@ -3,7 +3,6 @@
 pub mod context;
 pub mod invoke;
 pub mod job;
-pub mod script;
 
 use self::{
     context::BuildContext,

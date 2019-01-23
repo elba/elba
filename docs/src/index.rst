@@ -9,7 +9,6 @@ to be a mostly comprehensive guide on actually using it.
    :caption: Usage
              
    usage/getting_started
-   usage/manifest
    usage/configuration
    usage/installing
    usage/custom_subcommands
@@ -20,6 +19,7 @@ to be a mostly comprehensive guide on actually using it.
    :caption: Reference
              
    reference/resolutions
+   reference/manifest
    reference/indices
    reference/backends
    reference/dependencies
