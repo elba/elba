@@ -29,12 +29,13 @@ impl<'a> CompileInvocation<'a> {
         process.current_dir(&self.build).arg("--check");
 
         // Include dependencies
-        for binary in self.deps {
-            if flavor.is_idris2() {
-                bail!("The Idris 2 compiler currently doesn't support custom import paths")
+        if flavor.is_idris1() {
+            for binary in self.deps {
+                // We assume that the binary has already been compiled
+                process.arg("-i").arg(binary.target.path());
             }
-            // We assume that the binary has already been compiled
-            process.arg("-i").arg(binary.target.path());
+        } else {
+            process.env("BLODWEN_PATH", self.deps.iter().map(|x| x.target.path().to_string_lossy()).join(":"));
         }
 
         process.args(self.args);
@@ -109,12 +110,15 @@ impl<'a> CodegenInvocation<'a> {
         process.args(self.args);
 
         for bin in self.binary {
-            if flavor.is_idris2() {
-                bail!("The Idris 2 compiler currently doesn't support custom import paths")
+            if flavor.is_idris1() {
+                process.arg("-i");
+                process.arg(bin.parent().unwrap());
             }
-            process.arg("-i");
-            process.arg(bin.parent().unwrap());
             process.arg(bin);
+        }
+
+        if flavor.is_idris2() {
+            process.env("BLODWEN_PATH", self.binary.iter().map(|x| x.parent().unwrap().to_string_lossy()).join(":"));
         }
 
         let res = process.output()?;

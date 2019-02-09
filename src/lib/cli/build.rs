@@ -419,7 +419,7 @@ pub fn repl(
         ctx.shell.println_empty(Verbosity::Quiet);
 
         if bctx.compiler.flavor().is_idris2() {
-            bail!("The Idris 2 compiler doesn't currently support custom import paths, needed for the REPL.")
+            bail!("The Idris 2 compiler doesn't currently support custom source paths, needed for the REPL.")
         }
 
         let mut process = bctx.compiler.process();
