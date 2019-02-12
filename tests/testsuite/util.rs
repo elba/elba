@@ -57,7 +57,7 @@ fn index_dir() -> TempDir {
 
     let tmp = TempDir::new("elba").unwrap();
 
-    copy_dir(&path, tmp.path()).unwrap();
+    copy_dir(&path, tmp.path(), false).unwrap();
 
     tmp
 }
@@ -70,7 +70,7 @@ fn cache_dir() -> TempDir {
 
     let tmp = TempDir::new("elba").unwrap();
 
-    copy_dir(&path, tmp.path()).unwrap();
+    copy_dir(&path, tmp.path(), false).unwrap();
 
     tmp
 }
