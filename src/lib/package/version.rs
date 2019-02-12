@@ -750,9 +750,8 @@ impl<'de> Deserialize<'de> for Constraint {
 mod parse {
     use super::*;
     use nom::{
-        alt, alt_complete, call, complete, digit, do_parse, do_parse_sep, error_position, map,
-        map_res, named, opt, sep, separated_list, tag, tag_s, take_while1, take_while1_s,
-        types::CompleteStr, wrap_sep, ws,
+        alt, alt_complete, digit, do_parse, map, map_res, named, opt, separated_list, tag, tag_s,
+        take_while1_s, types::CompleteStr, ws,
     };
     use semver::Version;
     use std::str::FromStr;

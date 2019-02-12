@@ -10,7 +10,10 @@ use self::{
 };
 use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
-    util::{clear_dir, copy_dir, errors::Res, generate_ipkg, shell::OutputGroup},
+    util::{
+        clear_dir, copy_dir, copy_dir_iter, errors::Res, generate_ipkg, shell::OutputGroup,
+        valid_file,
+    },
 };
 use failure::{bail, format_err, ResultExt};
 use itertools::Itertools;
@@ -20,6 +23,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use walkdir::WalkDir;
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -161,7 +165,14 @@ pub fn compile_lib(
     args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));
     args.extend(bcx.opts.iter().cloned());
 
-    clear_and_copy(&src_path, &layout.build.join("lib"))?;
+    let src_walker = source
+        .meta()
+        .list_files(source.path(), &src_path, |_| true)?
+        .filter(|x| valid_file(&x));
+
+    clear_dir(&layout.build.join("lib"))?;
+    copy_dir_iter(src_walker, &src_path, &layout.build.join("lib"))?;
+
     let invocation = CompileInvocation {
         deps,
         targets: &targets,
@@ -172,44 +183,41 @@ pub fn compile_lib(
     let mut res = OutputGroup::from(invocation.exec(bcx)?);
 
     clear_dir(&layout.lib)?;
-    let mut lib_files = vec![];
 
-    for target in targets {
-        let target_bin = if bcx.compiler.flavor().is_idris2() {
-            target.with_extension("ibc")
-        } else {
-            target.with_extension("ttc")
-        };
-        let from = if bcx.compiler.flavor().is_idris2() {
-            layout.build.join("lib/build").join(&target_bin)
-        } else {
-            layout.build.join("lib").join(&target_bin)
-        };
-        // We strip the library prefix before copying
-        // target_bin is something like src/Test.ibc
-        // we want to move build/src/Test.ibc to lib/Test.ibc
-        let to = layout.lib.join(&target_bin);
+    let from = if bcx.compiler.flavor().is_idris2() {
+        layout.build.join("lib/build")
+    } else {
+        layout.build.join("lib")
+    };
 
-        fs::create_dir_all(to.parent().unwrap())?;
-        fs::copy(&from, &to)?;
-
-        if bcx.compiler.flavor().is_idris2() {
-            fs::copy(from.with_extension("ttm"), to.with_extension("ttm"))?;
-        }
-
-        if codegen {
-            if bcx.compiler.flavor().is_idris2() {
-                lib_files.push(to.with_extension("ttm"));
+    let build_walker = WalkDir::new(&from).into_iter().filter_map(|x| {
+        x.ok().and_then(|x| {
+            if valid_file(&x)
+                && x.path().extension() != Some(OsStr::new("idr"))
+                && x.path().extension() != Some(OsStr::new("lidr"))
+            {
+                Some(x)
+            } else {
+                None
             }
-            lib_files.push(to);
-        }
-    }
+        })
+    });
+
+    let lib_files = build_walker.collect::<Vec<_>>();
+
+    clear_dir(&layout.lib)?;
+    copy_dir_iter(lib_files.clone().into_iter(), &from, &layout.lib)?;
 
     if codegen {
         clear_dir(&layout.artifacts.join(&bcx.backend.name))?;
 
+        let lib_bins = lib_files
+            .into_iter()
+            .map(|x| x.into_path())
+            .collect::<Vec<_>>();
+
         let codegen_invoke = CodegenInvocation {
-            binary: &lib_files,
+            binary: &lib_bins,
             output: source.meta().name().name(),
             layout: &layout,
             is_artifact: true,
@@ -247,7 +255,9 @@ pub fn compile_bin(
         )
     })?;
 
-    clear_and_copy(&src_path, &layout.build.join("bin"))?;
+    clear_dir(&layout.build.join("bin"))?;
+    copy_dir(&src_path, &layout.build.join("bin"), false)?;
+
     // Check extension etc
     let target_path = if let Some(ext) = target_path.extension() {
         if ext != OsStr::new("idr") {
@@ -286,7 +296,7 @@ pub fn compile_bin(
     };
 
     if !bcx.codegen {
-        return Ok((res, None))
+        return Ok((res, None));
     }
 
     let codegen_invoke = CodegenInvocation {
@@ -384,11 +394,6 @@ pub fn compile_doc(
     })?;
 
     Ok(res.into())
-}
-
-fn clear_and_copy(from: &Path, to: &Path) -> Res<()> {
-    clear_dir(to)?;
-    copy_dir(from, to)
 }
 
 fn make_main_file(module: &str, fun: &str, parent: &Path) -> Res<PathBuf> {

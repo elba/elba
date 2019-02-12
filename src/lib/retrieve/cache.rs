@@ -56,12 +56,13 @@ use crate::{
         Index, Indices,
     },
     util::{
-        clear_dir, copy_dir, copy_dir_gitless,
+        clear_dir, copy_dir,
         errors::Res,
         graph::Graph,
         hexify_hash,
         lock::DirLock,
         shell::{Shell, Verbosity},
+        valid_file,
     },
 };
 use console::style;
@@ -217,7 +218,7 @@ impl Cache {
         ));
         let dir = if new_dir != dir.path() {
             if !new_dir.exists() {
-                copy_dir_gitless(dir.path(), &new_dir)?;
+                copy_dir(dir.path(), &new_dir, true)?;
             }
             DirLock::acquire(&new_dir)?
         } else {
@@ -426,7 +427,7 @@ impl Cache {
         let dest = DirLock::acquire(&dest)?;
 
         clear_dir(dest.path())?;
-        copy_dir(from, dest.path())?;
+        copy_dir(from, dest.path(), false)?;
 
         Ok(Binary { target: dest })
     }
@@ -723,21 +724,15 @@ impl Source {
         }
 
         // Creating the hash
-        let walker = WalkDir::new(path.path())
-            .into_iter()
-            .filter_entry(|entry| {
-                entry.file_name() != "target"
-                    && entry
-                        .file_name()
-                        .to_str()
-                        .map(|s| !s.starts_with('.'))
-                        .unwrap_or(false)
-            })
-            .filter(|e| e.as_ref().unwrap().file_type().is_file());
+        let walker = manifest
+            .list_files(path.path(), path.path(), |entry| {
+                entry.file_name() != ".git" && entry.file_name() != "target"
+            })?
+            .filter(valid_file);
 
         let mut hash = Sha256::new();
         for f in walker {
-            let mut file = fs::File::open(f.unwrap().path())?;
+            let mut file = fs::File::open(f.path())?;
             let fh = Sha256::digest_reader(&mut file)?;
             hash.input(&fh);
         }

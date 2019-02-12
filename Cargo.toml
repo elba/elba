@@ -27,6 +27,7 @@ failure_derive = "0.1"
 flate2 = "1.0"
 fs2 = "0.4"
 git2 = "0.7"
+ignore = "0.4"
 indexmap = { version = "1", features = ["serde-1"] }
 # The current version of indicatif doesn't let us print above the progress bar
 # We'll add this dep back in once it does
@@ -54,6 +55,11 @@ toml = "0.4"
 url = "1.7"
 url_serde = "0.2"
 walkdir = "2"
+
+[target.'cfg(windows)'.dependencies]
+miow = "0.3.1"
+fwdansi = "1"
+winapi = { version = "0.3", features = ["winerror"] }
 
 [dev-dependencies]
 lazy_static = "1"

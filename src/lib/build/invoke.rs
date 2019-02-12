@@ -35,7 +35,13 @@ impl<'a> CompileInvocation<'a> {
                 process.arg("-i").arg(binary.target.path());
             }
         } else {
-            process.env("BLODWEN_PATH", self.deps.iter().map(|x| x.target.path().to_string_lossy()).join(":"));
+            process.env(
+                "BLODWEN_PATH",
+                self.deps
+                    .iter()
+                    .map(|x| x.target.path().to_string_lossy())
+                    .join(":"),
+            );
         }
 
         process.args(self.args);
@@ -99,12 +105,10 @@ impl<'a> CodegenInvocation<'a> {
                 &bcx.backend.name,
             ]);
 
-        if !bcx.backend.opts.is_empty() {
-            if flavor.is_idris1() {
-                process
-                    .arg("--cg-opt")
-                    .arg(bcx.backend.opts.iter().join(" "));
-            }
+        if !bcx.backend.opts.is_empty() && flavor.is_idris1() {
+            process
+                .arg("--cg-opt")
+                .arg(bcx.backend.opts.iter().join(" "));
         }
 
         process.args(self.args);
@@ -118,7 +122,17 @@ impl<'a> CodegenInvocation<'a> {
         }
 
         if flavor.is_idris2() {
-            process.env("BLODWEN_PATH", self.binary.iter().map(|x| x.parent().unwrap().to_string_lossy()).join(":"));
+            process.env(
+                "BLODWEN_PATH",
+                self.binary
+                    .iter()
+                    .map(|x| x.parent().unwrap().to_string_lossy())
+                    .join(":"),
+            );
+
+            for bin in self.binary {
+                process.arg(bin);
+            }
         }
 
         let res = process.output()?;

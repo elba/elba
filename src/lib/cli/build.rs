@@ -598,7 +598,7 @@ pub fn build(
 
         let bctx = BuildContext {
             backend,
-            codegen: codegen,
+            codegen,
             compiler: Compiler::new(&ctx.compiler)?,
             opts: &ctx.opts,
             cache,

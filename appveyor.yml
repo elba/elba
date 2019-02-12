@@ -9,9 +9,9 @@ environment:
   matrix:
     # Testing other channels
     - TARGET: i686-pc-windows-msvc
-      RUST_VERSION: nightly
+      RUST_VERSION: stable
     - TARGET: x86_64-pc-windows-msvc
-      RUST_VERSION: nightly
+      RUST_VERSION: stable
 
 install:
   - ps: >-
@@ -51,7 +51,7 @@ deploy:
     secure: nDfMGdntE2VUlSOMkb3OnEmSxz32U8WPCkErulaKRyykfs3w/JYKpWEKinPILuVU
   description: ''
   on:
-    RUST_VERSION: nightly
+    RUST_VERSION: stable
     appveyor_repo_tag: true
   provider: GitHub
 

@@ -107,11 +107,11 @@ impl Name {
     }
 
     pub fn normalized_group(&self) -> &str {
-        self.inner.normalization.splitn(2, "/").next().unwrap()
+        self.inner.normalization.splitn(2, '/').next().unwrap()
     }
 
     pub fn normalized_name(&self) -> &str {
-        self.inner.normalization.rsplitn(2, "/").next().unwrap()
+        self.inner.normalization.rsplitn(2, '/').next().unwrap()
     }
 
     pub fn as_str(&self) -> &str {

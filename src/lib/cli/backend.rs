@@ -8,7 +8,7 @@ use crate::{
         resolution::{DirectRes, IndexRes},
     },
     retrieve::Cache,
-    util::{config, errors::Res},
+    util::{config, errors::Res, valid_file},
 };
 use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
@@ -23,7 +23,6 @@ use std::{
 };
 use tar;
 use toml;
-use walkdir::WalkDir;
 
 pub struct BackendCtx {
     pub index: IndexRes,
@@ -65,16 +64,15 @@ pub fn package(
     let enc = GzEncoder::new(tar_gz, Compression::default());
     let mut tar = tar::Builder::new(enc);
 
-    // TODO: More flexible ignores
-    let walker = WalkDir::new(&nproj)
-        .into_iter()
-        .filter_entry(|x| x.file_name() != ".git" && x.file_name() != "target")
-        .filter(|x| x.is_ok() && x.as_ref().unwrap().file_type().is_file());
+    let walker = manifest
+        .list_files(&nproj, &nproj, |x| {
+            x.file_name() != ".git" && x.file_name() != "target"
+        })?
+        .filter(valid_file);
 
     set_current_dir(&nproj)?;
 
     for item in walker {
-        let item = item.unwrap();
         let suffix = item.path().strip_prefix(&nproj).unwrap();
         tar.append_path(suffix)?;
     }

@@ -74,13 +74,8 @@ impl<'de> Deserialize<'de> for SubPath {
     }
 }
 
-pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
-    let walker = WalkDir::new(from)
-        .into_iter()
-        .filter_entry(|x| x.path() != to)
-        .filter(|x| x.is_ok() && valid_file(x.as_ref().unwrap()));
+pub fn copy_dir_iter(walker: impl Iterator<Item = DirEntry>, from: &Path, to: &Path) -> Res<()> {
     for entry in walker {
-        let entry = entry.unwrap();
         let to_p = to.join(entry.path().strip_prefix(from).unwrap());
         // Make sure that the file exists before we try copying
         fs::create_dir_all(to_p.parent().unwrap())?;
@@ -98,29 +93,16 @@ pub fn copy_dir(from: &Path, to: &Path) -> Res<()> {
     Ok(())
 }
 
-// copy-paste-oriented programming
-pub fn copy_dir_gitless(from: &Path, to: &Path) -> Res<()> {
+pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Res<()> {
     let walker = WalkDir::new(from)
         .into_iter()
-        .filter_entry(|x| x.file_name() != ".git" && x.path() != to)
-        .filter(|x| x.is_ok() && valid_file(x.as_ref().unwrap()));
-    for entry in walker {
-        let entry = entry.unwrap();
-        let to_p = to.join(entry.path().strip_prefix(from).unwrap());
-        // Make sure that the file exists before we try copying
-        fs::create_dir_all(to_p.parent().unwrap())?;
-        fs::File::create(&to_p).context(format_err!("couldn't create file {}", to_p.display()))?;
-        let _ = fs::copy(entry.path(), &to_p).with_context(|e| {
-            format_err!(
-                "couldn't copy {} to {}:\n{}",
-                entry.path().display(),
-                to_p.display(),
-                e
-            )
-        })?;
-    }
+        .filter_entry(|x| x.path() != to && (!gitless || x.file_name() != ".git"))
+        .filter_map(|x| {
+            x.ok()
+                .and_then(|x| if valid_file(&x) { Some(x) } else { None })
+        });
 
-    Ok(())
+    copy_dir_iter(walker, from, to)
 }
 
 pub fn clear_dir(dir: &Path) -> Res<()> {
@@ -131,7 +113,7 @@ pub fn clear_dir(dir: &Path) -> Res<()> {
     Ok(())
 }
 
-fn valid_file(entry: &DirEntry) -> bool {
+pub fn valid_file(entry: &DirEntry) -> bool {
     entry.file_type().is_file()
 }
 

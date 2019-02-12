@@ -93,14 +93,14 @@ pub enum CompilerFlavor {
 }
 
 impl CompilerFlavor {
-    pub fn is_idris1(&self) -> bool {
+    pub fn is_idris1(self) -> bool {
         match self {
             CompilerFlavor::Idris1 => true,
             _ => false,
         }
     }
 
-    pub fn is_idris2(&self) -> bool {
+    pub fn is_idris2(self) -> bool {
         match self {
             CompilerFlavor::Idris2 => true,
             _ => false,

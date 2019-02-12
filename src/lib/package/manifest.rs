@@ -4,9 +4,10 @@ use self::version::Constraint;
 use super::*;
 use crate::{
     remote::resolution::{DirectRes, IndexRes},
-    util::SubPath,
+    util::{valid_file, SubPath},
 };
 use failure::{bail, format_err, Error, ResultExt};
+use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
 use serde_derive::Deserialize;
@@ -17,6 +18,7 @@ use std::{
 use toml;
 use url::Url;
 use url_serde;
+use walkdir::{DirEntry, WalkDir};
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
 //
@@ -89,6 +91,46 @@ impl Manifest {
 
         Ok(deps)
     }
+
+    pub fn list_files<P>(
+        &self,
+        pkg_root: &Path,
+        search_root: &Path,
+        mut p: P,
+    ) -> Res<impl Iterator<Item = DirEntry>>
+    where
+        P: FnMut(&DirEntry) -> bool,
+    {
+        let mut excludes = GitignoreBuilder::new(pkg_root);
+        if let Some(rs) = self.package.exclude.as_ref() {
+            for r in rs {
+                excludes.add_line(None, r)?;
+            }
+        }
+        if pkg_root.join(".gitignore").exists() {
+            if let Some(e) = excludes.add(pkg_root.join(".gitignore")) {
+                return Err(e)?;
+            }
+        }
+        let excludes = excludes
+            .build()
+            .with_context(|e| format_err!("invalid excludes: {}", e))?;
+
+        let walker = WalkDir::new(search_root)
+            .into_iter()
+            .filter_entry(move |x| {
+                !excludes
+                    .matched_path_or_any_parents(x.path(), x.file_type().is_dir())
+                    .is_ignore()
+                    && p(&x)
+            })
+            .filter_map(|x| {
+                x.ok()
+                    .and_then(|x| if valid_file(&x) { Some(x) } else { None })
+            });
+
+        Ok(walker)
+    }
 }
 
 impl FromStr for Manifest {
@@ -118,6 +160,7 @@ pub struct PackageInfo {
     pub repository: Option<String>,
     pub readme: Option<SubPath>,
     pub license: Option<String>,
+    pub exclude: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

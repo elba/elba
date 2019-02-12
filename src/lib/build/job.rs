@@ -72,8 +72,13 @@ impl JobQueue {
                     Targets::new(vec![Target::Lib(false)])
                 };
 
-                let build_hash =
-                    BuildHash::new(source, &solve, &targets, &bcx, (!(node == NodeIndex::new(0)) || bcx.codegen) && targets.is_codegen());
+                let build_hash = BuildHash::new(
+                    source,
+                    &solve,
+                    &targets,
+                    &bcx,
+                    (node != NodeIndex::new(0) || bcx.codegen) && targets.is_codegen(),
+                );
 
                 let root_ol = root_ol.as_ref();
                 let job = if node == NodeIndex::new(0)

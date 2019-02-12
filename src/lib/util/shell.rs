@@ -105,11 +105,12 @@ impl Shell {
 }
 
 /// A group of command-line outputs.
+#[derive(Default)]
 pub struct OutputGroup(pub Vec<Output>);
 
 impl OutputGroup {
     pub fn new() -> Self {
-        OutputGroup(vec![])
+        Self::default()
     }
 
     pub fn push(&mut self, out: Output) {

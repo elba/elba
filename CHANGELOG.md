@@ -17,8 +17,13 @@
 - A new command `check`, along with associated alias `c`, which checks all
   Idris source files but doesn't build any artifacts for them.
   
-- New fields to the manifest for use with package backends: `description`,
-  `homepage`, `repository`, and `readme` (#30).
+- New fields to the manifest for use with package backends:
+  `package.description`, `package.homepage`, `package.repository`, and
+  `package.readme` (#30).
+  
+- A new manifest field `package.exclude`, which specifies which files
+  should be ignored when checking for file changes or building a
+  package. Also includes entries in `.gitignore`.
 
 - A new config key `directories.data` which specifies the folder where
   elba will store data files.
