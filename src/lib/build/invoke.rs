@@ -54,7 +54,7 @@ impl<'a> CompileInvocation<'a> {
         // The moment of truth:
         let res = process.output()?;
         if !res.status.success() {
-            bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
+            bail!("> {:#?}\n{}", process, fmt_output(&res))
         }
 
         Ok(res)
@@ -141,7 +141,7 @@ impl<'a> CodegenInvocation<'a> {
         let stdout = String::from_utf8_lossy(&res.stdout);
 
         if stdout.contains("No such variable Main.main") || !res.status.success() {
-            bail!("[cmd] {:#?}\n{}", process, fmt_output(&res))
+            bail!("> {:#?}\n{}", process, fmt_output(&res))
         }
 
         Ok(res)

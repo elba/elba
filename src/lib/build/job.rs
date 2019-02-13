@@ -1,4 +1,6 @@
-use super::{compile_bin, compile_doc, compile_lib, context::BuildContext, Target, Targets};
+use super::{
+    compile_bin, compile_doc, compile_lib, context::BuildContext, run_script, Target, Targets,
+};
 use crate::{
     retrieve::cache::{Binary, BuildHash, OutputLayout, Source},
     util::{
@@ -203,6 +205,19 @@ impl JobQueue {
 
                                 let mut res: Option<Binary> = None;
                                 let has_lib = ts.has_lib();
+
+                                // First, if there's a prebuild script, execute it
+                                if let Some(s) = source.meta().scripts.get("prebuild") {
+                                    shell.println(
+                                        style("Running").dim(),
+                                        "prebuild script",
+                                        Verbosity::Verbose,
+                                    );
+                                    shell.println_plain(
+                                        fmt_multiple(&run_script(source.path(), s)?),
+                                        Verbosity::Normal,
+                                    );
+                                }
 
                                 for t in ts.0.to_vec() {
                                     match t {

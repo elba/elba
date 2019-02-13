@@ -11,17 +11,19 @@ use self::{
 use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
     util::{
-        clear_dir, copy_dir, copy_dir_iter, errors::Res, generate_ipkg, shell::OutputGroup,
-        valid_file,
+        clear_dir, copy_dir, copy_dir_iter, errors::Res, fmt_output, generate_ipkg,
+        shell::OutputGroup, valid_file,
     },
 };
 use failure::{bail, format_err, ResultExt};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
+    env,
     ffi::OsStr,
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 use walkdir::WalkDir;
 
@@ -373,10 +375,10 @@ pub fn compile_doc(
     let res = process.output()?;
     if !res.status.success() {
         bail!(
-            "[cmd] {:#?}\n[stderr]\n{}\n[stdout]\n{}",
+            "> {:#?}\n--- stdout\n{}\n--- stderr\n{}",
             process,
+            String::from_utf8_lossy(&res.stdout),
             String::from_utf8_lossy(&res.stderr),
-            String::from_utf8_lossy(&res.stdout)
         )
     }
 
@@ -392,6 +394,32 @@ pub fn compile_doc(
             e
         )
     })?;
+
+    Ok(res.into())
+}
+
+pub fn run_script(root: &Path, cmd: &str) -> Res<OutputGroup> {
+    let mut process = if cfg!(target_os = "windows") {
+        let mut p = Command::new("cmd");
+        p.args(&["/C", cmd]);
+        p
+    } else {
+        let mut p = Command::new("sh");
+        p.arg("-c");
+        p.arg(cmd);
+        p
+    };
+
+    process.current_dir(root);
+
+    if let Ok(v) = env::var("PATH") {
+        process.env("PATH", v);
+    }
+
+    let res = process.output()?;
+    if !res.status.success() {
+        bail!("> {:#?}\n{}", process, fmt_output(&res))
+    }
 
     Ok(res.into())
 }

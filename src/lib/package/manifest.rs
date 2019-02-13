@@ -6,7 +6,7 @@ use crate::{
     remote::resolution::{DirectRes, IndexRes},
     util::{valid_file, SubPath},
 };
-use failure::{bail, format_err, Error, ResultExt};
+use failure::{format_err, Error, ResultExt};
 use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
@@ -45,9 +45,12 @@ pub struct Manifest {
     pub dependencies: IndexMap<Name, DepReq>,
     #[serde(default = "IndexMap::new")]
     pub dev_dependencies: IndexMap<Name, DepReq>,
+    #[serde(default)]
     pub targets: Targets,
     #[serde(default)]
     pub workspace: IndexMap<Name, SubPath>,
+    #[serde(default)]
+    pub scripts: IndexMap<String, String>,
 }
 
 impl Manifest {
@@ -141,10 +144,6 @@ impl FromStr for Manifest {
             .with_context(|e| format_err!("invalid manifest file: {}", e))
             .map_err(Error::from)?;
 
-        if toml.targets.lib.is_none() && toml.targets.bin.is_empty() {
-            bail!("manifests must define at least either a bin or lib target")
-        }
-
         Ok(toml)
     }
 }
@@ -224,7 +223,7 @@ impl DepReq {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Default, Debug, Clone)]
 pub struct Targets {
     pub lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]

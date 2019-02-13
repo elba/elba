@@ -24,6 +24,11 @@
 - A new manifest field `package.exclude`, which specifies which files
   should be ignored when checking for file changes or building a
   package. Also includes entries in `.gitignore`.
+  
+- A new manifest field `package.script` along with a command `script`,
+  which allows for running arbitrary shell commands/scripts. A special
+  script, `prebuild`, is always run (if present) before a package is
+  built; the build will fail if the command doesn't return a success.
 
 - A new config key `directories.data` which specifies the folder where
   elba will store data files.
@@ -50,6 +55,8 @@
   were a subfolder of another package.
 
 - Added extra Idris and backend options as part of the build hash.
+
+- Allow for virtual packages with no build targets.
 
 ## [0.2.0]
 

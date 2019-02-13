@@ -9,10 +9,24 @@ use elba::util::{config::Config, shell::Verbosity};
 use failure::{Error, ResultExt};
 use std::{process::exit, time::Instant};
 
-// Interaction with the main repo would just be implemented as a custom task.
-// Maybe tasks should be allowed to be designated in the manifest too. These would be placed in the
-// local target bin directory, not the global bin directory, but would otherwise be treated like
-// dependencies.
+// TODO: Tasks and scripts (i.e. hooks)
+// Tasks are binary dependencies which can be executed from within the project with `elba task`.
+// The target directory would have a directory to store the binaries (or they could be symlinks
+// to the global dir, and the bin would be stored in the global dir)
+//
+// Scripts subsume hooks, and are arbitrary shell commands. They function basically like npm
+// scripts. Certain special scripts are run automatically by elba after certain actions
+// (prebuild: run after building deps and before building this package, preinstall: after
+// building this package and before). Otherwise, arbitrary scripts can be run with
+// `elba script`.
+//
+// elba should have a built-in script for running an Idris file (we can simulate Cargo build
+// scripts this way)
+//
+// We can't just delegate this to the equivalent of `cargo-make` (i.e. a task-running plugin)
+// because elba won't use it when building dependencies - elba will only ever call `elba build`,
+// because it won't know about your task-running thing unless you can tell it to. In fact, scripts
+// would basically subsume task-running plugins anyway.
 
 fn cli() -> App<'static, 'static> {
     App::new("elba")
