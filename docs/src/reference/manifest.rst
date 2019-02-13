@@ -21,7 +21,11 @@ package. A complete example of a ``[package]`` section is shown below:
    version = "0.1.0"
    authors = ["David Cao <dcao@example.com>"]
    description = "The best package ever released"
+   homepage = "https://github.com/elba/elba"
+   repository = "https://github.com/elba/elba"
+   readme = "README.md"
    license = "MIT"
+   exclude = ["*.blah"]
 
 The namespaced name and version are the two most important parts of this
 specification. The name must contain a group (i.e. a namespace) and a
@@ -60,6 +64,13 @@ entirely, as can the description.
       names; you can still create a package called
       ``jsmith/unicorns_and_butterflies`` if you’d like.
 
+The ``exclude`` field specifies files which should be ignored when
+building a package, packaging a package, and checking to see if the
+package has changed. Each element of the list should correspond to a
+line in a ``.gitignore`` file. Also note that if an actual
+``.gitignore`` file is present, elba will also ignore any files
+as specified by that file.
+
 ``[dependencies]`` and ``[dev_dependencies]``
 ---------------------------------------------
 
@@ -72,7 +83,7 @@ section will only be loaded for test targets.
 elba dependencies can originate from one of three places: a package
 index (think RubyGems or crates.io), in which the package is identified
 by its version and package index (defaulting to the first package index
-specified in the :doc:`config file <./configuration>`; a git repository,
+specified in the :doc:`config file <../usage/configuration>`; a git repository,
 in which the package is identified by the url of the git repo and a git
 ref name (defaulting to “master”); and a directory tree, in which the
 package is identified by its path.
@@ -257,6 +268,40 @@ of the library to create output files under
 ``target/artifacts/<codegen name>`` (for more information on export
 lists and the like, see `this test case in the Idris
 compiler <https://github.com/idris-lang/Idris-dev/tree/master/test/ffi006>`__).
+
+Virtual packages
+~~~~~~~~~~~~~~~~
+
+elba allows packages to declare no packages at all; packages without any
+targets are called **virtual packages**.
+
+``[scripts]``
+-------------
+
+elba can run arbitrary shell commands called **scripts.** These are
+defined in a package's manifest file under the ``[scripts]`` section:
+
+.. code-block:: toml
+
+   [scripts]
+   "prebuild" = "echo 'I'm building now!"
+   "whatever" = "echo 'Hey!'"
+   "dep" = "elba script whatever && echo 'Cool.'"
+
+These can manually be executed with the `elba script` subcommand:
+
+.. code-block:: console
+
+   $ elba script whatever
+
+This feature is deceptively simple; because scripts can call other
+scripts in the same project, these simple scripts can function as
+a viable alternative to task runners like ``make``.
+
+Additionally, elba has a concept of **hooks**, which are scripts that
+are automatically run during certain phases of the build and install
+process. Currently, there is only one hook: ``prebuild``, which, if
+defined, is run automatically right before a package is built.
 
 ``[workspace]``
 ---------------

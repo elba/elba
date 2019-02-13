@@ -25,7 +25,7 @@
   should be ignored when checking for file changes or building a
   package. Also includes entries in `.gitignore`.
   
-- A new manifest field `package.script` along with a command `script`,
+- A new manifest field `scripts` along with a command `script`,
   which allows for running arbitrary shell commands/scripts. A special
   script, `prebuild`, is always run (if present) before a package is
   built; the build will fail if the command doesn't return a success.

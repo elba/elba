@@ -79,6 +79,10 @@ compiler. By default it is set to "idris". You should **not** pass
 any command line options in this string, as elba will search the
 path for an executable with the name of this string.
 
+elba is smart enough to detect the version of the compiler - whether
+it's Idris 1 or 2 (Blodwen). If it can't tell what version the compiler
+is, it'll default to the behavior for Idris 1.
+
 ``indices``
 ~~~~~~~~~~~
 
