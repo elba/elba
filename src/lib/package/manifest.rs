@@ -411,7 +411,7 @@ idris_opts = ["--warnpartial", "--warnreach"]
     }
 
     #[test]
-    fn manifest_no_targets() {
+    fn manifest_valid_no_targets() {
         let manifest = r#"
 [package]
 name = 'ring_ding/test'
@@ -428,7 +428,7 @@ license = 'MIT'
 'ayy/x' = '2.0'
 "#;
 
-        assert!(Manifest::from_str(manifest).is_err());
+        assert!(Manifest::from_str(manifest).is_ok());
     }
 
     #[test]
