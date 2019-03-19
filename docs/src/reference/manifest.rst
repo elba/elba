@@ -25,6 +25,7 @@ package. A complete example of a ``[package]`` section is shown below:
    repository = "https://github.com/elba/elba"
    readme = "README.md"
    license = "MIT"
+   keywords = ["package-manager", "packaging"]
    exclude = ["*.blah"]
 
 The namespaced name and version are the two most important parts of this
@@ -39,7 +40,8 @@ contains fields to indicate the authors of the package and the license
 which the code falls under. The authors section can be left empty, and
 each author should follow the format ``name <email>`` (this is just a
 helpful convention to follow). The license field can be omitted
-entirely, as can the description.
+entirely, as can the description, homepage, repository, readme,
+and keywords.
 
 .. note:: Why namespacing?
 

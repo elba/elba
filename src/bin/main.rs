@@ -14,6 +14,11 @@ use std::{process::exit, time::Instant};
 // The target directory would have a directory to store the binaries (or they could be symlinks
 // to the global dir, and the bin would be stored in the global dir)
 //
+// Rather than having a separate [tasks] section, we could just combine it in the dependencies
+// section.
+//
+// 
+//
 // Scripts subsume hooks, and are arbitrary shell commands. They function basically like npm
 // scripts. Certain special scripts are run automatically by elba after certain actions
 // (prebuild: run after building deps and before building this package, preinstall: after

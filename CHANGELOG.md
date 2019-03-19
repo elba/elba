@@ -18,8 +18,8 @@
   Idris source files but doesn't build any artifacts for them.
   
 - New fields to the manifest for use with package backends:
-  `package.description`, `package.homepage`, `package.repository`, and
-  `package.readme` (#30).
+  `package.description`, `package.homepage`, `package.repository`,
+  `package.readme`, and `package.keywords` (#30, #42).
   
 - A new manifest field `package.exclude`, which specifies which files
   should be ignored when checking for file changes or building a

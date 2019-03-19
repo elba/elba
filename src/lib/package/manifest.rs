@@ -155,6 +155,8 @@ pub struct PackageInfo {
     pub authors: Vec<String>,
     pub build: Option<SubPath>,
     pub description: Option<String>,
+    #[serde(default = "Vec::new")]
+    pub keywords: Vec<String>,
     pub homepage: Option<String>,
     pub repository: Option<String>,
     pub readme: Option<SubPath>,
@@ -384,6 +386,12 @@ name = 'ring_ding/test'
 version = '1.0.0'
 authors = ['me']
 license = 'MIT'
+description = "The best package ever released"
+homepage = "https://github.com/elba/elba"
+repository = "https://github.com/elba/elba"
+readme = "README.md"
+keywords = ["package-manager", "packaging"]
+exclude = ["*.blah"]
 
 [dependencies]
 'awesome/a' = '>= 1.0.0 < 2.0.0'
