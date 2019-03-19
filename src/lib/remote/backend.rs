@@ -17,14 +17,17 @@ impl Backend {
     pub fn yank(&self, name: &Name, version: &Version, token: &str) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
         let mut resp = client
-            .post(self.0.join("packages/yank").unwrap())
-            .query(&[
-                ("package_group_name", name.group()),
-                ("package_name", name.name()),
-                ("semver", &version.to_string()),
-                ("yanked", "true"),
-                ("token", token),
-            ])
+            .patch(
+                self.0
+                    .join(&format!(
+                        "api/v1/packages/{}/{}/{}/yank",
+                        name.group(),
+                        name.name(),
+                        &version.to_string()
+                    ))
+                    .unwrap(),
+            )
+            .query(&[("yanked", "true"), ("token", token)])
             .send()?;
 
         if resp.status().is_success() {
@@ -37,13 +40,17 @@ impl Backend {
     pub fn publish(&self, tar: File, name: &Name, version: &Version, token: &str) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
         let mut resp = client
-            .post(self.0.join("packages/publish").unwrap())
-            .query(&[
-                ("package_group_name", name.group()),
-                ("package_name", name.name()),
-                ("semver", &version.to_string()),
-                ("token", token),
-            ])
+            .put(
+                self.0
+                    .join(&format!(
+                        "api/v1/packages/{}/{}/{}/publish",
+                        name.group(),
+                        name.name(),
+                        &version.to_string()
+                    ))
+                    .unwrap(),
+            )
+            .query(&[("token", token)])
             .body(tar)
             .send()?;
 
