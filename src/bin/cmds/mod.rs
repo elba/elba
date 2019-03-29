@@ -11,6 +11,7 @@ mod print_config;
 mod publish;
 mod repl;
 mod script;
+mod search;
 mod test;
 mod uninstall;
 mod update;
@@ -46,6 +47,7 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         publish::cli(),
         repl::cli(),
         script::cli(),
+        search::cli(),
         test::cli(),
         uninstall::cli(),
         update::cli(),
@@ -68,6 +70,7 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "publish" => Some(publish::exec),
         "repl" => Some(repl::exec),
         "script" => Some(script::exec),
+        "search" => Some(search::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),
         "update" => Some(update::exec),

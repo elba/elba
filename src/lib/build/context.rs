@@ -64,7 +64,7 @@ impl Compiler {
         let out = Command::new(&self.path)
             .arg("--version")
             .output()
-            .with_context(|e| format!("couldn't invoke version command: {}", e))?;
+            .with_context(|e| format!("couldn't retrieve Idris compiler version: {}", e))?;
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
         } else {

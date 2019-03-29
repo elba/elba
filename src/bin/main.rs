@@ -17,7 +17,7 @@ use std::{process::exit, time::Instant};
 // Rather than having a separate [tasks] section, we could just combine it in the dependencies
 // section.
 //
-// 
+//
 //
 // Scripts subsume hooks, and are arbitrary shell commands. They function basically like npm
 // scripts. Certain special scripts are run automatically by elba after certain actions

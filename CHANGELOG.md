@@ -11,8 +11,8 @@
 - New commands for interacting with package backends: `package` for
   creating tested tarballs of packages, `publish` for publishing a
   package to an index, `yank` for disallowing new packages to
-  depend on a published package, and `login` for saving credentials
-  for an index (#31).
+  depend on a published package, `search` for searching through
+  packages, and `login` for saving credentials for an index (#31, #35).
   
 - A new command `check`, along with associated alias `c`, which checks all
   Idris source files but doesn't build any artifacts for them.

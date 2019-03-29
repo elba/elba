@@ -113,7 +113,7 @@ main = do
         )?;
     }
 
-    if !path.join(".gitignore").exists() && ctx.git {
+    if !path.join(".git").exists() && !path.join(".gitignore").exists() && ctx.git {
         fs::write(
             path.join(".gitignore"),
             r#"/target
@@ -123,7 +123,7 @@ main = do
         )?;
     }
 
-    if ctx.git {
+    if !path.join(".git").exists() && ctx.git {
         git::init(&ctx.path)?;
     }
 

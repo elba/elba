@@ -23,13 +23,13 @@
 //! caught immediately when creating the constraint.
 
 // Good ideas: https://pub.dartlang.org/packages/pub_semver
+pub use semver::Version;
 
 use self::Interval::{Closed, Open, Unbounded};
 use failure::{format_err, Error};
 use indexmap::{indexset, IndexSet};
 use itertools::Itertools;
 use nom::types::CompleteStr;
-use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{cmp, fmt, str::FromStr};
 

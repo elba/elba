@@ -10,7 +10,7 @@ pub type Res<T> = Result<T, Error>;
 // implement Fail for each type of error: Index failures, Parsing failures, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(display = "invalid source url")]
+    #[fail(display = "invalid source resolution specifier")]
     InvalidSourceUrl,
     #[fail(display = "package doesn't exist in index")]
     PackageNotFound,

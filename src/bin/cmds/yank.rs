@@ -14,6 +14,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(
             Arg::with_name("package")
                 .takes_value(true)
+                .required(true)
                 .help("The package spec to yank (name:version)"),
         )
         .arg(args::index())
@@ -25,7 +26,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     if spec.version.is_none() || spec.resolution.is_some() {
         return Err(format_err!(
-            "package spec must be in the format name:version"
+            "package spec must be in the format name|version"
         ));
     }
 

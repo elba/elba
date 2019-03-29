@@ -413,6 +413,16 @@ impl Spec {
     }
 }
 
+impl From<Name> for Spec {
+    fn from(f: Name) -> Spec {
+        Spec {
+            name: f,
+            version: None,
+            resolution: None
+        }
+    }
+}
+
 impl fmt::Display for Spec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)?;

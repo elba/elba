@@ -100,15 +100,32 @@ pub fn login(ctx: &BackendCtx, token: &str) -> Res<String> {
 pub fn yank(bcx: &build::BuildCtx, ctx: &BackendCtx, name: &Name, ver: &Version) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let backend = get_backend(&mut cache, ctx.index.res.clone())?;
+    let backend = get_backend(&mut cache, ctx.index.res.clone()).1?;
     backend.yank(name, ver, &token)?;
     Ok(())
+}
+
+// TODO: Local fallback
+// TODO: Search from multiple indices
+pub fn search(bcx: &build::BuildCtx, ctx: &BackendCtx, query: &str) -> Res<String> {
+    let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
+    let (indices, backend) = get_backend(&mut cache, ctx.index.res.clone());
+    let backend = backend?;
+
+    let res = backend.search(&indices, query)?;
+
+    let mut s = String::new();
+    for x in res.packages {
+        s.push_str(&format!("\"{}/{}\" = \"{}\"\n", x.group, x.name, x.version));
+    }
+
+    return Ok(s);
 }
 
 pub fn publish(bcx: &build::BuildCtx, ctx: &BackendCtx, project: &Path, verify: bool) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let backend = get_backend(&mut cache, ctx.index.res.clone())?;
+    let backend = get_backend(&mut cache, ctx.index.res.clone()).1?;
 
     let (tar, name, ver) = package(bcx, project, verify)?;
     let tar = File::open(tar)?;
@@ -122,6 +139,7 @@ fn get_logins(ctx: &BackendCtx) -> Res<(IndexMap<IndexRes, String>, PathBuf)> {
     let logins_file = ctx.data_dir.join("logins.toml");
 
     if !logins_file.exists() {
+        fs::create_dir_all(&ctx.data_dir)?;
         File::create(&logins_file).with_context(|e| {
             format_err!(
                 "couldn't create logins file {}: {}",
@@ -152,14 +170,19 @@ fn get_token(ctx: &BackendCtx) -> Res<String> {
     })
 }
 
-fn get_backend(c: &mut Cache, d: DirectRes) -> Res<remote::Backend> {
+fn get_backend(c: &mut Cache, d: DirectRes) -> (remote::Indices, Res<remote::Backend>) {
     let dt = d.to_string();
-    c.get_indices(&[d], false, false)
-        .indices
-        .get_index(0)
-        .ok_or_else(|| format_err!("invalid index: {}", dt))?
-        .1
-        .backend()
-        .ok_or_else(|| format_err!("index {} has no backend", dt))
-        .map(|x| x.clone())
+    let indices = c.get_indices(&[d], false, false);
+    let backend = (|| {
+        indices
+            .indices
+            .get_index(0)
+            .ok_or_else(|| format_err!("invalid index: {}", dt))?
+            .1
+            .backend()
+            .ok_or_else(|| format_err!("index {} has no backend", dt))
+            .map(|x| x.clone())
+    })();
+
+    (indices, backend)
 }

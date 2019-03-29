@@ -210,7 +210,7 @@ impl JobQueue {
                                 if let Some(s) = source.meta().scripts.get("prebuild") {
                                     shell.println(
                                         style("Running").dim(),
-                                        "prebuild script",
+                                        format!("prebuild script > {}", s),
                                         Verbosity::Verbose,
                                     );
                                     shell.println_plain(

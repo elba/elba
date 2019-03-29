@@ -31,7 +31,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     if let Some(s) = manifest.scripts.get(name) {
         c.shell().println(
             style("Running").dim(),
-            format!("script `{}`", name),
+            format!("script `{}` > {}", name, s),
             Verbosity::Normal,
         );
         c.shell().println_plain(
