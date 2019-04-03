@@ -2,7 +2,7 @@
 name = "elba"
 description = "elba is a package manager for Idris"
 authors = ["David Cao <dcao@protonmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 license = "MIT"
 edition = "2018"
 
@@ -38,6 +38,7 @@ rand = "0.5"
 reqwest = "0.9"
 scoped_threadpool = "0.1"
 semver = { version = "0.9", features = ["serde"] }
+semver_constraints = { version = "0.1", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"

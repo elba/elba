@@ -14,10 +14,7 @@ use self::{
     incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
 };
 use crate::{
-    package::{
-        version::{Constraint, Relation},
-        PackageId, Summary,
-    },
+    package::{PackageId, Summary},
     retrieve::Retriever,
     util::{
         errors::ErrorKind,
@@ -34,6 +31,7 @@ use petgraph::{
     Direction,
 };
 use semver::Version;
+use semver_constraints::{Constraint, Relation};
 use slog::{error, info, o, trace, Logger};
 use std::{cmp, collections::VecDeque};
 use textwrap::fill;

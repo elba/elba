@@ -8,10 +8,7 @@ pub mod cache;
 
 pub use self::cache::{Cache, Source};
 use crate::{
-    package::{
-        version::{Constraint, Interval, Range, Relation},
-        PackageId, Summary,
-    },
+    package::{PackageId, Summary},
     remote::{
         resolution::{DirectRes, IndexRes, Resolution},
         Indices, ResolvedEntry,
@@ -28,6 +25,7 @@ use failure::{format_err, Error, ResultExt};
 use indexmap::{indexmap, IndexMap, IndexSet};
 use itertools::Either::{self, Left, Right};
 use semver::Version;
+use semver_constraints::{Constraint, Interval, Range, Relation};
 use slog::{debug, info, o, trace, Logger};
 use std::borrow::Cow;
 

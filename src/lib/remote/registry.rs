@@ -5,9 +5,9 @@ use crate::{package::Name, remote::Indices, util::errors::Res};
 use failure::{format_err, Error, ResultExt};
 use reqwest::Client;
 use semver::Version;
-use serde::{ser, de};
+use serde::{de, ser};
 use serde_derive::{Deserialize, Serialize};
-use std::{fmt, fs::File, time::Duration, str::FromStr};
+use std::{fmt, fs::File, str::FromStr, time::Duration};
 use url::{
     percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET},
     Url,

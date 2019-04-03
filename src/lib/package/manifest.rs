@@ -1,6 +1,5 @@
 //! Package manifest files.
 
-use self::version::Constraint;
 use super::*;
 use crate::{
     remote::resolution::{DirectRes, IndexRes},
@@ -10,6 +9,7 @@ use failure::{format_err, Error, ResultExt};
 use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
+use semver_constraints::Constraint;
 use serde_derive::Deserialize;
 use std::{
     path::{Path, PathBuf},

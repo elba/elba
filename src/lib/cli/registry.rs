@@ -119,7 +119,7 @@ pub fn search(bcx: &build::BuildCtx, ctx: &RegistryCtx, query: &str) -> Res<Stri
         s.push_str(&format!("\"{}/{}\" = \"{}\"\n", x.group, x.name, x.version));
     }
 
-    return Ok(s);
+    Ok(s)
 }
 
 pub fn publish(bcx: &build::BuildCtx, ctx: &RegistryCtx, project: &Path, verify: bool) -> Res<()> {

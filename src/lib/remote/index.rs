@@ -24,7 +24,7 @@
 
 use super::registry::Registry;
 use crate::{
-    package::{version::Constraint, *},
+    package::*,
     remote::resolution::{DirectRes, IndexRes, Resolution},
     util::{
         errors::{ErrorKind, Res},
@@ -34,6 +34,7 @@ use crate::{
 use failure::{format_err, Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
+use semver_constraints::Constraint;
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -262,7 +263,13 @@ impl Index {
                     })
                 }
             } else {
-                entry.location.ok_or_else(|| format_err!("no location for index entry {} of package {}", lix + 1, name))
+                entry.location.ok_or_else(|| {
+                    format_err!(
+                        "no location for index entry {} of package {}",
+                        lix + 1,
+                        name
+                    )
+                })
             }?;
 
             let entry: ResolvedEntry = IndexEntry {

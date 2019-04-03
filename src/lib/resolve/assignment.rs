@@ -1,7 +1,8 @@
 //! Assignments for the dependency resolver.
 
-use crate::package::{version::Constraint, PackageId};
+use crate::package::PackageId;
 use semver::Version;
+use semver_constraints::Constraint;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assignment {
