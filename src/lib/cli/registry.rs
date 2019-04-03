@@ -1,4 +1,4 @@
-//! Repository-related commands: publishing, yanking, etc.
+//! Registry-related commands: publishing, yanking, etc.
 
 use super::build;
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
         resolution::{DirectRes, IndexRes},
     },
     retrieve::Cache,
-    util::{config, errors::Res, valid_file},
+    util::{config, errors::Res, shell::Verbosity, valid_file},
 };
 use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
@@ -24,7 +24,7 @@ use std::{
 use tar;
 use toml;
 
-pub struct BackendCtx {
+pub struct RegistryCtx {
     pub index: IndexRes,
     pub data_dir: PathBuf,
 }
@@ -87,7 +87,7 @@ pub fn package(
     ))
 }
 
-pub fn login(ctx: &BackendCtx, token: &str) -> Res<String> {
+pub fn login(ctx: &RegistryCtx, token: &str) -> Res<String> {
     let (mut logins, logins_file) = get_logins(ctx)?;
     logins.insert(ctx.index.clone(), token.to_owned());
     fs::write(&logins_file, toml::to_string(&logins).unwrap()).context(format_err!(
@@ -97,22 +97,22 @@ pub fn login(ctx: &BackendCtx, token: &str) -> Res<String> {
     Ok(format!("successfully logged into index {}", &ctx.index))
 }
 
-pub fn yank(bcx: &build::BuildCtx, ctx: &BackendCtx, name: &Name, ver: &Version) -> Res<()> {
+pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let backend = get_backend(&mut cache, ctx.index.res.clone()).1?;
-    backend.yank(name, ver, &token)?;
+    let registry = get_registry(&mut cache, ctx.index.res.clone()).1?;
+    registry.yank(name, ver, &token)?;
     Ok(())
 }
 
 // TODO: Local fallback
 // TODO: Search from multiple indices
-pub fn search(bcx: &build::BuildCtx, ctx: &BackendCtx, query: &str) -> Res<String> {
+pub fn search(bcx: &build::BuildCtx, ctx: &RegistryCtx, query: &str) -> Res<String> {
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let (indices, backend) = get_backend(&mut cache, ctx.index.res.clone());
-    let backend = backend?;
+    let (indices, registry) = get_registry(&mut cache, ctx.index.res.clone());
+    let registry = registry?;
 
-    let res = backend.search(&indices, query)?;
+    let res = registry.search(&indices, query)?;
 
     let mut s = String::new();
     for x in res.packages {
@@ -122,20 +122,25 @@ pub fn search(bcx: &build::BuildCtx, ctx: &BackendCtx, query: &str) -> Res<Strin
     return Ok(s);
 }
 
-pub fn publish(bcx: &build::BuildCtx, ctx: &BackendCtx, project: &Path, verify: bool) -> Res<()> {
+pub fn publish(bcx: &build::BuildCtx, ctx: &RegistryCtx, project: &Path, verify: bool) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let backend = get_backend(&mut cache, ctx.index.res.clone()).1?;
+    let registry = get_registry(&mut cache, ctx.index.res.clone()).1?;
 
     let (tar, name, ver) = package(bcx, project, verify)?;
     let tar = File::open(tar)?;
 
-    backend.publish(tar, &name, &ver, &token)?;
+    bcx.shell.println(
+        "Publishing",
+        format!("package {}|{}", name, ver),
+        Verbosity::Normal,
+    );
+    registry.publish(tar, &name, &ver, &token)?;
 
     Ok(())
 }
 
-fn get_logins(ctx: &BackendCtx) -> Res<(IndexMap<IndexRes, String>, PathBuf)> {
+fn get_logins(ctx: &RegistryCtx) -> Res<(IndexMap<IndexRes, String>, PathBuf)> {
     let logins_file = ctx.data_dir.join("logins.toml");
 
     if !logins_file.exists() {
@@ -159,7 +164,7 @@ fn get_logins(ctx: &BackendCtx) -> Res<(IndexMap<IndexRes, String>, PathBuf)> {
     Ok((logins, logins_file))
 }
 
-fn get_token(ctx: &BackendCtx) -> Res<String> {
+fn get_token(ctx: &RegistryCtx) -> Res<String> {
     let (logins, logins_file) = get_logins(&ctx)?;
     logins.get(&ctx.index).cloned().ok_or_else(|| {
         format_err!(
@@ -170,19 +175,19 @@ fn get_token(ctx: &BackendCtx) -> Res<String> {
     })
 }
 
-fn get_backend(c: &mut Cache, d: DirectRes) -> (remote::Indices, Res<remote::Backend>) {
+fn get_registry(c: &mut Cache, d: DirectRes) -> (remote::Indices, Res<remote::Registry>) {
     let dt = d.to_string();
     let indices = c.get_indices(&[d], false, false);
-    let backend = (|| {
+    let registry = (|| {
         indices
             .indices
             .get_index(0)
             .ok_or_else(|| format_err!("invalid index: {}", dt))?
             .1
-            .backend()
-            .ok_or_else(|| format_err!("index {} has no backend", dt))
+            .registry()
+            .ok_or_else(|| format_err!("index {} has no registry", dt))
             .map(|x| x.clone())
     })();
 
-    (indices, backend)
+    (indices, registry)
 }

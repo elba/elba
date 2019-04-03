@@ -1,5 +1,5 @@
 use crate::{
-    package::Checksum,
+    package::{Name, Checksum, version::Version},
     util::{
         clear_dir,
         errors::{ErrorKind, Res},
@@ -7,6 +7,7 @@ use crate::{
         hexify_hash,
         lock::DirLock,
     },
+    remote,
 };
 use failure::{format_err, Error, ResultExt};
 use flate2::read::GzDecoder;
@@ -134,19 +135,50 @@ pub enum DirectRes {
     /// itself. Checksums are stored in the fragment of the resolution url, with they key being the
     /// checksum format.
     Tar { url: Url, cksum: Option<Checksum> },
+    /// Registry: the package is stored by a registry.
+    Registry { registry: remote::Registry, name: Name, version: Version },
 }
 
 impl DirectRes {
     pub fn lowkey_eq(&self, other: &DirectRes) -> bool {
         match (self, other) {
             (DirectRes::Git { repo: r1, .. }, DirectRes::Git { repo: r2, .. }) => r1 == r2,
-            (DirectRes::Dir { path: p1 }, DirectRes::Dir { path: p2 }) => p1 == p2,
-            (DirectRes::Tar { url: u1, cksum: c1 }, DirectRes::Tar { url: u2, cksum: c2 }) => {
-                u1 == u2 && c1 == c2
-            }
-            _ => false,
+            _ => self == other,
         }
     }
+}
+
+/// Retrieves a package in the form of a tarball.
+fn retrieve_tar(url: Url, client: &Client, target: &DirLock, cksum: Option<&Checksum>) -> Res<()> {
+    client
+        .get(url)
+        .send()
+        .map_err(|_| Error::from(ErrorKind::CannotDownload))
+        .and_then(|mut r| {
+            let mut buf: Vec<u8> = vec![];
+            r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+
+            let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
+            if let Some(cksum) = cksum {
+                if cksum.hash != hash {
+                    return Err(format_err!(
+                        "tarball checksum doesn't match real checksum"
+                    ))?;
+                }
+            }
+
+            let archive = BufReader::new(&buf[..]);
+            let archive = GzDecoder::new(archive);
+            let mut archive = Archive::new(archive);
+
+            clear_dir(target.path())?;
+
+            archive
+                .unpack(target.path())
+                .context(ErrorKind::CannotDownload)?;
+
+            Ok(())
+        })
 }
 
 impl DirectRes {
@@ -161,35 +193,9 @@ impl DirectRes {
             DirectRes::Tar { url, cksum } => match url.scheme() {
                 "http" | "https" => {
                     dl_f(true)?;
-                    client
-                        .get(url.clone())
-                        .send()
-                        .map_err(|_| Error::from(ErrorKind::CannotDownload))
-                        .and_then(|mut r| {
-                            let mut buf: Vec<u8> = vec![];
-                            r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+                    retrieve_tar(url.clone(), &client, &target, cksum.as_ref())?;
 
-                            let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
-                            if let Some(cksum) = cksum {
-                                if cksum.hash != hash {
-                                    return Err(format_err!(
-                                        "tarball checksum doesn't match real checksum"
-                                    ))?;
-                                }
-                            }
-
-                            let archive = BufReader::new(&buf[..]);
-                            let archive = GzDecoder::new(archive);
-                            let mut archive = Archive::new(archive);
-
-                            clear_dir(target.path())?;
-
-                            archive
-                                .unpack(target.path())
-                                .context(ErrorKind::CannotDownload)?;
-
-                            Ok(None)
-                        })
+                    Ok(None)
                 }
                 "file" => {
                     dl_f(false)?;
@@ -344,6 +350,13 @@ impl DirectRes {
                     Err(format_err!("can't find directory {}", path.display()))?
                 }
             }
+            DirectRes::Registry { registry, name, version } => {
+                dl_f(true)?;
+                // TODO: Checksums?
+                retrieve_tar(registry.retrieve_url(&name, &version), &client, &target, None)?;
+
+                Ok(None)
+            }
         }
     }
 
@@ -401,6 +414,17 @@ impl FromStr for DirectRes {
                 url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
+            "res" => {
+                let mut url = Url::parse(rest).context(format_err!("invalid registry url"))?;
+                let frag = url.fragment().map(|x| x.to_owned()).ok_or_else(|| format_err!("registry url missing name/version fragment"))?;
+                url.set_fragment(None);
+
+                let registry = remote::Registry::new(url.clone());
+                let mut name_ver = frag.splitn(2, '|');
+                let name = Name::from_str(name_ver.next().unwrap())?;
+                let version = Version::from_str(name_ver.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?)?;
+                Ok(DirectRes::Registry { registry, name, version })
+            }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
     }
@@ -423,6 +447,9 @@ impl fmt::Display for DirectRes {
                         "".to_string()
                     },
                 )
+            }
+            DirectRes::Registry { registry, name, version } => {
+                write!(f, "reg+{}#{}|{}", registry, name, version)
             }
         }
     }

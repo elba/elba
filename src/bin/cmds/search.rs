@@ -1,7 +1,7 @@
 use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
-    cli::backend,
+    cli::registry,
     util::{config::Config, errors::Res},
 };
 
@@ -23,12 +23,12 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     let bcx = get::build_ctx(c, args);
     let bck_text = bck.to_string();
-    let ctx = backend::BackendCtx {
+    let ctx = registry::RegistryCtx {
         index: bck,
         data_dir: c.directories.data.clone(),
     };
 
-    println!("{}", backend::search(&bcx, &ctx, &query)?);
+    println!("{}", registry::search(&bcx, &ctx, &query)?);
 
     Ok(format!("search complete in index {}", bck_text))
 }

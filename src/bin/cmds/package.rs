@@ -1,7 +1,7 @@
 use super::{args, get};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
-    cli::backend,
+    cli::registry,
     util::{config::Config, errors::Res},
 };
 use failure::{format_err, ResultExt};
@@ -20,7 +20,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     let ctx = get::build_ctx(c, args);
 
-    let (gz_name, _, _) = backend::package(&ctx, &project, !args.is_present("no-verify"))?;
+    let (gz_name, _, _) = registry::package(&ctx, &project, !args.is_present("no-verify"))?;
 
     Ok(format!(
         "created compressed tarball at `{}`",

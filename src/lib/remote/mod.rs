@@ -1,5 +1,5 @@
-mod backend;
 mod index;
+mod registry;
 pub mod resolution;
 
-pub use self::{backend::*, index::*};
+pub use self::{index::*, registry::*};

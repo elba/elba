@@ -22,7 +22,7 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC enabling
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
-use super::backend::Backend;
+use super::registry::Registry;
 use crate::{
     package::{version::Constraint, *},
     remote::resolution::{DirectRes, IndexRes, Resolution},
@@ -62,7 +62,7 @@ impl FromStr for IndexConfig {
 pub struct IndexConfInner {
     pub secure: bool,
     pub dependencies: IndexMap<String, IndexRes>,
-    pub backend: Option<Backend>,
+    pub registry: Option<Registry>,
 }
 
 impl Default for IndexConfInner {
@@ -70,7 +70,7 @@ impl Default for IndexConfInner {
         IndexConfInner {
             secure: false,
             dependencies: IndexMap::new(),
-            backend: None,
+            registry: None,
         }
     }
 }
@@ -181,16 +181,16 @@ impl Indices {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct IndexEntry<T> {
+pub struct IndexEntry<T, L> {
     pub name: Name,
     pub version: Version,
     pub dependencies: Vec<Dep<T>>,
     pub yanked: bool,
-    pub location: DirectRes,
+    pub location: L,
 }
 
-pub type ResolvedEntry = IndexEntry<IndexRes>;
-pub type TomlEntry = IndexEntry<Option<String>>;
+pub type ResolvedEntry = IndexEntry<IndexRes, DirectRes>;
+pub type TomlEntry = IndexEntry<Option<String>, Option<DirectRes>>;
 
 /// Struct `Index` defines a single index.
 ///
@@ -251,12 +251,26 @@ impl Index {
                 })
                 .collect::<Vec<_>>();
 
+            let location = if let Some(url) = &self.config.index.registry {
+                if let Some(eloc) = entry.location {
+                    Ok(eloc)
+                } else {
+                    Ok(DirectRes::Registry {
+                        registry: url.clone(),
+                        name: name.clone(),
+                        version: entry.version.clone(),
+                    })
+                }
+            } else {
+                entry.location.ok_or_else(|| format_err!("no location for index entry {} of package {}", lix + 1, name))
+            }?;
+
             let entry: ResolvedEntry = IndexEntry {
                 name: entry.name,
                 version: entry.version,
                 dependencies,
                 yanked: entry.yanked,
-                location: entry.location,
+                location,
             };
 
             res.insert(entry.version.clone(), entry);
@@ -269,7 +283,7 @@ impl Index {
         self.config.index.dependencies.iter().map(|x| x.1)
     }
 
-    pub fn backend(&self) -> Option<&Backend> {
-        self.config.index.backend.as_ref()
+    pub fn registry(&self) -> Option<&Registry> {
+        self.config.index.registry.as_ref()
     }
 }

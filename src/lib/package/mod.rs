@@ -418,7 +418,7 @@ impl From<Name> for Spec {
         Spec {
             name: f,
             version: None,
-            resolution: None
+            resolution: None,
         }
     }
 }

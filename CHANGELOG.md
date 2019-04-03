@@ -8,7 +8,7 @@
   can now be specified in elba's configuration, which propagate to
   packages and commands which take an `--index` flag.
 
-- New commands for interacting with package backends: `package` for
+- New commands for interacting with package registries: `package` for
   creating tested tarballs of packages, `publish` for publishing a
   package to an index, `yank` for disallowing new packages to
   depend on a published package, `search` for searching through
@@ -17,7 +17,7 @@
 - A new command `check`, along with associated alias `c`, which checks all
   Idris source files but doesn't build any artifacts for them.
   
-- New fields to the manifest for use with package backends:
+- New fields to the manifest for use with package registries:
   `package.description`, `package.homepage`, `package.repository`,
   `package.readme`, and `package.keywords` (#30, #42).
   
@@ -39,8 +39,18 @@
 - Preliminary support for the Blodwen compiler. (Note that because the
   compiler is still so barebones, it can't build any packages with
   dependencies or executables)
+  
+- A new direct source for packages: a package registry (#37).
 
 ### Changed
+
+- **BREAKING CHANGE**: the `backend` field in `index.toml` is now
+  `registry`.
+
+- "Remote backends" or "index backends" are now "registries."
+
+- If a registry is specified for an index, the locations of each
+  package defaults to the registry (#37).
 
 - Made elba check for literate Idris files when looking for modules
   (#28).

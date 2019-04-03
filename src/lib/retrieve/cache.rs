@@ -451,6 +451,17 @@ impl Cache {
             if seen.contains(&index) {
                 continue;
             }
+
+            // If we're passed a Registry as a DirectRes, we give up immediately - registries only
+            // make sense as a DirectRes for packages.
+            if let DirectRes::Registry { .. } = &index {
+                self.shell.println(
+                    style("[warn]").yellow().bold(),
+                    format!("Ignoring registry resolution: {}", index),
+                    Verbosity::Quiet,
+                );
+            }
+
             // We special-case a local dir index because `dir` won't exist for it.
             if let DirectRes::Dir { path } = &index {
                 let lock = match DirLock::acquire(path) {

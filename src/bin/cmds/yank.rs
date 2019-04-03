@@ -1,7 +1,7 @@
 use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
-    cli::backend,
+    cli::registry,
     package::Spec,
     util::{config::Config, errors::Res},
 };
@@ -32,12 +32,12 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
 
     let bcx = get::build_ctx(c, args);
     let bck_text = bck.to_string();
-    let ctx = backend::BackendCtx {
+    let ctx = registry::RegistryCtx {
         index: bck,
         data_dir: c.directories.data.clone(),
     };
 
-    backend::yank(&bcx, &ctx, &spec.name, spec.version.as_ref().unwrap())?;
+    registry::yank(&bcx, &ctx, &spec.name, spec.version.as_ref().unwrap())?;
 
     Ok(format!("yanked package {} from index {}", spec, bck_text))
 }
