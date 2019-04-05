@@ -460,6 +460,7 @@ impl Cache {
                     format!("Ignoring registry resolution: {}", index),
                     Verbosity::Quiet,
                 );
+                continue;
             }
 
             // We special-case a local dir index because `dir` won't exist for it.

@@ -331,14 +331,25 @@ impl BinTarget {
         // Otherwise, we have to do more complicated logic.
         let src_path = parent.join(&self.path.0);
         let mut split = self.main.trim_matches('.').rsplitn(2, '.');
-        let (after, before) = (split.next().unwrap(), split.next());
+        let after = split.next().unwrap();
+        let (after, before) = if after == "lidr" || after == "idr" {
+            if let Some(before) = split.next() {
+                let mut new_split = before.rsplitn(2, '.');
+                let fpart = new_split.next().unwrap();
+                (format!("{}.{}", fpart, after), new_split.next())
+            } else {
+                (after.to_owned(), None)
+            }
+        } else {
+            (after.to_owned(), split.next())
+        };
 
         if let Some(before) = before {
             let target_path: PathBuf = before.replace(".", "/").into();
             // If there is at least one dot in the name:
             if src_path
                 .join(&target_path)
-                .join(after)
+                .join(&after)
                 .with_extension("idr")
                 .exists()
             {
@@ -346,7 +357,7 @@ impl BinTarget {
                 Some((src_path, target_path.join(after).with_extension("idr")))
             } else if src_path
                 .join(&target_path)
-                .join(after)
+                .join(&after)
                 .with_extension("lidr")
                 .exists()
             {

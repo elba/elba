@@ -262,7 +262,7 @@ pub fn compile_bin(
 
     // Check extension etc
     let target_path = if let Some(ext) = target_path.extension() {
-        if ext != OsStr::new("idr") {
+        if ext != OsStr::new("idr") && ext != OsStr::new("lidr") {
             let mod_name = &*target_path
                 .with_extension("")
                 .to_string_lossy()

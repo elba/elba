@@ -426,7 +426,7 @@ impl FromStr for DirectRes {
                 url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
-            "res" => {
+            "reg" => {
                 let mut url = Url::parse(rest).context(format_err!("invalid registry url"))?;
                 let frag = url
                     .fragment()
