@@ -100,7 +100,7 @@ pub fn login(ctx: &RegistryCtx, token: &str) -> Res<String> {
 pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let registry = get_registry(&mut cache, ctx.index.res.clone()).1?;
+    let registry = get_registry(&mut cache, ctx.index.res.clone(), false).1?;
     registry.yank(name, ver, &token)?;
     Ok(())
 }
@@ -109,7 +109,7 @@ pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version
 // TODO: Search from multiple indices
 pub fn search(bcx: &build::BuildCtx, ctx: &RegistryCtx, query: &str) -> Res<String> {
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let (indices, registry) = get_registry(&mut cache, ctx.index.res.clone());
+    let (indices, registry) = get_registry(&mut cache, ctx.index.res.clone(), false);
     let registry = registry?;
 
     let res = registry.search(&indices, query)?;
@@ -125,7 +125,7 @@ pub fn search(bcx: &build::BuildCtx, ctx: &RegistryCtx, query: &str) -> Res<Stri
 pub fn publish(bcx: &build::BuildCtx, ctx: &RegistryCtx, project: &Path, verify: bool) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let registry = get_registry(&mut cache, ctx.index.res.clone()).1?;
+    let registry = get_registry(&mut cache, ctx.index.res.clone(), true).1?;
 
     let (tar, name, ver) = package(bcx, project, verify)?;
     let tar = File::open(tar)?;
@@ -175,9 +175,9 @@ fn get_token(ctx: &RegistryCtx) -> Res<String> {
     })
 }
 
-fn get_registry(c: &mut Cache, d: DirectRes) -> (remote::Indices, Res<remote::Registry>) {
+fn get_registry(c: &mut Cache, d: DirectRes, eager: bool) -> (remote::Indices, Res<remote::Registry>) {
     let dt = d.to_string();
-    let indices = c.get_indices(&[d], false, false);
+    let indices = c.get_indices(&[d], eager, false);
     let registry = (|| {
         indices
             .indices
