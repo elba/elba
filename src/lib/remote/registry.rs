@@ -111,7 +111,7 @@ impl Registry {
 
     pub fn publish(&self, tar: File, name: &Name, version: &Version, token: &str) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
-        client
+        let mut resp = client
             .put(
                 self.url
                     .join(&format!(
@@ -126,7 +126,11 @@ impl Registry {
             .body(tar)
             .send()?;
 
-        Ok(())
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format_err!("{}", resp.text()?))?
+        }
     }
 
     pub fn search(&self, indices: &Indices, query: &str) -> Res<SearchResponse<SearchVersioned>> {
