@@ -169,8 +169,9 @@ pub fn compile_lib(
 
     let src_walker = source
         .meta()
-        .list_files(source.path(), &src_path, |_| true)?
-        .filter(|x| valid_file(&x));
+        .list_files(source.path(), &src_path, |x| {
+            x.path() != &layout.build
+        })?;
 
     clear_dir(&layout.build.join("lib"))?;
     copy_dir_iter(src_walker, &src_path, &layout.build.join("lib"))?;

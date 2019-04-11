@@ -97,6 +97,12 @@ impl Shell {
         }
     }
 
+    pub fn print_plain(self, message: impl Display, min_verbosity: Verbosity) {
+        if self.verbosity >= min_verbosity {
+            print!("{}", message);
+        }
+    }
+
     pub fn println_empty(self, min_verbosity: Verbosity) {
         if self.verbosity >= min_verbosity {
             println!();

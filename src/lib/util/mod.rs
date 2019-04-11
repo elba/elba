@@ -95,6 +95,7 @@ pub fn copy_dir_iter(walker: impl Iterator<Item = DirEntry>, from: &Path, to: &P
 
 pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Res<()> {
     let walker = WalkDir::new(from)
+        .follow_links(true)
         .into_iter()
         .filter_entry(|x| x.path() != to && (!gitless || x.file_name() != ".git"))
         .filter_map(|x| {

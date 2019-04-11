@@ -120,6 +120,7 @@ impl Manifest {
             .with_context(|e| format_err!("invalid excludes: {}", e))?;
 
         let walker = WalkDir::new(search_root)
+            .follow_links(true)
             .into_iter()
             .filter_entry(move |x| {
                 !excludes

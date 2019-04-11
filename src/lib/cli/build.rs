@@ -89,7 +89,6 @@ pub fn test(
             threads: ctx.threads,
         };
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[2/3]").dim().bold(),
             "Building targets...",
@@ -124,7 +123,6 @@ pub fn test(
         let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
         q.exec(&bctx)?;
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[3/3]").dim().bold(),
             "Running tests...",
@@ -182,7 +180,6 @@ pub fn test(
             // pb.finish_and_clear();
         });
 
-        ctx.shell.println_empty(Verbosity::Normal);
         let mut errs = 0;
         while let Some(res) = results.try_pop() {
             match res {
@@ -261,7 +258,6 @@ pub fn install(
             threads: ctx.threads,
         };
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[2/3]").dim().bold(),
             "Building targets...",
@@ -277,7 +273,6 @@ pub fn install(
         let bins = q.exec(&bctx)?.1;
         let binc = bins.len();
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[3/3]").dim().bold(),
             "Installing binaries...",
@@ -392,7 +387,6 @@ pub fn repl(
             threads: ctx.threads,
         };
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[2/3]").dim().bold(),
             "Building targets...",
@@ -410,13 +404,11 @@ pub fn repl(
 
         // From here, we basically manually build a CompileInvocation, but tailor-made for the
         // repl command.
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[3/3]").dim().bold(),
             "Launching REPL...",
             Verbosity::Quiet,
         );
-        ctx.shell.println_empty(Verbosity::Quiet);
 
         if bctx.compiler.flavor().is_idris2() {
             bail!("The Idris 2 compiler doesn't currently support custom source paths, needed for the REPL.")
@@ -511,7 +503,6 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
             threads: ctx.threads,
         };
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[2/2]").dim().bold(),
             "Building targets + root docs...",
@@ -605,7 +596,6 @@ pub fn build(
             threads: ctx.threads,
         };
 
-        ctx.shell.println_empty(Verbosity::Normal);
         ctx.shell.println(
             style("[2/2]").dim().bold(),
             "Building targets...",
@@ -866,8 +856,6 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(
         ctx.offline,
     );
     let solve = Resolver::new(&retriever.logger.clone(), &mut retriever).solve()?;
-
-    ctx.shell.println_empty(Verbosity::Normal);
 
     f(&cache, retriever, solve)
 }
