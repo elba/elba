@@ -44,6 +44,13 @@
 
 ### Changed
 
+- **BREAKING CHANGE**: the syntax for specifying a package from a custom
+  index has now changed to be consistent with the docs:
+  
+  ```toml
+  "index/explicit" = { version = ">= 0.1.0", index = "index+dir+../index" }
+  ```
+
 - **BREAKING CHANGE**: the `backend` field in `index.toml` is now
   `registry`.
 

@@ -44,6 +44,7 @@ serde_derive = "1.0"
 serde_json = "1.0"
 sha2 = "0.7"
 shell-escape = "0.1"
+simsearch = "0.1"
 slog = { version = "2", features = ["max_level_trace", "release_max_level_warn"] }
 slog-async = "2"
 slog-term = "2"

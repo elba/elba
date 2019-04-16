@@ -170,8 +170,8 @@ pub struct PackageInfo {
 pub enum DepReq {
     Registry(Constraint),
     RegLong {
-        con: Constraint,
-        registry: String,
+        version: Constraint,
+        index: String,
     },
     Local {
         path: PathBuf,
@@ -202,14 +202,14 @@ impl DepReq {
                 let pi = PackageId::new(n, def_index.1.clone().into());
                 Ok((pi, c))
             }
-            DepReq::RegLong { con, registry } => {
-                if let Some(mapped) = ixmap.get(&registry) {
+            DepReq::RegLong { version, index } => {
+                if let Some(mapped) = ixmap.get(&index) {
                     let pi = PackageId::new(n, mapped.clone().into());
-                    Ok((pi, con))
+                    Ok((pi, version))
                 } else {
-                    let ix = IndexRes::from_str(&registry)?;
+                    let ix = IndexRes::from_str(&index)?;
                     let pi = PackageId::new(n, ix.into());
-                    Ok((pi, con))
+                    Ok((pi, version))
                 }
             }
             DepReq::Local { path } => {

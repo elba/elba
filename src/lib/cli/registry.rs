@@ -105,21 +105,28 @@ pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version
     Ok(())
 }
 
-// TODO: Local fallback
-// TODO: Search from multiple indices
-pub fn search(bcx: &build::BuildCtx, ctx: &RegistryCtx, query: &str) -> Res<String> {
-    let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
-    let (indices, registry) = get_registry(&mut cache, ctx.index.res.clone(), false);
-    let registry = registry?;
+pub fn search(bcx: &build::BuildCtx, query: &str) -> Res<String> {
+    let cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
+    let ixs = bcx
+        .indices
+        .values()
+        .cloned()
+        .map(|x| x.res)
+        .collect::<Vec<_>>();
+    let indices = cache.get_indices(&ixs, false, false);
 
-    let res = registry.search(&indices, query)?;
+    let pkgs = indices.search(query)?;
+    let mut res = String::new();
 
-    let mut s = String::new();
-    for x in res.packages {
-        s.push_str(&format!("\"{}/{}\" = \"{}\"\n", x.group, x.name, x.version));
+    for (name, ver, ir) in &pkgs {
+        if ir.res == ixs[0] {
+            res.push_str(&format!("\"{}\" = \"{}\"", name, ver));
+        } else {
+            res.push_str(&format!("\"{}\" = \"{{ version = {}, index = {} }}\"", name, ver, ir));
+        }
     }
 
-    Ok(s)
+    Ok(res)
 }
 
 pub fn publish(bcx: &build::BuildCtx, ctx: &RegistryCtx, project: &Path, verify: bool) -> Res<()> {
@@ -175,7 +182,11 @@ fn get_token(ctx: &RegistryCtx) -> Res<String> {
     })
 }
 
-fn get_registry(c: &mut Cache, d: DirectRes, eager: bool) -> (remote::Indices, Res<remote::Registry>) {
+fn get_registry(
+    c: &mut Cache,
+    d: DirectRes,
+    eager: bool,
+) -> (remote::Indices, Res<remote::Registry>) {
     let dt = d.to_string();
     let indices = c.get_indices(&[d], eager, false);
     let registry = (|| {

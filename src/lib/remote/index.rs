@@ -37,12 +37,14 @@ use semver::Version;
 use semver_constraints::Constraint;
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
+use simsearch::SimSearch;
 use std::{
     fs,
     io::{self, prelude::*, BufReader},
     str::FromStr,
 };
 use toml;
+use walkdir::WalkDir;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct IndexConfig {
@@ -179,6 +181,29 @@ impl Indices {
             Err(Error::from(ErrorKind::PackageNotFound))
         }
     }
+
+    pub fn search(&self, query: &str) -> Res<Vec<(Name, Version, &IndexRes)>> {
+        let mut engine: SimSearch<(&IndexRes, &str)> = SimSearch::new();
+        let x = self
+            .indices
+            .iter()
+            .map(|x| x.1.packages().map(move |p| (x.0, p)))
+            .flatten()
+            .collect::<Vec<_>>();
+
+        for (ir, pkg) in &x {
+            engine.insert((ir, pkg), pkg);
+        }
+        let pkgs = engine.search(query);
+
+        pkgs.iter().map(|(ir, pkg)| {
+            let name = Name::from_str(pkg).unwrap();
+            let ix = &self.indices[*ir];
+            let ver: Version = ix.entries(&name)?.into_iter().map(|x| x.0).last().unwrap();
+
+            Ok((name, ver, *ir))
+        }).collect::<Res<Vec<_>>>()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -284,6 +309,21 @@ impl Index {
         }
 
         Ok(res)
+    }
+
+    pub fn packages(&self) -> impl Iterator<Item = String> {
+        let root_path = self.path.path().to_path_buf();
+        let git_path = root_path.join(".git");
+        WalkDir::new(self.path.path())
+            .min_depth(2)
+            .max_depth(3)
+            .into_iter()
+            .filter_entry(move |x| x.path().parent().unwrap() != git_path)
+            .filter_map(|x| x.ok())
+            .map(move |x| {
+                let stripped = x.path().strip_prefix(&root_path).unwrap();
+                stripped.to_string_lossy().to_string()
+            })
     }
 
     pub fn depends(&self) -> impl Iterator<Item = &IndexRes> {
