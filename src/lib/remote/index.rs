@@ -37,7 +37,7 @@ use semver::Version;
 use semver_constraints::Constraint;
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
-use simsearch::SimSearch;
+use simsearch::{SearchOptions, SimSearch};
 use std::{
     fs,
     io::{self, prelude::*, BufReader},
@@ -183,7 +183,8 @@ impl Indices {
     }
 
     pub fn search(&self, query: &str) -> Res<Vec<(Name, Version, &IndexRes)>> {
-        let mut engine: SimSearch<(&IndexRes, &str)> = SimSearch::new();
+        let mut engine: SimSearch<(&IndexRes, &str)> =
+            SimSearch::new_with(SearchOptions::new().stop_words(&["/", "\\"]));
         let x = self
             .indices
             .iter()
@@ -322,7 +323,7 @@ impl Index {
             .filter_map(|x| x.ok())
             .map(move |x| {
                 let stripped = x.path().strip_prefix(&root_path).unwrap();
-                stripped.to_string_lossy().to_string()
+                stripped.to_string_lossy().replace("\\", "/").to_string()
             })
     }
 
