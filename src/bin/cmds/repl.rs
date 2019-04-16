@@ -2,7 +2,7 @@ use super::{args, get};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
-    util::{config::Config, errors::Res},
+    util::{config::Config, errors::Res, shell::Verbosity},
 };
 use failure::{format_err, ResultExt};
 use std::env::current_dir;
@@ -21,6 +21,12 @@ pub fn cli() -> App<'static, 'static> {
                 .long("ide-mode")
                 .help("Launches the interactive IDE backend instead of a normal REPL"),
         )
+        .arg(
+            Arg::with_name("ide-mode-socket")
+                .long("ide-mode-socket")
+                .conflicts_with("ide-mode")
+                .help("Launches the IDE socket backend"),
+        )
         .args(&args::backends())
 }
 
@@ -34,8 +40,17 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         args.values_of("bin").map(|x| x.collect::<Vec<_>>()),
     );
 
+    let interactivity = if args.is_present("ide-mode") {
+        build::Interactivity::IDE
+    } else if args.is_present("ide-mode-socket") {
+        c.verbosity(Verbosity::None);
+        build::Interactivity::Socket
+    } else {
+        build::Interactivity::Normal
+    };
+
     let backend = get::backends(c, args);
     let ctx = get::build_ctx(c, args);
 
-    build::repl(&ctx, &project, &ts, &backend, args.is_present("ide-mode"))
+    build::repl(&ctx, &project, &ts, &backend, interactivity)
 }

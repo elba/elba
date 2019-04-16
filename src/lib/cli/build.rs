@@ -293,12 +293,19 @@ pub fn install(
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Interactivity {
+    Normal,
+    IDE,
+    Socket,
+}
+
 pub fn repl(
     ctx: &BuildCtx,
     project: &Path,
     targets: &(bool, Option<Vec<&str>>),
     backend: &Backend,
-    ide: bool,
+    interactivity: Interactivity,
 ) -> Res<String> {
     let mut contents = String::new();
     let project = find_manifest_root(project)?;
@@ -434,11 +441,13 @@ pub fn repl(
             process.arg(&target.1);
         }
 
-        if ide {
+        match interactivity {
             // In ide-mode, we only want to pass the current file as the arg.
             // An editor should be in charge of dealing with this.
-            process.arg("--ide-mode");
-        }
+            Interactivity::IDE => { process.arg("--ide-mode"); },
+            Interactivity::Socket => { process.arg("--ide-mode-socket"); },
+            _ => {},
+        };
 
         // The moment of truth:
         process
