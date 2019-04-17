@@ -41,6 +41,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     );
 
     let interactivity = if args.is_present("ide-mode") {
+        c.verbosity(Verbosity::None);
         build::Interactivity::IDE
     } else if args.is_present("ide-mode-socket") {
         c.verbosity(Verbosity::None);
