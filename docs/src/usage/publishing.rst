@@ -1,4 +1,4 @@
-Publishing to an Index
-===============================
+Publishing Packages
+===================
 
-TODO: Rewriting for 0.3.0...
+TODO: fix for 0.3.0

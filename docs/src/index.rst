@@ -8,8 +8,7 @@ to be a mostly comprehensive guide on actually using it.
    :maxdepth: 2
    :caption: Usage
              
-   usage/getting_started
-   usage/configuration
+   usage/quick_start
    usage/installing
    usage/custom_subcommands
    usage/publishing
@@ -18,9 +17,11 @@ to be a mostly comprehensive guide on actually using it.
    :maxdepth: 2
    :caption: Reference
              
+   reference/configuration
    reference/resolutions
    reference/manifest
    reference/indices
+   reference/registries
    reference/dependencies
    reference/cache
    

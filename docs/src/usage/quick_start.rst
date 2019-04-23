@@ -1,5 +1,5 @@
-Getting Started
-===============
+Quick Start
+===========
 
 This section is for getting up-to-speed with elba as fast as possible,
 covering getting elba installed on your machine in the first place and
@@ -8,6 +8,11 @@ making a new project.
 By the end of this chapter, you should have a basic elba installation
 up-and-running, as well as a general overview of how to use elba for
 day-to-day Idris development.
+
+We will assume that you already have the Idris toolchain installed. If
+you don't, there are instructions available on the
+`Idris <https://www.idris-lang.org/download/>`__ and
+`Blodwen <https://github.com/edwinb/Blodwen>`__ websites.
 
 Installation
 ------------
@@ -68,15 +73,8 @@ After that’s done, download elba’s source code and install it:
 Remember to add ``~/.elba/bin`` to your PATH to be able to run
 elba-installed packages.
 
-Quick Start
------------
-
-This section intends to be a whirlwind tour of all the functionality
-available with elba. For more information on each step, refer to either
-the Usage or Reference chapters.
-
 Creating a package
-~~~~~~~~~~~~~~~~~~
+------------------
 
 Creating a package is easy with elba: all you need is a package name.
 Note that names in elba are special in that they are *always
@@ -104,7 +102,7 @@ Regardless of which target is chosen, an ``elba.toml`` manifest file
 will also be generated.
 
 Initializing a pre-existing package
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you already have an Idris project and want to turn it into an elba
 project, use the ``elba init`` command instead; it follows the exact
@@ -112,7 +110,7 @@ same syntax as ``elba new`` and is functionally identical, but uses the
 current directory instead of making a new one.
 
 Adding dependencies
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 Now that a new package has been created, you can start to add packages
 as part of your dependencies. A package can originate from one of three
@@ -142,7 +140,7 @@ At this point, you can add whatever files you want and import anything
 from your dependencies.
 
 Targets
-~~~~~~~
+-------
 
 The manifest also allows you to specify which targets you want to have
 built for your package. There are three types of targets:
@@ -188,7 +186,7 @@ built for your package. There are three types of targets:
    binary succeeds upon execution if it returns exit code 0.
 
 Building a package
-~~~~~~~~~~~~~~~~~~
+------------------
 
 …can be accomplished with the command:
 

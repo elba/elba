@@ -1,36 +1,14 @@
 //! Package repositories that can be published/yanked to.
 //! elba reads from indices and writes to repos.
 
-use crate::{package::Name, remote::Indices, util::errors::Res};
+use crate::{package::Name, util::errors::Res};
 use failure::{format_err, Error, ResultExt};
 use reqwest::Client;
 use semver::Version;
 use serde::{de, ser};
 use serde_derive::{Deserialize, Serialize};
 use std::{fmt, fs::File, str::FromStr, time::Duration};
-use url::{
-    percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET},
-    Url,
-};
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SearchResponse<T> {
-    pub packages: Vec<T>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SearchPkg {
-    pub group: String,
-    #[serde(rename = "package")]
-    pub name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct SearchVersioned {
-    pub group: String,
-    pub name: String,
-    pub version: Version,
-}
+use url::Url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Registry {
@@ -130,40 +108,6 @@ impl Registry {
             Ok(())
         } else {
             Err(format_err!("{}", resp.text()?))?
-        }
-    }
-
-    pub fn search(&self, indices: &Indices, query: &str) -> Res<SearchResponse<SearchVersioned>> {
-        let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
-        // Encode the string so that it's safe for a url
-        let query = utf8_percent_encode(query, DEFAULT_ENCODE_SET).collect::<String>();
-        let mut resp = client
-            .get(self.url.join("api/v1/packages/search").unwrap())
-            .query(&[("q", query)])
-            .send()?;
-
-        if resp.status().is_success() {
-            let sr = resp.json::<SearchResponse<SearchPkg>>()?;
-
-            let packages = sr
-                .packages
-                .into_iter()
-                .map(|x| {
-                    let n = Name::new(x.group.clone(), x.name.clone()).unwrap();
-                    let sum = indices.select_by_spec(&n.into())?;
-                    Ok(SearchVersioned {
-                        group: x.group,
-                        name: x.name,
-                        version: sum.version,
-                    })
-                })
-                .collect::<Res<_>>()?;
-
-            let ns = SearchResponse { packages };
-
-            Ok(ns)
-        } else {
-            Err(format_err!("{} {}", resp.status(), resp.text()?))?
         }
     }
 
