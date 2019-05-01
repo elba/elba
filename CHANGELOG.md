@@ -42,6 +42,9 @@
   
 - A new direct source for packages: a package registry (#37).
 
+- A flag `--unyank` to the `elba yank` command, allowing for unyanking
+  packages.
+
 ### Changed
 
 - **BREAKING CHANGE**: the syntax for specifying a package from a custom

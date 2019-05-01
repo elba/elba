@@ -6,7 +6,6 @@ use failure::{format_err, Error, ResultExt};
 use reqwest::Client;
 use semver::Version;
 use serde::{de, ser};
-use serde_derive::{Deserialize, Serialize};
 use std::{fmt, fs::File, str::FromStr, time::Duration};
 use url::Url;
 
@@ -64,7 +63,7 @@ impl Registry {
         unimplemented!()
     }
 
-    pub fn yank(&self, name: &Name, version: &Version, token: &str) -> Res<()> {
+    pub fn yank(&self, name: &Name, version: &Version, token: &str, yank: bool) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
         let mut resp = client
             .patch(
@@ -77,7 +76,7 @@ impl Registry {
                     ))
                     .unwrap(),
             )
-            .query(&[("yanked", "true"), ("token", token)])
+            .query(&[("yanked", yank.to_string()), ("token", token.to_string())])
             .send()?;
 
         if resp.status().is_success() {

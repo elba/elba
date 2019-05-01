@@ -1,10 +1,10 @@
 Registries
 ==========
 
-Where `indices <./indices>` can be thought of as the "read-only" part of
-a package repository, providing information about packages and nothing
-more, a **registry** is a package server which serves the actual package
-files and allows users to upload and yank packages from them.
+Where :doc:`indices <./indices>` can be thought of as the "read-only"
+part of a package repository, providing information about packages and
+nothing more, a **registry** is a package server which serves the actual
+package files and allows users to upload and yank packages from them.
 
 All registries are tied to indices - a registry must have a
 corresponding package index (though the opposite isn't necessarily

@@ -97,11 +97,11 @@ pub fn login(ctx: &RegistryCtx, token: &str) -> Res<String> {
     Ok(format!("successfully logged into index {}", &ctx.index))
 }
 
-pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version) -> Res<()> {
+pub fn yank(bcx: &build::BuildCtx, ctx: &RegistryCtx, name: &Name, ver: &Version, yank: bool) -> Res<()> {
     let token = get_token(ctx)?;
     let mut cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
     let registry = get_registry(&mut cache, ctx.index.res.clone(), false).1?;
-    registry.yank(name, ver, &token)?;
+    registry.yank(name, ver, &token, yank)?;
     Ok(())
 }
 
