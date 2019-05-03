@@ -37,6 +37,7 @@ have multiple indices specified in your configuration, you can specify
 the index to use with the ``--index`` flag. For example:
 
 .. code-block:: console
+
    $ elba login a67fc893bccfea2141 --index index+git+https://github.com/elba/index
 
 Otherwise, elba will use the default index (the first index specified in
@@ -80,6 +81,7 @@ your project, under the ``package.ignore`` key.
 .gitignore files as list elements. An example is provided below:
 
 .. code-block:: toml
+
    [package]
    # snip: other package metadata
    # ignoring files that end with .out or .dev

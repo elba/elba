@@ -181,7 +181,6 @@ three types of targets which elba can build:
       # this corresponds to the first of the following files which exists:
       # - bin/Whatever/Module.idr
       # - bin/Whatever/Module.lidr
-      # - src/bin/Whatever/Module.idr (because of the default `path` value)
 
       # Example 2: main uses dots instead of slashes to separate folders, and
       # includes an idr extension
@@ -200,8 +199,6 @@ three types of targets which elba can build:
       # corresponds to the first of the following files which exists:
       # - bin/Whatever/Module.idr
       # - bin/Whatever/Module.lidr
-      # - src/bin/Whatever/Module.idr (due to the default `path` value)
-      # - src/bin/Whatever/Module.lidr
       # in both cases, this file should have a function `Module.custom : IO ()`,
       # which will be used as the main function
 

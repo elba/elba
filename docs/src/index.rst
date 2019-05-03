@@ -9,6 +9,7 @@ to be a mostly comprehensive guide on actually using it.
    :caption: Usage
              
    usage/quick_start
+   usage/binaries_and_tests
    usage/installing
    usage/custom_subcommands
    usage/publishing

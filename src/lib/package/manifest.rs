@@ -369,6 +369,9 @@ impl BinTarget {
                 // part exists, we assume that the last part refers to a function which
                 // should be treated as the main function.
                 Some((src_path, target_path.with_extension(after)))
+            } else if src_path.join(&target_path).with_extension("lidr").exists() {
+                // Same, but for literate file
+                Some((src_path, target_path.with_extension(after)))
             } else {
                 None
             }

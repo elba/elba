@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('util'))
 # -- Project information -----------------------------------------------------
 
 project = 'elba'
-copyright = '2018, David Cao'
+copyright = '2019, David Cao'
 author = 'David Cao'
 
 # The short X.Y version
