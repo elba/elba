@@ -7,7 +7,7 @@ Status](https://ci.appveyor.com/api/projects/status/j2pk9krx63o1dpdv?svg=true)](
 
 A modern and (hopefully!) fast package manager for
 [Idris](https://www.idris-lang.org). Supplemental information and alternatives
-can be found at [this blog post](http://cao.st/post/elba/).
+can be found at [this blog post](http://cao.st/posts/elba/).
 
 ## Installation
 

@@ -64,20 +64,20 @@ Given the following binary target:
 elba will go through the following rules to resolve a target specifier
 (the first search which works is used):
 
-1. Attempt to interpret as a subpath: filename ``pqr.xyz``, extension ``ext``
-   1. If there's no file extension or ``ext`` == ``idr`` or ``lidr``:
-      1. Search for ``a/.../xyz.idr``
-      2. Search for ``a/.../xyz.lidr``
-   2. Otherwise:
-      1. Search for ``a/.../xyz.idr``, generate main for fn ``ext``
-      2. Search for ``a/.../xyz.lidr``, generate main for fn ``ext``
-   3. If either branch failed, continue to next
-2. Otherwise, interpret as a mixed or module path:
-   1. Search for ``$p/a/.../pqr/xyz/ext.idr``
-   2. Search for ``$p/a/.../pqr/xyz/ext.lidr``
-   3. Search for ``$p/a/.../pqr/xyz.idr``, generate main for fn ``ext``
+-  Attempt to interpret as a subpath: filename ``pqr.xyz``, extension ``ext``
+   -  If there's no file extension or ``ext`` == ``idr`` or ``lidr``:
+      -  Search for ``a/.../xyz.idr``
+      -  Search for ``a/.../xyz.lidr``
+   -  Otherwise:
+      -  Search for ``a/.../xyz.idr``, generate main for fn ``ext``
+      -  Search for ``a/.../xyz.lidr``, generate main for fn ``ext``
+   -  If either branch failed, continue to next
+-  Otherwise, interpret as a mixed or module path:
+   -  Search for ``$p/a/.../pqr/xyz/ext.idr``
+   -  Search for ``$p/a/.../pqr/xyz/ext.lidr``
+   -  Search for ``$p/a/.../pqr/xyz.idr``, generate main for fn ``ext``
       (except if ``ext`` == ``idr`` or ``lidr``)
-   4. Search for ``$p/a/.../pqr/xyz.lidr``, generate main for fn ``ext``
+   -  Search for ``$p/a/.../pqr/xyz.lidr``, generate main for fn ``ext``
       (except if ``ext`` == ``idr`` or ``lidr``)
 
 These rules make more sense in practice.
@@ -92,8 +92,8 @@ your source files *will not* be available unless they are located under
 the source path). To determine where to divide the source and target
 paths, elba uses the following rules:
 
-1. The source path of a subpath is its immediate parent.
-2. The source path of a mixed or module path is the value of the
+-  The source path of a subpath is its immediate parent.
+-  The source path of a mixed or module path is the value of the
    ``path`` specifier.
 
 In Practice
@@ -190,11 +190,11 @@ elba has special cases for target specifiers that end in ``idr`` or
 
 elba will look for:
 
-1. ``Tests.idr``
-2. ``tests/Tests/idr.idr``
-3. ``tests/Tests/idr.lidr``
-4. ``tests/Tests.idr``
-5. ``tests/Tests.lidr``
+-  ``Tests.idr``
+-  ``tests/Tests/idr.idr``
+-  ``tests/Tests/idr.lidr``
+-  ``tests/Tests.idr``
+-  ``tests/Tests.lidr``
 
 elba will never try to generate anything if the target specifier ends
 with ``.idr`` or ``.lidr``.
