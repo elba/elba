@@ -1,3 +1,4 @@
+mod add;
 mod build;
 mod check;
 mod clean;
@@ -34,6 +35,7 @@ pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
+        add::cli(),
         build::cli(),
         check::cli(),
         clean::cli(),
@@ -57,6 +59,7 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
 
 pub fn execute_internal(cmd: &str) -> Option<Exec> {
     match cmd {
+        "add" => Some(add::exec),
         "build" => Some(build::exec),
         "check" => Some(check::exec),
         "clean" => Some(clean::exec),

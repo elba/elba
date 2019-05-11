@@ -1,5 +1,6 @@
 //! Package manifest files.
 
+
 use super::*;
 use crate::{
     remote::resolution::{DirectRes, IndexRes},
@@ -38,7 +39,7 @@ use walkdir::{DirEntry, WalkDir};
 //
 // With this in place, we can safely avoid module namespace conflicts.
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Manifest {
     pub package: PackageInfo,
     #[serde(default = "IndexMap::new")]
@@ -149,7 +150,7 @@ impl FromStr for Manifest {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PackageInfo {
     pub name: Name,
     pub version: Version,
@@ -165,7 +166,7 @@ pub struct PackageInfo {
     pub exclude: Option<Vec<String>>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum DepReq {
     Registry(Constraint),
@@ -226,7 +227,7 @@ impl DepReq {
     }
 }
 
-#[derive(Deserialize, Default, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub struct Targets {
     pub lib: Option<LibTarget>,
     #[serde(default = "Vec::new")]
@@ -235,7 +236,7 @@ pub struct Targets {
     pub test: Vec<TestTarget>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LibTarget {
     #[serde(default = "default_lib_subpath")]
     pub path: SubPath,
@@ -248,7 +249,7 @@ fn default_lib_subpath() -> SubPath {
     SubPath::from_path(Path::new("src")).unwrap()
 }
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct BinTarget {
     pub name: String,
     #[serde(default = "default_bin_subpath")]
@@ -266,7 +267,7 @@ fn default_bin_subpath() -> SubPath {
 /// the difference in default path.
 ///
 /// I know, code duplication sucks and is stupid, but what can ya do :v
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct TestTarget {
     pub name: Option<String>,
     #[serde(default = "default_test_subpath")]

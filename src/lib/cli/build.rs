@@ -34,12 +34,13 @@ use scoped_threadpool::Pool;
 use slog::Logger;
 use std::{
     env, fs,
-    io::prelude::*,
+    io::{prelude::*, Seek, SeekFrom},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
 };
 use toml;
+use toml_edit;
 
 pub struct BuildCtx {
     pub compiler: String,
@@ -684,6 +685,50 @@ pub fn update(ctx: &BuildCtx, project: &Path, ignore: Option<&[Spec]>) -> Res<St
             Ok("lockfile created at `./elba.lock`".to_string())
         }
     })
+}
+
+pub fn add(ctx: &BuildCtx, project: &Path, spec: &Spec, dev: bool) -> Res<String> {
+    let mut contents = String::new();
+    let project = find_manifest_root(project)?;
+    let mut mf = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(project.join("elba.toml"))
+        .context(format_err!("failed to read manifest file (elba.toml)"))?;
+    mf.read_to_string(&mut contents)?;
+    let mut manifest = contents.parse::<toml_edit::Document>().with_context(|e| format!("invalid manifest toml format: {}", e))?;
+
+    let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
+    let indices = ctx
+        .indices
+        .values()
+        .cloned()
+        .map(|x| x.res)
+        .collect::<Vec<_>>();
+    let indices = cache.get_indices(&indices, false, false);
+    let target = indices.select_by_spec(&spec)?;
+    let target_s = target.to_string();
+
+    let res = match target.id.resolution() {
+        Resolution::Index(IndexRes { res }) => res.clone(),
+        _ => unreachable!(),
+    };
+
+    if !dev {
+        manifest["dependencies"][target.id.name().to_string()]["version"] = toml_edit::value(target.version.to_string());
+        manifest["dependencies"][target.id.name().to_string()]["index"] = toml_edit::value(res.to_string());
+        manifest["dependencies"][target.id.name().to_string()].as_inline_table_mut().map(|t| t.fmt());
+    } else {
+        manifest["dev_dependencies"][target.id.name().to_string()]["version"] = toml_edit::value(target.version.to_string());
+        manifest["dev_dependencies"][target.id.name().to_string()]["index"] = toml_edit::value(res.to_string());
+        manifest["dev_dependencies"][target.id.name().to_string()].as_inline_table_mut().map(|t| t.fmt());
+    }
+
+    mf.seek(SeekFrom::Start(0))?;
+    mf.write_all(manifest.to_string().as_bytes())?;
+
+
+    Ok(format!("added package {} to manifest", target_s))
 }
 
 pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Res<String>>(

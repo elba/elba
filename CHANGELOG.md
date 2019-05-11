@@ -17,6 +17,8 @@
 - A new command `check`, along with associated alias `c`, which checks all
   Idris source files but doesn't build any artifacts for them.
   
+- A new command `add` for adding a dependency to the current project (#51).
+  
 - New fields to the manifest for use with package registries:
   `package.description`, `package.homepage`, `package.repository`,
   `package.readme`, and `package.keywords` (#30, #42).
