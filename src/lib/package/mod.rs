@@ -9,7 +9,8 @@ use crate::{
 };
 use failure::{bail, format_err, Error};
 use semver::Version;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer, Error as DeError};
+use serde::ser::{Serialize, Serializer};
 use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -172,7 +173,7 @@ impl fmt::Display for Name {
 impl<'de> Deserialize<'de> for Name {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        FromStr::from_str(&s).map_err(de::Error::custom)
+        FromStr::from_str(&s).map_err(DeError::custom)
     }
 }
 
@@ -248,7 +249,7 @@ impl fmt::Display for PackageId {
 impl<'de> Deserialize<'de> for PackageId {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        FromStr::from_str(&s).map_err(de::Error::custom)
+        FromStr::from_str(&s).map_err(DeError::custom)
     }
 }
 
@@ -317,7 +318,7 @@ impl fmt::Display for Checksum {
 impl<'de> Deserialize<'de> for Checksum {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        FromStr::from_str(&s).map_err(de::Error::custom)
+        FromStr::from_str(&s).map_err(DeError::custom)
     }
 }
 
