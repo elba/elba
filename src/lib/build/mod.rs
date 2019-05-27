@@ -156,8 +156,9 @@ pub fn compile_lib(
                 Ok(path.with_extension("lidr"))
             } else {
                 Err(format_err!(
-                    "Module at path {} doesn't exist",
-                    path.display()
+                    "module {} isn't a subpath and doesn't exist under path {}",
+                    mod_name,
+                    src_path.display()
                 ))
             }
         })
