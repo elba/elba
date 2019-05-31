@@ -11,10 +11,14 @@ use self::{
 use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
     util::{
-        clear_dir, copy_dir, copy_dir_iter, errors::Res, fmt_output, generate_ipkg,
-        shell::OutputGroup, valid_file,
+        clear_dir, copy_dir, copy_dir_iter,
+        errors::Res,
+        fmt_multiple, fmt_output, generate_ipkg,
+        shell::{OutputGroup, Shell, Verbosity},
+        valid_file,
     },
 };
+use console::style;
 use failure::{bail, format_err, ResultExt};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -135,6 +139,7 @@ pub fn compile_lib(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
+    shell: Shell,
 ) -> Res<OutputGroup> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
@@ -174,6 +179,8 @@ pub fn compile_lib(
 
     clear_dir(&layout.build.join("lib"))?;
     copy_dir_iter(src_walker, &src_path, &layout.build.join("lib"))?;
+
+    run_prebuild_script(source, &layout.build.join("lib"), shell)?;
 
     let invocation = CompileInvocation {
         deps,
@@ -238,6 +245,7 @@ pub fn compile_bin(
     deps: &[&Binary],
     layout: &OutputLayout,
     bcx: &BuildContext,
+    shell: Shell,
 ) -> Res<(OutputGroup, Option<PathBuf>)> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build executables")
@@ -260,13 +268,16 @@ pub fn compile_bin(
     clear_dir(&layout.build.join("bin"))?;
     copy_dir(&src_path, &layout.build.join("bin"), false)?;
 
+    run_prebuild_script(source, &layout.build.join("bin"), shell)?;
+
     // Check extension etc
     let target_path = if let Some(ext) = target_path.extension() {
         if ext != OsStr::new("idr") && ext != OsStr::new("lidr") {
             let mod_name = &*target_path
                 .with_extension("")
                 .to_string_lossy()
-                .replace("/", ".");
+                .replace("/", ".")
+                .replace("\\", ".");
             make_main_file(mod_name, &*ext.to_string_lossy(), &layout.build.join("bin"))?
         } else {
             target_path
@@ -422,6 +433,22 @@ pub fn run_script(root: &Path, cmd: &str) -> Res<OutputGroup> {
     }
 
     Ok(res.into())
+}
+
+pub fn run_prebuild_script(source: &Source, root: &Path, shell: Shell) -> Res<()> {
+    if let Some(s) = source.meta().scripts.get("prebuild") {
+        shell.println(
+            style("Running").dim(),
+            format!("prebuild script > {}", s),
+            Verbosity::Verbose,
+        );
+        shell.println_plain(
+            fmt_multiple(&run_script(root, s)?),
+            Verbosity::Normal,
+        );
+    }
+
+    Ok(())
 }
 
 fn make_main_file(module: &str, fun: &str, parent: &Path) -> Res<PathBuf> {
