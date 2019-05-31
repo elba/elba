@@ -11,7 +11,7 @@ use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
 use semver_constraints::Constraint;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,

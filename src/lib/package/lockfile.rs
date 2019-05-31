@@ -6,7 +6,7 @@ use crate::util::graph::Graph;
 use failure::{Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use petgraph::{self, graph::NodeIndex};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
 use toml;
 

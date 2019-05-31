@@ -14,7 +14,7 @@ use crate::{
 use config;
 use directories::{BaseDirs, ProjectDirs};
 use indexmap::{indexmap, IndexMap};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
 use url::Url;
 

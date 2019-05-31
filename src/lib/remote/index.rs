@@ -35,7 +35,7 @@ use failure::{format_err, Error, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
 use semver_constraints::Constraint;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 use simsearch::{SearchOptions, SimSearch};
 use std::{

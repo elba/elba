@@ -10,7 +10,6 @@ use crate::{
 use failure::{bail, format_err, Error};
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use serde_derive::{Deserialize, Serialize};
 use std::{
     fmt,
     hash::{Hash, Hasher},
