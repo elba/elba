@@ -1,6 +1,15 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0]
+
+This is a major release which adds many new features and polishes many
+old ones. In particular, this release adds proper support for package
+repositories (deemed "indices" and "registries") by adding many new
+commands and manifest fields for interacting with registries, and
+generally making the index/registry system more robust.
+
+This release also provides experimental support for the Blodwen
+compiler; in the future, more robust support will be added.
 
 ### Added
 
@@ -244,7 +253,8 @@ other packages.
 - Commands for creating packages, building packages (generating a lockfile
   and building all targets), testing packages, and (un)installing packages.
 
-[Unreleased]: https://github.com/elba/elba/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/elba/elba/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/elba/elba/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/elba/elba/compare/0.1.5...0.2.0
 [0.1.5]: https://github.com/elba/elba/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/elba/elba/compare/0.1.3...0.1.4
