@@ -5,7 +5,7 @@ Status](https://travis-ci.com/elba/elba.svg?branch=master)](https://travis-ci.co
 [![Windows Build
 Status](https://ci.appveyor.com/api/projects/status/j2pk9krx63o1dpdv?svg=true)](https://ci.appveyor.com/project/dcao/elba)
 
-A modern and (hopefully!) fast package manager for
+[Elba](https://www.elba.pub/) is a modern and (hopefully!) fast package manager for
 [Idris](https://www.idris-lang.org). Supplemental information and alternatives
 can be found at [this blog post](http://cao.st/posts/elba/).
 
