@@ -67,7 +67,7 @@ After that’s done, download elba’s source code and install it:
 
    $ git clone https://github.com/elba/elba
    $ cd elba
-   $ cargo install --release
+   $ cargo install --path .
    $ elba # should work!
 
 Remember to add ``~/.elba/bin`` to your PATH to be able to run
