@@ -182,7 +182,7 @@ mod get {
     pub fn threads(_c: &mut Config, args: &ArgMatches) -> u32 {
         args.value_of("build-threads")
             .and_then(|s| s.parse().ok())
-            .unwrap_or(1)
+            .unwrap_or(num_cpus::get() as u32)
     }
 
     pub fn idris_opts(_c: &mut Config, args: &ArgMatches) -> Vec<String> {

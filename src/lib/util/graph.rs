@@ -26,6 +26,10 @@ impl<T: Eq, E> Graph<T, E> {
         Graph { inner: graph }
     }
 
+    pub fn root(&self) -> Option<&T> {
+        self.inner.raw_nodes().get(0).map(|node| &node.weight)
+    }
+
     pub fn find_id(&self, node: &T) -> Option<NodeIndex> {
         self.inner
             .node_references()
@@ -96,17 +100,6 @@ impl<T: Eq, E> Graph<T, E> {
         }
 
         Ok(Graph::new(tree))
-    }
-
-    pub fn filter_map<U, V, F, G>(&mut self, mut f: F, mut g: G) -> Graph<U, V>
-    where
-        U: Eq,
-        F: FnMut(&T) -> Option<U>,
-        G: FnMut(&E) -> Option<V>,
-    {
-        Graph {
-            inner: self.inner.filter_map(|_, i| f(i), |_, j| g(j)),
-        }
     }
 }
 

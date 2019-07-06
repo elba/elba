@@ -254,9 +254,7 @@ impl Cache {
     /// Return the build directory exists, else None.
     pub fn checkout_build(&self, hash: &BuildHash) -> Res<Option<Binary>> {
         if let Some(path) = self.check_build(&hash) {
-            Ok(Some(Binary {
-                target: DirLock::acquire(&path)?,
-            }))
+            Ok(Some(Binary::new(DirLock::acquire(&path)?)))
         } else {
             Ok(None)
         }
@@ -268,7 +266,10 @@ impl Cache {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
         if lock.path().exists() {
-            clear_dir(&lock.path()).context(format_err!("couldn't remove existing output path"))?;
+            clear_dir(&lock.path()).context(format_err!(
+                "couldn't remove existing output path: {}",
+                lock.path().display()
+            ))?;
         }
         OutputLayout::new(lock)
     }
@@ -429,7 +430,7 @@ impl Cache {
         clear_dir(dest.path())?;
         copy_dir(from, dest.path(), false)?;
 
-        Ok(Binary { target: dest })
+        Ok(Binary::new(dest))
     }
 
     fn check_build(&self, hash: &BuildHash) -> Option<PathBuf> {
@@ -608,9 +609,9 @@ impl Layout {
 //       it doesn't rebuild already built targets, and it reuses the same build dir
 /// The Layout of an output directory. This is used either as the `target` directory or one of the
 /// folders in a temporary build directory in the global cache.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OutputLayout {
-    lock: DirLock,
+    lock: Arc<DirLock>,
     pub root: PathBuf,
     pub artifacts: PathBuf,
     pub bin: PathBuf,
@@ -625,7 +626,7 @@ impl OutputLayout {
         let root = lock.path().to_path_buf();
 
         let layout = OutputLayout {
-            lock,
+            lock: Arc::new(lock),
             root: root.clone(),
             artifacts: root.join("artifacts"),
             bin: root.join("bin"),
@@ -665,8 +666,6 @@ impl OutputLayout {
 /// pointless unpacking-repacking).
 #[derive(Debug, Clone)]
 pub struct Source {
-    // Note: the reason we have to deal with this Arc is because in the JobQueue, there's no way of
-    // moving Sources out of the queue, hence the need to clone the references to the Source.
     inner: Arc<SourceInner>,
 }
 
@@ -809,9 +808,17 @@ impl PartialEq for Source {
 impl Eq for Source {}
 
 /// Information about a built library that is available somewhere in the file system.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Binary {
-    pub target: DirLock,
+    pub target: Arc<DirLock>,
+}
+
+impl Binary {
+    pub fn new(target: DirLock) -> Binary {
+        Binary {
+            target: Arc::new(target),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -834,7 +841,7 @@ impl BuildHash {
         if let Ok(ver) = ctx.compiler.version() {
             hasher.input(ver.as_bytes());
         }
-        for opt in ctx.opts {
+        for opt in &ctx.opts {
             hasher.input(opt.as_bytes());
         }
         if codegen {

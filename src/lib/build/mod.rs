@@ -6,7 +6,7 @@ pub mod job;
 
 use self::{
     context::BuildContext,
-    invoke::{CodegenInvocation, CompileInvocation},
+    invoke::{invoke_codegen, invoke_compile},
 };
 use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
@@ -20,6 +20,7 @@ use crate::{
 };
 use console::style;
 use failure::{bail, format_err, ResultExt};
+use futures::future;
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
@@ -133,12 +134,12 @@ impl Targets {
     }
 }
 
-pub fn compile_lib(
-    source: &Source,
+pub async fn compile_lib<'a>(
+    source: &'a Source,
     codegen: bool,
-    deps: &[&Binary],
-    layout: &OutputLayout,
-    bcx: &BuildContext,
+    deps: &'a [Binary],
+    layout: &'a OutputLayout,
+    bcx: &'a BuildContext,
     shell: Shell,
 ) -> Res<OutputGroup> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
@@ -182,14 +183,48 @@ pub fn compile_lib(
 
     run_prebuild_script(source, &layout.build.join("lib"), shell)?;
 
-    let invocation = CompileInvocation {
-        deps,
-        targets: &targets,
-        build: &layout.build.join("lib"),
-        args: &args,
-    };
+    let mut compilations = targets.iter().map(|target| {
+        let module = target
+            .with_extension("")
+            .to_string_lossy()
+            .replace("/", ".")
+            .replace("\\", ".");
+        shell.println(
+            style("Module").cyan(),
+            format!("{} [{}]", module, source.meta().name()),
+            Verbosity::Normal,
+        );
 
-    let mut res = OutputGroup::from(invocation.exec(bcx)?);
+        invoke_compile(deps, &target, layout.build.join("lib"), &args, bcx)
+    });
+
+    let mut outputs = Vec::new();
+
+    // Invoke compilations in parallel
+    let mut ongoing_compilation = Vec::new();
+    loop {
+        while let Some(compile) = compilations.next() {
+            ongoing_compilation.push(Box::pin(compile));
+            if ongoing_compilation.len() > 4 {
+                break;
+            }
+        }
+
+        if ongoing_compilation.is_empty() {
+            break;
+        }
+
+        let (output, _, remaining) = future::select_all(ongoing_compilation).await;
+        match output {
+            Ok(output) => outputs.push(output),
+            Err(err) => {
+                bail!(err);
+            }
+        }
+        ongoing_compilation = remaining;
+    }
+
+    let mut res = OutputGroup(outputs);
 
     clear_dir(&layout.lib)?;
 
@@ -225,26 +260,28 @@ pub fn compile_lib(
             .map(|x| x.into_path())
             .collect::<Vec<_>>();
 
-        let codegen_invoke = CodegenInvocation {
-            binary: &lib_bins,
-            output: source.meta().name().name(),
-            layout: &layout,
-            is_artifact: true,
-            args: &args,
-        };
+        let output = invoke_codegen(
+            &lib_bins,
+            source.meta().name().name(),
+            &layout,
+            true,
+            &args,
+            &bcx,
+        )
+        .await?;
 
-        res.push(codegen_invoke.exec(&bcx)?);
+        res.push(output);
     }
 
     Ok(res)
 }
 
-pub fn compile_bin(
-    source: &Source,
+pub async fn compile_bin<'a>(
+    source: &'a Source,
     target: Target,
-    deps: &[&Binary],
-    layout: &OutputLayout,
-    bcx: &BuildContext,
+    deps: &'a [Binary],
+    layout: &'a OutputLayout,
+    bcx: &'a BuildContext,
     shell: Shell,
 ) -> Res<(OutputGroup, Option<PathBuf>)> {
     if bcx.compiler.flavor().is_idris2() {
@@ -290,14 +327,20 @@ pub fn compile_bin(
     args.extend(bin_target.idris_opts.iter().map(|x| x.to_owned()));
     args.extend(bcx.opts.iter().cloned());
 
-    let compile_invoke = CompileInvocation {
-        deps,
-        targets: &[target_path.clone()],
-        build: &layout.build.join("bin"),
-        args: &args,
-    };
+    let module = target_path
+        .with_extension("")
+        .to_string_lossy()
+        .replace("/", ".")
+        .replace("\\", ".");
+    shell.println(
+        style("Module").cyan(),
+        format!("{} [{}]", module, source.meta().name()),
+        Verbosity::Normal,
+    );
 
-    let mut res = OutputGroup::from(compile_invoke.exec(bcx)?);
+    let output = invoke_compile(deps, &target_path, layout.build.join("bin"), &args, bcx).await?;
+
+    let mut res = OutputGroup::from(output);
 
     let target_bin = target_path.with_extension("ibc");
 
@@ -312,16 +355,13 @@ pub fn compile_bin(
         return Ok((res, None));
     }
 
-    let codegen_invoke = CodegenInvocation {
-        binary: &[layout.build.join("bin").join(&target_bin)],
-        output: &*name.to_string_lossy(),
-        layout: &layout,
-        is_artifact: false,
-        args: &args,
-    };
+    let binarys = &[layout.build.join("bin").join(&target_bin)];
+    let output_name = &*name.to_string_lossy();
+
+    let output = invoke_codegen(binarys, output_name, &layout, false, &args, &bcx).await?;
 
     // The output exectable will always go in target/bin
-    res.push(codegen_invoke.exec(bcx)?);
+    res.push(output);
 
     let out = layout.bin.join(name);
 
@@ -334,11 +374,11 @@ pub fn compile_bin(
     }
 }
 
-pub fn compile_doc(
-    source: &Source,
-    deps: &[&Binary],
-    layout: &OutputLayout,
-    bcx: &BuildContext,
+pub async fn compile_doc<'a>(
+    source: &'a Source,
+    deps: &'a [Binary],
+    layout: &'a OutputLayout,
+    bcx: &'a BuildContext,
 ) -> Res<OutputGroup> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build documentation")
@@ -442,10 +482,7 @@ pub fn run_prebuild_script(source: &Source, root: &Path, shell: Shell) -> Res<()
             format!("prebuild script > {}", s),
             Verbosity::Verbose,
         );
-        shell.println_plain(
-            fmt_multiple(&run_script(root, s)?),
-            Verbosity::Normal,
-        );
+        shell.println_plain(fmt_multiple(&run_script(root, s)?), Verbosity::Normal);
     }
 
     Ok(())

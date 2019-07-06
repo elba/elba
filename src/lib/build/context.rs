@@ -8,21 +8,20 @@ use std::{
     process::Command,
 };
 
-// TODO: triple target
-#[derive(Debug)]
-pub struct BuildContext<'a> {
-    pub backend: &'a Backend,
+#[derive(Debug, Clone)]
+pub struct BuildContext {
+    pub backend: Backend,
     /// Whether to actually generate code or only check for errors
     pub codegen: bool,
     pub compiler: Compiler,
     /// The global cache to use.
-    pub cache: &'a Cache,
+    pub cache: Cache,
     pub threads: u32,
-    pub opts: &'a [String],
+    pub opts: Vec<String>,
 }
 
 /// Information on the compiler executable
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Compiler {
     /// The location of the exe
     path: PathBuf,

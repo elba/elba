@@ -202,8 +202,9 @@ impl<'cache> Retriever<'cache> {
                         "locked" => lp.to_string(),
                         "type" => "index"
                     );
+                    let v = v.clone();
                     return self
-                        .select(&Summary::new(pkg.clone(), v.clone()))
+                        .select(&Summary::new(pkg.clone(), v))
                         .map(|e| e.into_owned().version);
                 };
             }

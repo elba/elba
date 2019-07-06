@@ -11,12 +11,64 @@ use crate::{
     },
 };
 use console::style;
-use crossbeam::queue::MsQueue;
-use failure::{bail, ResultExt};
+use failure::{bail, format_err, ResultExt};
+use futures::future::{self, FutureExt, TryFutureExt};
 use petgraph::graph::NodeIndex;
-use scoped_threadpool::Pool;
 use slog::{debug, o, Logger};
-use std::{collections::HashSet, iter::FromIterator, path::PathBuf};
+use std::{collections::HashSet, future::Future, path::PathBuf};
+use tokio::runtime::Runtime;
+
+/// Work refers to either a Source and its BuildHash which needs to be built,
+/// a built library which is still being used by other code, or a built target
+/// with no remaining dependencies up the chain.
+///
+/// We separate things like this to drop our locks on directories as soon as we
+/// can, to allow other instances of elba to start work asap.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Work {
+    None,
+    Fresh(Binary),
+    Dirty(Source, BuildHash),
+}
+
+impl Work {
+    pub fn is_none(&self) -> bool {
+        match self {
+            Work::None => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        match self {
+            Work::Dirty(_, _) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_fresh(&self) -> bool {
+        match self {
+            Work::Fresh(_) => true,
+            _ => false,
+        }
+    }
+}
+
+/// A Job is an individual unit of work in the elba build graph.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Job {
+    pub work: Work,
+    pub targets: Targets,
+}
+
+impl Default for Job {
+    fn default() -> Self {
+        Job {
+            work: Work::None,
+            targets: Targets::new(vec![Target::Lib(false)]),
+        }
+    }
+}
 
 pub struct JobQueue {
     /// The graph of jobs which need to be done.
@@ -24,6 +76,7 @@ pub struct JobQueue {
     pub root_ol: Option<OutputLayout>,
     pub logger: Logger,
     pub shell: Shell,
+    pub bcx: BuildContext,
 }
 
 // The current implementation of the JobQueue combines target generation and dependency preparation
@@ -33,7 +86,7 @@ impl JobQueue {
         solve: Graph<Source>,
         root: &Targets,
         root_ol: Option<OutputLayout>,
-        bcx: &BuildContext,
+        bcx: BuildContext,
         plog: &Logger,
         shell: Shell,
     ) -> Res<Self> {
@@ -121,296 +174,103 @@ impl JobQueue {
         Ok(JobQueue {
             graph,
             root_ol,
+            bcx,
             logger,
             shell,
         })
     }
 
-    pub fn exec(mut self, bcx: &BuildContext) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
-        let threads = bcx.threads;
-        let mut thread_pool = Pool::new(threads);
+    pub fn exec<'a>(self) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
+        let mut rt =
+            Runtime::new().with_context(|_| format_err!("Couldn't start parallel runtime"))?;
+        rt.block_on(self.exec_async().boxed().compat())
+    }
+
+    async fn exec_async<'a>(mut self) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
+        // TODO: the threads has no effect now 
+        // let threads = bcx.threads;
 
         let root_ol = &self.root_ol;
-        let root_hash = self.graph.inner.raw_nodes().get(0).and_then(|x| {
-            if let Work::Dirty(_, h) = &x.weight.work {
+        let root_hash = self.graph.root().and_then(|x| {
+            if let Work::Dirty(_, h) = &x.work {
                 Some(h.clone())
             } else {
                 None
             }
         });
 
-        // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
-        let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
-            self.graph[index].work.is_dirty()
-                && self
-                    .graph
-                    .children(index)
-                    .all(|(child, _)| self.graph[child].work.is_fresh())
-        });
-
-        // this queue only contains dirty jobs.
-        let mut queue: Vec<NodeIndex> = Vec::from_iter(bottom_jobs);
-        // store job results from threads.
-        let done = &MsQueue::new();
-        // We also store the locations and summaries of our binaries
-        let bins = &MsQueue::new();
+        let mut ongoing_jobs: HashSet<NodeIndex> = HashSet::new();
+        let mut parallal_jobs_future = Vec::new();
+        let mut bins_vec = Vec::new();
 
         loop {
-            // break if the job queue is complete
-            if queue.is_empty() {
+            // Bottom jobs are Dirty jobs whose dependencies are all satisfied.
+            let bottom_jobs = self.graph.inner.node_indices().filter(|&index| {
+                self.graph[index].work.is_dirty()
+                    && self
+                        .graph
+                        .children(index)
+                        .all(|(child, _)| self.graph[child].work.is_fresh())
+            });
+
+            for job in bottom_jobs {
+                if !ongoing_jobs.contains(&job) {
+                    parallal_jobs_future.push(Box::pin(self.complete_job(job)?));
+                    ongoing_jobs.insert(job);
+                }
+            }
+
+            if ongoing_jobs.is_empty() {
                 break;
             }
 
-            // start a group of independent jobs, which can be executed in parallel at current step
-            thread_pool.scoped(|scoped| {
-                for job_index in queue.drain(..) {
-                    let logger = &self.logger;
-                    if let Work::Dirty(source, build_hash) = &self.graph[job_index].work {
-                        let deps = self
+            let (job_res, _, remaining) = future::select_all(parallal_jobs_future).await;
+            parallal_jobs_future = remaining;
+
+            match job_res {
+                Ok((job_index, binary, mut bins)) => {
+                    ongoing_jobs.remove(&job_index);
+
+                    // prg += 1;
+                    // pb.set_position(prg);
+                    if let Some(b) = binary {
+                        // If we got a compiled library out of it, set the binary
+                        self.graph[job_index].work = Work::Fresh(b)
+                    } else if self.graph[job_index].work.is_dirty() {
+                        // The Targets struct ensures that the library target will always be
+                        // compiled first, meaning that the work will be set to Fresh.
+                        // If we're compiling a not-library and it's still dirty, that means
+                        // there's no lib target and nothing to depend on.
+                        self.graph[job_index].work = Work::None
+                    }
+
+                    // For all of this package's dependencies, if all of the packages which
+                    // depend on them have been built, we can drop them entirely.
+                    let mut child_done = Vec::new();
+                    for (child, _) in self.graph.children(job_index) {
+                        let ready = self
                             .graph
-                            .children(job_index)
-                            .filter(|(_, job)| job.work.is_fresh())
-                            .map(|(_, job)| match &job.work {
-                                Work::Fresh(binary) => binary,
-                                _ => unreachable!(),
-                            })
-                            .collect::<Vec<_>>();
+                            .parents(child)
+                            .all(|(_, job)| job.work.is_fresh());
 
-                        let ts = &self.graph[job_index].targets;
-
-                        self.shell.println(
-                            style("Building").cyan(),
-                            format!("{} [{}..]", source.pretty_summary(), &build_hash.0[0..8]),
-                            Verbosity::Normal,
-                        );
-
-                        let shell = self.shell;
-
-                        scoped.execute(move || {
-                            let op = || -> Res<Option<Binary>> {
-                                let tmp;
-                                let layout = if job_index == NodeIndex::new(0) {
-                                    if let Some(x) = root_ol {
-                                        x
-                                    } else {
-                                        tmp = bcx.cache.checkout_tmp(&build_hash)?;
-                                        &tmp
-                                    }
-                                } else {
-                                    tmp = bcx.cache.checkout_tmp(&build_hash)?;
-                                    &tmp
-                                };
-
-                                let mut res: Option<Binary> = None;
-                                let has_lib = ts.has_lib();
-
-                                for t in ts.0.to_vec() {
-                                    match t {
-                                        Target::Lib(cg) => {
-                                            debug!(
-                                                logger, "building target";
-                                                "target_type" => "lib",
-                                                "target" => cg,
-                                                "summary" => source.summary()
-                                            );
-                                            let out = compile_lib(
-                                                &source, cg, &deps, &layout, bcx, shell,
-                                            )
-                                            .with_context(|e| {
-                                                format!(
-                                                    "Couldn't build library target for {}\n{}",
-                                                    source.pretty_summary(),
-                                                    e
-                                                )
-                                            })?;
-
-                                            res = if job_index == NodeIndex::new(0)
-                                                && root_ol.is_some()
-                                            {
-                                                let out = fmt_multiple(&out);
-                                                if !out.is_empty() {
-                                                    shell.println_plain(out, Verbosity::Normal);
-                                                }
-
-                                                let target = DirLock::acquire(&layout.lib)?;
-                                                Some(Binary { target })
-                                            } else {
-                                                Some(
-                                                    bcx.cache
-                                                        .store_build(&layout.lib, &build_hash)?,
-                                                )
-                                            }
-                                        }
-                                        Target::Bin(ix) => {
-                                            debug!(
-                                                logger, "building target";
-                                                "target_type" => "bin",
-                                                "target" => ix,
-                                                "summary" => source.summary()
-                                            );
-                                            let (out, path) = compile_bin(
-                                                &source,
-                                                Target::Bin(ix),
-                                                &deps,
-                                                &layout,
-                                                bcx,
-                                                shell,
-                                            )
-                                            .with_context(|e| {
-                                                format!(
-                                                    "Couldn't build binary {} for {}\n{}",
-                                                    ix,
-                                                    source.pretty_summary(),
-                                                    e
-                                                )
-                                            })?;
-
-                                            if let Some(p) = path {
-                                                bins.push((p, source.summary()));
-                                            }
-
-                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out = fmt_multiple(&out);
-                                                if !out.is_empty() {
-                                                    shell.println_plain(out, Verbosity::Normal);
-                                                }
-                                            }
-                                        }
-                                        Target::Test(ix) => {
-                                            debug!(
-                                                logger, "building target";
-                                                "target_type" => "test",
-                                                "target" => ix,
-                                                "summary" => source.summary()
-                                            );
-                                            let mut deps = deps.clone();
-                                            let root_lib;
-                                            if has_lib {
-                                                root_lib = {
-                                                    let target = DirLock::acquire(
-                                                        &layout.build.join("lib"),
-                                                    )?;
-                                                    Binary { target }
-                                                };
-                                                deps.push(&root_lib);
-                                            }
-                                            let (out, _) = compile_bin(
-                                                &source,
-                                                Target::Test(ix),
-                                                &deps,
-                                                &layout,
-                                                bcx,
-                                                shell,
-                                            )
-                                            .with_context(|e| {
-                                                format!(
-                                                    "Couldn't build test {} for {}\n{}",
-                                                    ix,
-                                                    source.pretty_summary(),
-                                                    e
-                                                )
-                                            })?;
-
-                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out = fmt_multiple(&out);
-                                                if !out.is_empty() {
-                                                    shell.println_plain(out, Verbosity::Normal);
-                                                }
-                                            }
-
-                                            // For now, only the root package can do tests, so we
-                                            // don't worry about storing the binary anywhere.
-                                        }
-                                        Target::Doc => {
-                                            debug!(
-                                                logger, "building target";
-                                                "target_type" => "doc",
-                                                "summary" => source.summary()
-                                            );
-                                            let out = compile_doc(&source, &deps, &layout, bcx)
-                                                .with_context(|e| {
-                                                    format!(
-                                                        "Couldn't build docs for {}\n{}",
-                                                        source.pretty_summary(),
-                                                        e
-                                                    )
-                                                })?;
-
-                                            if job_index == NodeIndex::new(0) && root_ol.is_some() {
-                                                let out_str = fmt_multiple(&out);
-                                                if !out_str.is_empty() {
-                                                    shell.println_plain(out_str, Verbosity::Normal);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Ok(res)
-                            };
-
-                            done.push((job_index, op()));
-                        });
+                        if ready {
+                            child_done.push(child);
+                        }
                     }
+                    for child in child_done {
+                        self.graph[child].work = Work::None;
+                    }
+
+                    bins_vec.append(&mut bins);
                 }
-            });
-
-            // Handle the results of job execution
-            while let Some((job_index, job_res)) = done.try_pop() {
-                match job_res {
-                    Ok(binary) => {
-                        // prg += 1;
-                        // pb.set_position(prg);
-                        if let Some(b) = binary {
-                            // If we got a compiled library out of it, set the binary
-                            self.graph[job_index].work = Work::Fresh(b)
-                        } else if self.graph[job_index].work.is_dirty() {
-                            // The Targets struct ensures that the library target will always be
-                            // compiled first, meaning that the work will be set to Fresh.
-                            // If we're compiling a not-library and it's still dirty, that means
-                            // there's no lib target and nothing to depend on.
-                            self.graph[job_index].work = Work::None
-                        }
-
-                        // push jobs that can be execute at next step into queue
-                        for (parent, _) in self.graph.parents(job_index) {
-                            let ready = self
-                                .graph
-                                .children(parent)
-                                .all(|(_, job)| job.work.is_fresh());
-
-                            if ready && self.graph[parent].work.is_dirty() {
-                                queue.push(parent);
-                            }
-                        }
-
-                        // For all of this package's dependencies, if all of the packages which
-                        // depend on them have been built, we can drop them entirely.
-                        let mut child_done = Vec::new();
-                        for (child, _) in self.graph.children(job_index) {
-                            let ready = self
-                                .graph
-                                .parents(child)
-                                .all(|(_, job)| job.work.is_fresh());
-
-                            if ready {
-                                child_done.push(child);
-                            }
-                        }
-                        for child in child_done {
-                            self.graph[child].work = Work::None;
-                        }
-                    }
-                    Err(err) => {
-                        // pb.finish_and_clear();
-                        self.shell
-                            .println(style("[error]").red().bold(), err, Verbosity::Quiet);
-                        bail!("one or more packages couldn't be built")
-                    }
+                Err(err) => {
+                    // pb.finish_and_clear();
+                    self.shell
+                        .println(style("[error]").red().bold(), err, Verbosity::Quiet);
+                    bail!("one or more packages couldn't be built");
                 }
             }
         }
-
         if let Some(ol) = root_ol.as_ref() {
             let res = clear_dir(&ol.build);
             if let Err(e) = res {
@@ -440,11 +300,6 @@ impl JobQueue {
             }
         }
 
-        let mut bins_vec = vec![];
-        while let Some((path, sum)) = bins.try_pop() {
-            bins_vec.push((path, sum));
-        }
-
         let root_children = self
             .graph
             .children(NodeIndex::new(0))
@@ -459,56 +314,195 @@ impl JobQueue {
 
         Ok((root_children, bins_vec))
     }
-}
 
-/// A Job is an individual unit of work in the elba build graph.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Job {
-    pub work: Work,
-    pub targets: Targets,
-}
+    fn complete_job(
+        &self,
+        job_index: NodeIndex,
+    ) -> Res<impl Future<Output = Res<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)>>> {
+        if let Work::Dirty(source, build_hash) = &self.graph[job_index].work {
+            self.shell.println(
+                style("Building").cyan(),
+                format!("{} [{}..]", source.pretty_summary(), &build_hash.0[0..8]),
+                Verbosity::Normal,
+            );
+            let layout: OutputLayout = if job_index == NodeIndex::new(0) {
+                if let Some(x) = &self.root_ol {
+                    x.clone()
+                } else {
+                    self.bcx.cache.checkout_tmp(&build_hash)?
+                }
+            } else {
+                self.bcx.cache.checkout_tmp(&build_hash)?
+            };
 
-impl Default for Job {
-    fn default() -> Self {
-        Job {
-            work: Work::None,
-            targets: Targets::new(vec![Target::Lib(false)]),
+            let deps = self
+                .graph
+                .children(job_index)
+                .filter(|(_, job)| job.work.is_fresh())
+                .map(|(_, job)| match &job.work {
+                    Work::Fresh(binary) => binary.clone(),
+                    _ => unreachable!(),
+                })
+                .collect::<Vec<_>>();
+
+            let targets = self.graph[job_index].targets.clone();
+
+            let res = Self::compile_target(
+                job_index,
+                source.clone(),
+                build_hash.clone(),
+                targets,
+                deps,
+                layout,
+                self.root_ol.is_some(),
+                self.logger.clone(),
+                self.bcx.clone(),
+                self.shell,
+            );
+
+            Ok(res)
+        } else {
+            unreachable!()
         }
     }
-}
 
-/// Work refers to either a Source and its BuildHash which needs to be built,
-/// a built library which is still being used by other code, or a built target
-/// with no remaining dependencies up the chain.
-///
-/// We separate things like this to drop our locks on directories as soon as we
-/// can, to allow other instances of elba to start work asap.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Work {
-    None,
-    Fresh(Binary),
-    Dirty(Source, BuildHash),
-}
+    async fn compile_target<'a>(
+        job_index: NodeIndex,
+        source: Source,
+        build_hash: BuildHash,
+        targets: Targets,
+        deps: Vec<Binary>,
+        layout: OutputLayout,
+        is_root: bool,
+        logger: Logger,
+        bcx: BuildContext,
+        shell: Shell,
+    ) -> Res<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)> {
+        let mut res: Option<Binary> = None;
+        let mut bins: Vec<(PathBuf, String)> = Vec::new();
+        let has_lib = targets.has_lib();
 
-impl Work {
-    pub fn is_none(&self) -> bool {
-        match self {
-            Work::None => true,
-            _ => false,
+        for target in targets.0 {
+            match target {
+                Target::Lib(cg) => {
+                    debug!(
+                        logger, "building target";
+                        "target_type" => "lib",
+                        "target" => cg,
+                        "summary" => source.summary()
+                    );
+                    let out = compile_lib(&source, cg, &deps, &layout, &bcx, shell)
+                        .await
+                        .with_context(|e| {
+                            format!(
+                                "Couldn't build library target for {}\n{}",
+                                source.pretty_summary(),
+                                e
+                            )
+                        })?;
+
+                    res = if job_index == NodeIndex::new(0) && is_root {
+                        let out = fmt_multiple(&out);
+                        if !out.is_empty() {
+                            shell.println_plain(out, Verbosity::Normal);
+                        }
+
+                        let target = DirLock::acquire(&layout.lib)?;
+                        Some(Binary::new(target))
+                    } else {
+                        Some(bcx.cache.store_build(&layout.lib, &build_hash)?)
+                    }
+                }
+                Target::Bin(ix) => {
+                    debug!(
+                        logger, "building target";
+                        "target_type" => "bin",
+                        "target" => ix,
+                        "summary" => source.summary()
+                    );
+                    let (out, path) =
+                        compile_bin(&source, Target::Bin(ix), &deps, &layout, &bcx, shell)
+                            .await
+                            .with_context(|e| {
+                                format!(
+                                    "Couldn't build binary {} for {}\n{}",
+                                    ix,
+                                    source.pretty_summary(),
+                                    e
+                                )
+                            })?;
+
+                    if let Some(p) = path {
+                        bins.push((p, source.summary()));
+                    }
+
+                    if job_index == NodeIndex::new(0) && is_root {
+                        let out = fmt_multiple(&out);
+                        if !out.is_empty() {
+                            shell.println_plain(out, Verbosity::Normal);
+                        }
+                    }
+                }
+                Target::Test(ix) => {
+                    debug!(
+                        logger, "building target";
+                        "target_type" => "test",
+                        "target" => ix,
+                        "summary" => source.summary()
+                    );
+                    let mut deps = deps.clone();
+                    let root_lib;
+                    if has_lib {
+                        root_lib = {
+                            let target = DirLock::acquire(&layout.build.join("lib"))?;
+                            Binary::new(target)
+                        };
+                        deps.push(root_lib);
+                    }
+                    let (out, _) =
+                        compile_bin(&source, Target::Test(ix), &deps, &layout, &bcx, shell)
+                            .await
+                            .with_context(|e| {
+                                format!(
+                                    "Couldn't build test {} for {}\n{}",
+                                    ix,
+                                    source.pretty_summary(),
+                                    e
+                                )
+                            })?;
+
+                    if job_index == NodeIndex::new(0) && is_root {
+                        let out = fmt_multiple(&out);
+                        if !out.is_empty() {
+                            shell.println_plain(out, Verbosity::Normal);
+                        }
+                    }
+
+                    // For now, only the root package can do tests, so we
+                    // don't worry about storing the binary anywhere.
+                }
+                Target::Doc => {
+                    debug!(
+                        logger, "building target";
+                        "target_type" => "doc",
+                        "summary" => source.summary()
+                    );
+                    let out = compile_doc(&source, &deps, &layout, &bcx)
+                        .await
+                        .with_context(|e| {
+                            format!("Couldn't build docs for {}\n{}", source.pretty_summary(), e)
+                        })?;
+
+                    if job_index == NodeIndex::new(0) && is_root {
+                        let out_str = fmt_multiple(&out);
+                        if !out_str.is_empty() {
+                            shell.println_plain(out_str, Verbosity::Normal);
+                        }
+                    }
+                }
+            }
         }
-    }
 
-    pub fn is_dirty(&self) -> bool {
-        match self {
-            Work::Dirty(_, _) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_fresh(&self) -> bool {
-        match self {
-            Work::Fresh(_) => true,
-            _ => false,
-        }
+        Ok((job_index, res, bins))
     }
 }
