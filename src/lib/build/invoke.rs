@@ -2,7 +2,7 @@
 
 use crate::{
     build::context::BuildContext,
-    retrieve::cache::{Binary, OutputLayout},
+    retrieve::cache::Binary,
     util::{
         errors::Res,
         fmt_output,
@@ -74,7 +74,8 @@ pub async fn invoke_compile<'a>(
 pub async fn invoke_codegen<'a>(
     binary: &'a [PathBuf],
     output: &'a str,
-    layout: &'a OutputLayout,
+    build: PathBuf,
+    output_dir: PathBuf,
     // Whether the output should be treated as a binary (false) or artifact files (true)
     is_artifact: bool,
     args: &'a [String],
@@ -83,7 +84,6 @@ pub async fn invoke_codegen<'a>(
 ) -> Res<Output> {
     let mut process = bcx.compiler.process();
     let flavor = bcx.compiler.flavor();
-    let cwd;
 
     if is_artifact {
         if flavor.is_idris1() {
@@ -94,12 +94,7 @@ pub async fn invoke_codegen<'a>(
     }
 
     process
-        .current_dir(if is_artifact {
-            cwd = layout.artifacts.join(&bcx.backend.name);
-            &cwd
-        } else {
-            &layout.bin
-        })
+        .current_dir(output_dir)
         .args(&["-o", &output])
         .args(&[
             if bcx.backend.portable && flavor.is_idris1() {
@@ -121,7 +116,7 @@ pub async fn invoke_codegen<'a>(
     for bin in binary {
         if flavor.is_idris1() {
             process.arg("-i");
-            process.arg(bin.parent().unwrap());
+            process.arg(&build);
         }
         process.arg(bin);
     }

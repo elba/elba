@@ -264,7 +264,8 @@ pub async fn compile_lib<'a>(
         let output = invoke_codegen(
             &lib_bins,
             source.meta().name().name(),
-            &layout,
+            layout.build.join("lib"),
+            layout.artifacts.join(&bcx.backend.name),
             true,
             &args,
             &bcx,
@@ -374,7 +375,17 @@ pub async fn compile_bin<'a>(
         Verbosity::Normal,
     );
 
-    let output = invoke_codegen(binarys, output_name, &layout, false, &args, &bcx, shell).await?;
+    let output = invoke_codegen(
+        binarys,
+        output_name,
+        layout.build.join("bin"),
+        layout.bin.clone(),
+        false,
+        &args,
+        &bcx,
+        shell,
+    )
+    .await?;
 
     // The output exectable will always go in target/bin
     res.push(output);
