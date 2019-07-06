@@ -130,11 +130,7 @@ modules = {}
 }
 
 pub fn fmt_multiple(c: &shell::OutputGroup) -> String {
-    c.0.iter()
-        .map(|x| fmt_output(&x))
-        .join("\n")
-        .trim()
-        .to_string()
+    c.0.iter().map(|x| fmt_output(&x)).join("\n")
 }
 
 pub fn fmt_output(c: &Output) -> String {

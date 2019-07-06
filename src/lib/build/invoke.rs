@@ -3,7 +3,11 @@
 use crate::{
     build::context::BuildContext,
     retrieve::cache::{Binary, OutputLayout},
-    util::{errors::Res, fmt_output},
+    util::{
+        errors::Res,
+        fmt_output,
+        shell::{Shell, Verbosity},
+    },
 };
 use failure::bail;
 use futures::compat::Future01CompatExt;
@@ -21,6 +25,7 @@ pub async fn invoke_compile<'a>(
     build: PathBuf,
     args: &'a [String],
     bcx: &'a BuildContext,
+    shell: Shell,
 ) -> Res<Output> {
     let mut process = bcx.compiler.process();
     let flavor = bcx.compiler.flavor();
@@ -47,6 +52,8 @@ pub async fn invoke_compile<'a>(
     // Idris sometimes breaks down if multiple modules is being compiled
     // in parallel. We reties if the stdout contains 'loadable'.
     for _ in 0..3usize {
+        shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);
+
         let output = process.output_async().compat().await?;
 
         if !output.status.success() {
@@ -72,6 +79,7 @@ pub async fn invoke_codegen<'a>(
     is_artifact: bool,
     args: &'a [String],
     bcx: &'a BuildContext,
+    shell: Shell,
 ) -> Res<Output> {
     let mut process = bcx.compiler.process();
     let flavor = bcx.compiler.flavor();
@@ -131,6 +139,8 @@ pub async fn invoke_codegen<'a>(
             process.arg(bin);
         }
     }
+
+    shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);
 
     let output = process.output_async().compat().await?;
 

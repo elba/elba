@@ -187,7 +187,7 @@ impl JobQueue {
     }
 
     async fn exec_async<'a>(mut self) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
-        // TODO: the threads has no effect now 
+        // TODO: the threads has no effect now
         // let threads = bcx.threads;
 
         let root_ol = &self.root_ol;
@@ -403,9 +403,7 @@ impl JobQueue {
 
                     res = if job_index == NodeIndex::new(0) && is_root {
                         let out = fmt_multiple(&out);
-                        if !out.is_empty() {
-                            shell.println_plain(out, Verbosity::Normal);
-                        }
+                        shell.println_plain(out, Verbosity::Normal);
 
                         let target = DirLock::acquire(&layout.lib)?;
                         Some(Binary::new(target))
@@ -420,6 +418,15 @@ impl JobQueue {
                         "target" => ix,
                         "summary" => source.summary()
                     );
+                    let mut deps = deps.clone();
+                    let root_lib;
+                    if has_lib {
+                        root_lib = {
+                            let target = DirLock::acquire(&layout.lib)?;
+                            Binary::new(target)
+                        };
+                        deps.push(root_lib);
+                    }
                     let (out, path) =
                         compile_bin(&source, Target::Bin(ix), &deps, &layout, &bcx, shell)
                             .await
@@ -438,9 +445,7 @@ impl JobQueue {
 
                     if job_index == NodeIndex::new(0) && is_root {
                         let out = fmt_multiple(&out);
-                        if !out.is_empty() {
-                            shell.println_plain(out, Verbosity::Normal);
-                        }
+                        shell.println_plain(out, Verbosity::Normal);
                     }
                 }
                 Target::Test(ix) => {
@@ -454,7 +459,7 @@ impl JobQueue {
                     let root_lib;
                     if has_lib {
                         root_lib = {
-                            let target = DirLock::acquire(&layout.build.join("lib"))?;
+                            let target = DirLock::acquire(&layout.lib)?;
                             Binary::new(target)
                         };
                         deps.push(root_lib);
@@ -473,9 +478,7 @@ impl JobQueue {
 
                     if job_index == NodeIndex::new(0) && is_root {
                         let out = fmt_multiple(&out);
-                        if !out.is_empty() {
-                            shell.println_plain(out, Verbosity::Normal);
-                        }
+                        shell.println_plain(out, Verbosity::Normal);
                     }
 
                     // For now, only the root package can do tests, so we
@@ -495,9 +498,7 @@ impl JobQueue {
 
                     if job_index == NodeIndex::new(0) && is_root {
                         let out_str = fmt_multiple(&out);
-                        if !out_str.is_empty() {
-                            shell.println_plain(out_str, Verbosity::Normal);
-                        }
+                        shell.println_plain(out_str, Verbosity::Normal);
                     }
                 }
             }

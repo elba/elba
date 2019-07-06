@@ -87,25 +87,32 @@ impl Shell {
         min_verbosity: Verbosity,
     ) {
         if self.verbosity >= min_verbosity {
+            let message = format!("{}", message);
             println!("{} {}", status, message);
         }
     }
 
     pub fn println_plain(self, message: impl Display, min_verbosity: Verbosity) {
         if self.verbosity >= min_verbosity {
-            println!("{}", message);
+            let message = format!("{}", message);
+            if !message.trim().is_empty() {
+                println!("{}", message);
+            }
         }
     }
 
     pub fn print_plain(self, message: impl Display, min_verbosity: Verbosity) {
         if self.verbosity >= min_verbosity {
-            print!("{}", message);
+            let message = format!("{}", message);
+            if !message.trim().is_empty() {
+                print!("{}", message);
+            }
         }
     }
 
     pub fn println_empty(self, min_verbosity: Verbosity) {
         if self.verbosity >= min_verbosity {
-            println!();
+            println!("");
         }
     }
 }

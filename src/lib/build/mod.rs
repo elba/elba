@@ -189,13 +189,14 @@ pub async fn compile_lib<'a>(
             .to_string_lossy()
             .replace("/", ".")
             .replace("\\", ".");
+
         shell.println(
-            style("Module").cyan(),
+            style("Compiling").cyan(),
             format!("{} [{}]", module, source.meta().name()),
             Verbosity::Normal,
         );
 
-        invoke_compile(deps, &target, layout.build.join("lib"), &args, bcx)
+        invoke_compile(deps, &target, layout.build.join("lib"), &args, bcx, shell)
     });
 
     let mut outputs = Vec::new();
@@ -267,6 +268,7 @@ pub async fn compile_lib<'a>(
             true,
             &args,
             &bcx,
+            shell,
         )
         .await?;
 
@@ -333,12 +335,20 @@ pub async fn compile_bin<'a>(
         .replace("/", ".")
         .replace("\\", ".");
     shell.println(
-        style("Module").cyan(),
+        style("Compiling").cyan(),
         format!("{} [{}]", module, source.meta().name()),
         Verbosity::Normal,
     );
 
-    let output = invoke_compile(deps, &target_path, layout.build.join("bin"), &args, bcx).await?;
+    let output = invoke_compile(
+        deps,
+        &target_path,
+        layout.build.join("bin"),
+        &args,
+        bcx,
+        shell,
+    )
+    .await?;
 
     let mut res = OutputGroup::from(output);
 
@@ -358,7 +368,13 @@ pub async fn compile_bin<'a>(
     let binarys = &[layout.build.join("bin").join(&target_bin)];
     let output_name = &*name.to_string_lossy();
 
-    let output = invoke_codegen(binarys, output_name, &layout, false, &args, &bcx).await?;
+    shell.println(
+        style("Codegen").cyan(),
+        format!("{} ({}) [{}]", module, output_name, source.meta().name()),
+        Verbosity::Normal,
+    );
+
+    let output = invoke_codegen(binarys, output_name, &layout, false, &args, &bcx, shell).await?;
 
     // The output exectable will always go in target/bin
     res.push(output);
