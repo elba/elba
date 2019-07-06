@@ -310,6 +310,16 @@ pub async fn compile_bin<'a>(
 
     run_prebuild_script(source, &layout.build.join("bin"), shell)?;
 
+    // The Idris compiler ignores and rebuilds the imported
+    // ibc modules if there are idrs match the modules name in
+    // the source directory. So we copy the ibcs into the build
+    // directory in advance to avoid that.
+    if let Some(lib_target) = &source.meta().targets.lib {
+        if lib_target.path == bin_target.path {
+            copy_dir(&layout.lib, &layout.build.join("bin"), false)?;
+        }
+    }
+
     // Check extension etc
     let target_path = if let Some(ext) = target_path.extension() {
         if ext != OsStr::new("idr") && ext != OsStr::new("lidr") {
