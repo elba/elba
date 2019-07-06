@@ -13,16 +13,16 @@ env:
 matrix:
   include:
     - env: TARGET=i686-unknown-linux-gnu
-      rust: stable
+      rust: nightly-2019-07-02
     - env: TARGET=x86_64-unknown-linux-gnu
-      rust: stable
+      rust: nightly-2019-07-02
     - env: TARGET=i686-unknown-linux-musl
-      rust: stable
+      rust: nightly-2019-07-02
     - env: TARGET=x86_64-unknown-linux-musl
-      rust: stable
+      rust: nightly-2019-07-02
     - env: TARGET=x86_64-apple-darwin
       os: osx
-      rust: stable
+      rust: nightly-2019-07-02
 
 before_install:
   - set -e
@@ -46,7 +46,6 @@ deploy:
   file_glob: true
   file: $CRATE_NAME-$TRAVIS_TAG-$TARGET.*
   on:
-    condition: $TRAVIS_RUST_VERSION = stable
     tags: true
   provider: releases
   skip_cleanup: true
