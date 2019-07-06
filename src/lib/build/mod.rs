@@ -340,11 +340,13 @@ pub async fn compile_bin<'a>(
     args.extend(bin_target.idris_opts.iter().map(|x| x.to_owned()));
     args.extend(bcx.opts.iter().cloned());
 
-    let module = target_path
-        .with_extension("")
-        .to_string_lossy()
-        .replace("/", ".")
-        .replace("\\", ".");
+    let module = if target_path.is_absolute() {
+        target_path.file_stem().expect("bin target should be a file").to_string_lossy().to_string()
+    } else {
+        target_path.with_extension("")
+        .to_string_lossy().replace("/", ".")
+        .replace("\\", ".")
+    }        ;
     shell.println(
         style("Compiling").cyan(),
         format!("{} [{}]", module, source.meta().name()),

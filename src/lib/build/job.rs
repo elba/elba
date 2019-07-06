@@ -213,6 +213,7 @@ impl JobQueue {
                         .all(|(child, _)| self.graph[child].work.is_fresh())
             });
 
+            // Spwan new jobs
             for job in bottom_jobs {
                 if !ongoing_jobs.contains(&job) {
                     parallal_jobs_future.push(Box::pin(self.complete_job(job)?));
@@ -220,13 +221,16 @@ impl JobQueue {
                 }
             }
 
+            // Check if build is complete
             if ongoing_jobs.is_empty() {
                 break;
             }
 
+            // Await one of the jobs to complete
             let (job_res, _, remaining) = future::select_all(parallal_jobs_future).await;
             parallal_jobs_future = remaining;
 
+            // Handle the job result
             match job_res {
                 Ok((job_index, binary, mut bins)) => {
                     ongoing_jobs.remove(&job_index);
@@ -271,6 +275,8 @@ impl JobQueue {
                 }
             }
         }
+
+        // Clean up the build environment
         if let Some(ol) = root_ol.as_ref() {
             let res = clear_dir(&ol.build);
             if let Err(e) = res {
@@ -315,6 +321,7 @@ impl JobQueue {
         Ok((root_children, bins_vec))
     }
 
+    // Drive a job from dirty to done 
     fn complete_job(
         &self,
         job_index: NodeIndex,
