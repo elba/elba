@@ -15,7 +15,9 @@ use itertools::Itertools;
 use std::{
     path::{Path, PathBuf},
     process::Output,
+    time::{Duration, Instant}
 };
+use tokio::timer::Delay;
 use tokio_process::CommandExt;
 
 // dealing with ibc stuff
@@ -51,14 +53,16 @@ pub async fn invoke_compile<'a>(
 
     // Idris sometimes breaks down if multiple modules is being compiled
     // in parallel. We reties if the stdout contains 'loadable'.
-    for _ in 0..3usize {
+    for _ in 0..15usize {
         shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);
 
         let output = process.output_async().compat().await?;
 
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            if !stdout.contains("loadable") {
+            if stdout.contains("loadable") {
+                Delay::new(Instant::now() + Duration::from_secs(3)).compat().await?;
+            } else {
                 bail!("> {:#?}\n{}", process, fmt_output(&output))
             }
         } else {
@@ -113,15 +117,10 @@ pub async fn invoke_codegen<'a>(
 
     process.args(args);
 
-    for bin in binary {
-        if flavor.is_idris1() {
-            process.arg("-i");
-            process.arg(&build);
-        }
-        process.arg(bin);
-    }
-
-    if flavor.is_idris2() {
+    if flavor.is_idris1() {
+        process.arg("-i");
+        process.arg(&build);
+    } else {
         process.env(
             "BLODWEN_PATH",
             binary
@@ -129,10 +128,10 @@ pub async fn invoke_codegen<'a>(
                 .map(|x| x.parent().unwrap().to_string_lossy())
                 .join(":"),
         );
-
-        for bin in binary {
-            process.arg(bin);
-        }
+    }
+    
+    for bin in binary {
+        process.arg(bin);
     }
 
     shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);

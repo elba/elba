@@ -256,9 +256,13 @@ pub async fn compile_lib<'a>(
     if codegen {
         clear_dir(&layout.artifacts.join(&bcx.backend.name))?;
 
+        // TODO: Idris 2 now doesn't support lib interface, 
+        // so it's temporarily safe to assume all the codegen
+        // targets are ibc files.
         let lib_bins = lib_files
             .into_iter()
             .map(|x| x.into_path())
+            .filter(|x| x.extension() == Some(OsStr::new("ibc")))
             .collect::<Vec<_>>();
 
         let output = invoke_codegen(
