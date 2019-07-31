@@ -38,7 +38,7 @@ pub fn package(
         build::build(
             &ctx,
             project,
-            &(true, true, None, None),
+            &(true, false, None, None),
             true,
             &config::Backend::default(),
         )?;

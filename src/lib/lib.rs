@@ -1,5 +1,7 @@
 //! A package manager for the Idris language.
 
+#![feature(async_await)]
+
 pub mod build;
 pub mod cli;
 pub mod package;

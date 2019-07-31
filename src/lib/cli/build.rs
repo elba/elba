@@ -71,7 +71,7 @@ pub fn test(
         bail!("at least one test must be defined")
     }
 
-    solve_local(ctx, &project, 3, None, |cache, mut retriever, solve| {
+    solve_local(&ctx, &project, 3, None, |cache, mut retriever, solve| {
         let sources = retriever
             .retrieve_packages(&solve)
             .context(format_err!("package retrieval failed"))?;
@@ -82,11 +82,11 @@ pub fn test(
         drop(retriever);
 
         let bctx = BuildContext {
-            backend,
+            backend: backend.clone(),
             codegen: true,
             compiler: Compiler::new(&ctx.compiler)?,
-            opts: &ctx.opts,
-            cache,
+            opts: ctx.opts.clone(),
+            cache: cache.clone(),
             threads: ctx.threads,
         };
 
@@ -121,8 +121,8 @@ pub fn test(
         }
 
         let root = Targets::new(root);
-        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
-        q.exec(&bctx)?;
+        let q = JobQueue::new(sources, &root, Some(layout), bctx, &ctx.logger, ctx.shell)?;
+        q.exec()?;
 
         ctx.shell.println(
             style("[3/3]").dim().bold(),
@@ -154,10 +154,11 @@ pub fn test(
             let shell = ctx.shell;
             for test in &root {
                 let bin_dir = &bin_dir;
+                let runner = &backend.runner;
                 // let pb = &pb;
                 scope.execute(move || {
                     shell.println(style("Running").cyan(), &test.name, Verbosity::Normal);
-                    let out = if let Some(r) = &backend.runner {
+                    let out = if let Some(r) = runner {
                         Command::new(r).arg(bin_dir.join(&test.name)).output()
                     } else {
                         Command::new(bin_dir.join(&test.name)).output()
@@ -251,11 +252,11 @@ pub fn install(
         let root = Targets::new(root);
 
         let bctx = BuildContext {
-            backend,
+            backend: backend.clone(),
             codegen: true,
             compiler: Compiler::new(&ctx.compiler)?,
-            opts: &ctx.opts,
-            cache,
+            opts: ctx.opts.clone(),
+            cache: cache.clone(),
             threads: ctx.threads,
         };
 
@@ -268,10 +269,10 @@ pub fn install(
         // We unconditionally use a global OutputLayout to force rebuilding of root packages
         // and to avoid dealing with making our own for global/remote packages
 
-        let q = JobQueue::new(sources, &root, None, &bctx, &ctx.logger, ctx.shell)?;
+        let q = JobQueue::new(sources, &root, None, bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        let bins = q.exec(&bctx)?.1;
+        let bins = q.exec()?.1;
         let binc = bins.len();
 
         ctx.shell.println(
@@ -387,11 +388,11 @@ pub fn repl(
         let root = Targets::new(root);
 
         let bctx = BuildContext {
-            backend,
+            backend: backend.clone(),
             codegen: true,
             compiler: Compiler::new(&ctx.compiler)?,
-            opts: &ctx.opts,
-            cache,
+            opts: ctx.opts.clone(),
+            cache: cache.clone(),
             threads: ctx.threads,
         };
 
@@ -401,14 +402,14 @@ pub fn repl(
             Verbosity::Quiet,
         );
 
-        let mut q = JobQueue::new(sources, &root, None, &bctx, &ctx.logger, ctx.shell)?;
+        let mut q = JobQueue::new(sources, &root, None, bctx.clone(), &ctx.logger, ctx.shell)?;
 
         // We only want to build the dependencies; we expressly do NOT want to generate anything
         // for the root package, because we're gonna manually add the files ourselves.
         // The reason we do this is because the repl is often used for interactive development.
         q.graph.inner[NodeIndex::new(0)] = Job::default();
 
-        let deps = q.exec(&bctx)?.0;
+        let deps = q.exec()?.0;
 
         // From here, we basically manually build a CompileInvocation, but tailor-made for the
         // repl command.
@@ -445,9 +446,13 @@ pub fn repl(
         match interactivity {
             // In ide-mode, we only want to pass the current file as the arg.
             // An editor should be in charge of dealing with this.
-            Interactivity::IDE => { process.arg("--ide-mode"); },
-            Interactivity::Socket => { process.arg("--ide-mode-socket"); },
-            _ => {},
+            Interactivity::IDE => {
+                process.arg("--ide-mode");
+            }
+            Interactivity::Socket => {
+                process.arg("--ide-mode-socket");
+            }
+            _ => {}
         };
 
         // The moment of truth:
@@ -505,11 +510,11 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
 
         let bctx = BuildContext {
             // We just use the default backend cause it doesn't matter for this case
-            backend: &backend,
+            backend,
             codegen: true,
             compiler: Compiler::new(&ctx.compiler)?,
-            opts: &ctx.opts,
-            cache,
+            opts: ctx.opts.clone(),
+            cache: cache.clone(),
             threads: ctx.threads,
         };
 
@@ -523,10 +528,10 @@ pub fn doc(ctx: &BuildCtx, project: &Path) -> Res<String> {
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
+        let q = JobQueue::new(sources, &root, Some(layout), bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        q.exec(&bctx)?;
+        q.exec()?;
 
         Ok("docs output available at `./target/docs`".to_string())
     })
@@ -598,11 +603,11 @@ pub fn build(
         drop(retriever);
 
         let bctx = BuildContext {
-            backend,
+            backend: backend.clone(),
             codegen,
             compiler: Compiler::new(&ctx.compiler)?,
-            opts: &ctx.opts,
-            cache,
+            opts: ctx.opts.clone(),
+            cache: cache.clone(),
             threads: ctx.threads,
         };
 
@@ -616,10 +621,10 @@ pub fn build(
         let lock = DirLock::acquire(&project.join("target"))?;
         let layout = OutputLayout::new(lock).context("could not create local target directory")?;
 
-        let q = JobQueue::new(sources, &root, Some(layout), &bctx, &ctx.logger, ctx.shell)?;
+        let q = JobQueue::new(sources, &root, Some(layout), bctx, &ctx.logger, ctx.shell)?;
         // Because we're just building, we don't need to do anything after executing the build
         // process. Yay abstraction!
-        q.exec(&bctx)?;
+        q.exec()?;
 
         Ok("build output available at `./target`".to_string())
     })
@@ -696,7 +701,9 @@ pub fn add(ctx: &BuildCtx, project: &Path, spec: &Spec, dev: bool) -> Res<String
         .open(project.join("elba.toml"))
         .context(format_err!("failed to read manifest file (elba.toml)"))?;
     mf.read_to_string(&mut contents)?;
-    let mut manifest = contents.parse::<toml_edit::Document>().with_context(|e| format!("invalid manifest toml format: {}", e))?;
+    let mut manifest = contents
+        .parse::<toml_edit::Document>()
+        .with_context(|e| format!("invalid manifest toml format: {}", e))?;
 
     let cache = Cache::from_disk(&ctx.logger, ctx.global_cache.clone(), ctx.shell)?;
     let indices = ctx
@@ -715,18 +722,25 @@ pub fn add(ctx: &BuildCtx, project: &Path, spec: &Spec, dev: bool) -> Res<String
     };
 
     if !dev {
-        manifest["dependencies"][target.id.name().to_string()]["version"] = toml_edit::value(target.version.to_string());
-        manifest["dependencies"][target.id.name().to_string()]["index"] = toml_edit::value(res.to_string());
-        manifest["dependencies"][target.id.name().to_string()].as_inline_table_mut().map(|t| t.fmt());
+        manifest["dependencies"][target.id.name().to_string()]["version"] =
+            toml_edit::value(target.version.to_string());
+        manifest["dependencies"][target.id.name().to_string()]["index"] =
+            toml_edit::value(res.to_string());
+        manifest["dependencies"][target.id.name().to_string()]
+            .as_inline_table_mut()
+            .map(|t| t.fmt());
     } else {
-        manifest["dev_dependencies"][target.id.name().to_string()]["version"] = toml_edit::value(target.version.to_string());
-        manifest["dev_dependencies"][target.id.name().to_string()]["index"] = toml_edit::value(res.to_string());
-        manifest["dev_dependencies"][target.id.name().to_string()].as_inline_table_mut().map(|t| t.fmt());
+        manifest["dev_dependencies"][target.id.name().to_string()]["version"] =
+            toml_edit::value(target.version.to_string());
+        manifest["dev_dependencies"][target.id.name().to_string()]["index"] =
+            toml_edit::value(res.to_string());
+        manifest["dev_dependencies"][target.id.name().to_string()]
+            .as_inline_table_mut()
+            .map(|t| t.fmt());
     }
 
     mf.seek(SeekFrom::Start(0))?;
     mf.write_all(manifest.to_string().as_bytes())?;
-
 
     Ok(format!("added package {} to manifest", target_s))
 }

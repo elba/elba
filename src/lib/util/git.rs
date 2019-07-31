@@ -369,7 +369,7 @@ where
 pub fn with_fetch_options<T>(
     git_config: &git2::Config,
     url: &Url,
-    cb: &mut FnMut(git2::FetchOptions) -> Res<T>,
+    cb: &mut dyn FnMut(git2::FetchOptions) -> Res<T>,
 ) -> Res<T> {
     with_authentication(url.as_str(), git_config, |f| {
         let mut rcb = git2::RemoteCallbacks::new();
