@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1]
+
+This release reduces the build time and comes with new command line
+output appearance.
+
+### Changed
+
+- Bin targets are able to import lib target of the same project, if there
+is one.
+
+- Lib target will **not** codegen artifacts by default when publish.
+
+- Fix bugs where bin target codegen fails. (#61)
+
 ## [0.3.0]
 
 This is a major release which adds many new features and polishes many
@@ -253,7 +267,8 @@ other packages.
 - Commands for creating packages, building packages (generating a lockfile
   and building all targets), testing packages, and (un)installing packages.
 
-[Unreleased]: https://github.com/elba/elba/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/elba/elba/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/elba/elba/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/elba/elba/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/elba/elba/compare/0.1.5...0.2.0
 [0.1.5]: https://github.com/elba/elba/compare/0.1.4...0.1.5
