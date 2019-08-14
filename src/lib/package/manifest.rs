@@ -39,6 +39,7 @@ use walkdir::{DirEntry, WalkDir};
 //
 // With this in place, we can safely avoid module namespace conflicts.
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Manifest {
     pub package: PackageInfo,
@@ -150,6 +151,7 @@ impl FromStr for Manifest {
     }
 }
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PackageInfo {
     pub name: Name,
@@ -167,7 +169,7 @@ pub struct PackageInfo {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum DepReq {
     Registry(Constraint),
     RegLong {
@@ -227,6 +229,7 @@ impl DepReq {
     }
 }
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub struct Targets {
     pub lib: Option<LibTarget>,
@@ -236,6 +239,7 @@ pub struct Targets {
     pub test: Vec<TestTarget>,
 }
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LibTarget {
     #[serde(default = "default_lib_subpath")]
@@ -249,6 +253,7 @@ fn default_lib_subpath() -> SubPath {
     SubPath::from_path(Path::new("src")).unwrap()
 }
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct BinTarget {
     pub name: String,
@@ -267,6 +272,7 @@ fn default_bin_subpath() -> SubPath {
 /// the difference in default path.
 ///
 /// I know, code duplication sucks and is stupid, but what can ya do :v
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct TestTarget {
     pub name: Option<String>,
