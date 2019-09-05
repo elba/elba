@@ -206,7 +206,7 @@ pub async fn compile_lib<'a>(
     loop {
         while let Some(compile) = compilations.next() {
             ongoing_compilation.push(Box::pin(compile));
-            if ongoing_compilation.len() > 4 {
+            if ongoing_compilation.len() >= 2 {
                 break;
             }
         }

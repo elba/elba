@@ -3,15 +3,15 @@
 
 environment:
   global:
-    RUST_VERSION: nightly-2019-07-02
+    RUST_VERSION: nightly-2019-09-04
     CRATE_NAME: elba
 
   matrix:
     # Testing other channels
     - TARGET: i686-pc-windows-msvc
-      RUST_VERSION: nightly-2019-07-02
+      RUST_VERSION: nightly-2019-09-04
     - TARGET: x86_64-pc-windows-msvc
-      RUST_VERSION: nightly-2019-07-02
+      RUST_VERSION: nightly-2019-09-04
 
 install:
   - ps: >-

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.2]
+
+This release decreases the number of compilation tasks in parallel
+so as to reduce the chance that Idris compiler breaks down on high load.
+
 ## [0.3.1]
 
 This release reduces the build time and comes with new command line
@@ -267,7 +272,8 @@ other packages.
 - Commands for creating packages, building packages (generating a lockfile
   and building all targets), testing packages, and (un)installing packages.
 
-[Unreleased]: https://github.com/elba/elba/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/elba/elba/compare/0.3.2...HEAD
+[0.3.2]: https://github.com/elba/elba/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/elba/elba/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/elba/elba/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/elba/elba/compare/0.1.5...0.2.0
