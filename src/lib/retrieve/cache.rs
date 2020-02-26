@@ -69,7 +69,7 @@ use console::style;
 use failure::{bail, format_err, Error, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use reqwest::Client;
+use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use slog::{debug, o, Logger};
 use std::{

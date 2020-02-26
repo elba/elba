@@ -321,7 +321,7 @@ impl JobQueue {
         Ok((root_children, bins_vec))
     }
 
-    // Drive a job from dirty to done 
+    // Drive a job from dirty to done
     fn complete_job(
         &self,
         job_index: NodeIndex,

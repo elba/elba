@@ -12,7 +12,7 @@ use crate::{
 use failure::{format_err, Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
-use reqwest::Client;
+use reqwest::blocking::Client;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
@@ -156,7 +156,7 @@ impl DirectRes {
 /// Retrieves a package in the form of a tarball.
 fn retrieve_tar(url: Url, client: &Client, target: &DirLock, cksum: Option<&Checksum>) -> Res<()> {
     client
-        .get(url)
+        .get(url.as_str())
         .send()
         .map_err(|_| Error::from(ErrorKind::CannotDownload))
         .and_then(|mut r| {

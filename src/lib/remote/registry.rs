@@ -3,7 +3,7 @@
 
 use crate::{package::Name, util::errors::Res};
 use failure::{format_err, Error, ResultExt};
-use reqwest::Client;
+use reqwest::blocking::Client;
 use semver::Version;
 use serde::{de, ser};
 use std::{fmt, fs::File, str::FromStr, time::Duration};
@@ -65,7 +65,7 @@ impl Registry {
 
     pub fn yank(&self, name: &Name, version: &Version, token: &str, yank: bool) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
-        let mut resp = client
+        let resp = client
             .patch(
                 self.url
                     .join(&format!(
@@ -74,7 +74,8 @@ impl Registry {
                         name.name(),
                         &version.to_string()
                     ))
-                    .unwrap(),
+                    .unwrap()
+                    .as_str(),
             )
             .query(&[("yanked", yank.to_string()), ("token", token.to_string())])
             .send()?;
@@ -88,7 +89,7 @@ impl Registry {
 
     pub fn publish(&self, tar: File, name: &Name, version: &Version, token: &str) -> Res<()> {
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
-        let mut resp = client
+        let resp = client
             .put(
                 self.url
                     .join(&format!(
@@ -97,7 +98,8 @@ impl Registry {
                         name.name(),
                         &version.to_string()
                     ))
-                    .unwrap(),
+                    .unwrap()
+                    .as_str(),
             )
             .query(&[("token", token)])
             .body(tar)

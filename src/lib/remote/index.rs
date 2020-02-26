@@ -197,13 +197,15 @@ impl Indices {
         }
         let pkgs = engine.search(query);
 
-        pkgs.iter().map(|(ir, pkg)| {
-            let name = Name::from_str(pkg).unwrap();
-            let ix = &self.indices[*ir];
-            let ver: Version = ix.entries(&name)?.into_iter().map(|x| x.0).last().unwrap();
+        pkgs.iter()
+            .map(|(ir, pkg)| {
+                let name = Name::from_str(pkg).unwrap();
+                let ix = &self.indices[*ir];
+                let ver: Version = ix.entries(&name)?.into_iter().map(|x| x.0).last().unwrap();
 
-            Ok((name, ver, *ir))
-        }).collect::<Res<Vec<_>>>()
+                Ok((name, ver, *ir))
+            })
+            .collect::<Res<Vec<_>>>()
     }
 }
 

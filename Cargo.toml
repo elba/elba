@@ -17,7 +17,7 @@ categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = "2"
-config = "0.9"
+config = "0.10"
 console = "0.6"
 crossbeam = "0.4"
 digest = { version = "0.7", features = ["std"]}
@@ -36,12 +36,12 @@ libc = "0.2"
 nom = "4.0"
 num_cpus = "1"
 petgraph = "0.4"
-rand = "0.5"
-reqwest = "0.9"
+rand = "0.7"
+reqwest = { version = "0.10", features = ["blocking"] }
 scoped_threadpool = "0.1"
 semver = { version = "0.9", features = ["serde"] }
 semver_constraints = { version = "0.1", features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.7"
 shell-escape = "0.1"

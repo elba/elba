@@ -17,10 +17,7 @@ pub fn cli() -> App<'static, 'static> {
                 .required(true)
                 .help("The package spec to yank (name|version)"),
         )
-        .arg(
-            Arg::with_name("unyank")
-                .help("Whether to unyank a package instead of yanking it"),
-        )
+        .arg(Arg::with_name("unyank").help("Whether to unyank a package instead of yanking it"))
         .arg(args::index())
 }
 
@@ -41,7 +38,13 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         data_dir: c.directories.data.clone(),
     };
 
-    registry::yank(&bcx, &ctx, &spec.name, spec.version.as_ref().unwrap(), !args.is_present("unyank"))?;
+    registry::yank(
+        &bcx,
+        &ctx,
+        &spec.name,
+        spec.version.as_ref().unwrap(),
+        !args.is_present("unyank"),
+    )?;
 
     Ok(format!("yanked package {} from index {}", spec, bck_text))
 }

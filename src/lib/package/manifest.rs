@@ -1,6 +1,5 @@
 //! Package manifest files.
 
-
 use super::*;
 use crate::{
     remote::resolution::{DirectRes, IndexRes},

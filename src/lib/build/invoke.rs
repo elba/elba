@@ -15,7 +15,7 @@ use itertools::Itertools;
 use std::{
     path::{Path, PathBuf},
     process::Output,
-    time::{Duration, Instant}
+    time::{Duration, Instant},
 };
 use tokio::timer::Delay;
 use tokio_process::CommandExt;
@@ -61,7 +61,9 @@ pub async fn invoke_compile<'a>(
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if stdout.contains("loadable") {
-                Delay::new(Instant::now() + Duration::from_secs(3)).compat().await?;
+                Delay::new(Instant::now() + Duration::from_secs(3))
+                    .compat()
+                    .await?;
             } else {
                 bail!("> {:#?}\n{}", process, fmt_output(&output))
             }
@@ -129,7 +131,7 @@ pub async fn invoke_codegen<'a>(
                 .join(":"),
         );
     }
-    
+
     for bin in binary {
         process.arg(bin);
     }

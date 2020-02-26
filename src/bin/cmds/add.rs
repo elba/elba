@@ -17,10 +17,7 @@ pub fn cli() -> App<'static, 'static> {
                 .required(true)
                 .help("The package spec to add"),
         )
-        .arg(
-            Arg::with_name("dev")
-                .help("Whether to add the package as a dev_dependency")
-        )
+        .arg(Arg::with_name("dev").help("Whether to add the package as a dev_dependency"))
 }
 
 pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {

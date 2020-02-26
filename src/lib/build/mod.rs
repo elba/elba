@@ -256,7 +256,7 @@ pub async fn compile_lib<'a>(
     if codegen {
         clear_dir(&layout.artifacts.join(&bcx.backend.name))?;
 
-        // TODO: Idris 2 now doesn't support lib interface, 
+        // TODO: Idris 2 now doesn't support lib interface,
         // so it's temporarily safe to assume all the codegen
         // targets are ibc files.
         let lib_bins = lib_files
@@ -345,12 +345,18 @@ pub async fn compile_bin<'a>(
     args.extend(bcx.opts.iter().cloned());
 
     let module = if target_path.is_absolute() {
-        target_path.file_stem().expect("bin target should be a file").to_string_lossy().to_string()
+        target_path
+            .file_stem()
+            .expect("bin target should be a file")
+            .to_string_lossy()
+            .to_string()
     } else {
-        target_path.with_extension("")
-        .to_string_lossy().replace("/", ".")
-        .replace("\\", ".")
-    }        ;
+        target_path
+            .with_extension("")
+            .to_string_lossy()
+            .replace("/", ".")
+            .replace("\\", ".")
+    };
     shell.println(
         style("Compiling").cyan(),
         format!("{} [{}]", module, source.meta().name()),
