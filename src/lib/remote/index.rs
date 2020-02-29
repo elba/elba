@@ -22,7 +22,6 @@
 //! This design follows closely with that of Cargo's, specifically with their RFC enabling
 //! [unofficial registries](https://github.com/rust-lang/rfcs/blob/master/text/2141-alternative-registries.md).
 
-use super::registry::Registry;
 use crate::{
     package::*,
     remote::resolution::{DirectRes, IndexRes, Resolution},
@@ -65,7 +64,6 @@ impl FromStr for IndexConfig {
 pub struct IndexConfInner {
     pub secure: bool,
     pub dependencies: IndexMap<String, IndexRes>,
-    pub registry: Option<Registry>,
 }
 
 impl Default for IndexConfInner {
@@ -73,7 +71,6 @@ impl Default for IndexConfInner {
         IndexConfInner {
             secure: false,
             dependencies: IndexMap::new(),
-            registry: None,
         }
     }
 }
@@ -280,25 +277,13 @@ impl Index {
                 })
                 .collect::<Vec<_>>();
 
-            let location = if let Some(url) = &self.config.index.registry {
-                if let Some(eloc) = entry.location {
-                    Ok(eloc)
-                } else {
-                    Ok(DirectRes::Registry {
-                        registry: url.clone(),
-                        name: name.clone(),
-                        version: entry.version.clone(),
-                    })
-                }
-            } else {
-                entry.location.ok_or_else(|| {
-                    format_err!(
-                        "no location for index entry {} of package {}",
-                        lix + 1,
-                        name
-                    )
-                })
-            }?;
+            let location = entry.location.ok_or_else(|| {
+                format_err!(
+                    "no location for index entry {} of package {}",
+                    lix + 1,
+                    name
+                )
+            })?;
 
             let entry: ResolvedEntry = IndexEntry {
                 name: entry.name,
@@ -331,9 +316,5 @@ impl Index {
 
     pub fn depends(&self) -> impl Iterator<Item = &IndexRes> {
         self.config.index.dependencies.iter().map(|x| x.1)
-    }
-
-    pub fn registry(&self) -> Option<&Registry> {
-        self.config.index.registry.as_ref()
     }
 }

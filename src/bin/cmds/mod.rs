@@ -5,18 +5,15 @@ mod clean;
 mod doc;
 mod init;
 mod install;
-mod login;
 mod new;
 mod package;
 mod print_config;
-mod publish;
 mod repl;
 mod script;
 mod search;
 mod test;
 mod uninstall;
 mod update;
-mod yank;
 
 use clap::{App, ArgMatches};
 use elba::util::{
@@ -42,18 +39,15 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         doc::cli(),
         init::cli(),
         install::cli(),
-        login::cli(),
         new::cli(),
         package::cli(),
         print_config::cli(),
-        publish::cli(),
         repl::cli(),
         script::cli(),
         search::cli(),
         test::cli(),
         uninstall::cli(),
         update::cli(),
-        yank::cli(),
     ]
 }
 
@@ -66,18 +60,15 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "doc" => Some(doc::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
-        "login" => Some(login::exec),
         "new" => Some(new::exec),
         "package" => Some(package::exec),
         "print-config" => Some(print_config::exec),
-        "publish" => Some(publish::exec),
         "repl" => Some(repl::exec),
         "script" => Some(script::exec),
         "search" => Some(search::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),
         "update" => Some(update::exec),
-        "yank" => Some(yank::exec),
         _ => None,
     }
 }
@@ -311,12 +302,5 @@ mod args {
         Arg::with_name("no-verify")
             .long("no-verify")
             .help("Skip building the package to test for validity")
-    }
-
-    pub fn index() -> Arg {
-        Arg::with_name("index")
-            .long("index")
-            .takes_value(true)
-            .help("The index which the command should apply to")
     }
 }

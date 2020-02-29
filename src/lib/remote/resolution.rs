@@ -1,6 +1,5 @@
 use crate::{
-    package::{Checksum, Name},
-    remote,
+    package::Checksum,
     util::{
         clear_dir,
         errors::{ErrorKind, Res},
@@ -13,7 +12,7 @@ use failure::{format_err, Error, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
 use reqwest::blocking::Client;
-use semver::Version;
+
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
@@ -136,12 +135,6 @@ pub enum DirectRes {
     /// itself. Checksums are stored in the fragment of the resolution url, with they key being the
     /// checksum format.
     Tar { url: Url, cksum: Option<Checksum> },
-    /// Registry: the package is stored by a registry.
-    Registry {
-        registry: remote::Registry,
-        name: Name,
-        version: Version,
-    },
 }
 
 impl DirectRes {
@@ -353,22 +346,6 @@ impl DirectRes {
                     Err(format_err!("can't find directory {}", path.display()))?
                 }
             }
-            DirectRes::Registry {
-                registry,
-                name,
-                version,
-            } => {
-                dl_f(true)?;
-                // TODO: Checksums?
-                retrieve_tar(
-                    registry.retrieve_url(&name, &version),
-                    &client,
-                    &target,
-                    None,
-                )?;
-
-                Ok(None)
-            }
         }
     }
 
@@ -426,25 +403,6 @@ impl FromStr for DirectRes {
                 url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
-            "reg" => {
-                let mut url = Url::parse(rest).context(format_err!("invalid registry url"))?;
-                let frag = url
-                    .fragment()
-                    .map(|x| x.to_owned())
-                    .ok_or_else(|| format_err!("registry url missing name/version fragment"))?;
-                url.set_fragment(None);
-
-                let registry = remote::Registry::new(url.clone());
-                let mut name_ver = frag.splitn(2, '|');
-                let name = Name::from_str(name_ver.next().unwrap())?;
-                let version =
-                    Version::from_str(name_ver.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?)?;
-                Ok(DirectRes::Registry {
-                    registry,
-                    name,
-                    version,
-                })
-            }
             _ => Err(ErrorKind::InvalidSourceUrl)?,
         }
     }
@@ -468,11 +426,6 @@ impl fmt::Display for DirectRes {
                     },
                 )
             }
-            DirectRes::Registry {
-                registry,
-                name,
-                version,
-            } => write!(f, "reg+{}#{}|{}", registry, name, version),
         }
     }
 }
