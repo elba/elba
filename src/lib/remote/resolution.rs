@@ -247,7 +247,7 @@ impl DirectRes {
 
                                 let mut revwalk = repo.revwalk()?;
                                 revwalk.push(head.id())?;
-                                revwalk.set_sorting(Sort::TOPOLOGICAL);
+                                revwalk.set_sorting(Sort::TOPOLOGICAL)?;
 
                                 if revwalk.any(|x| x == Ok(cur.id())) {
                                     if &cur.id().to_string() == tag {

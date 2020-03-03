@@ -84,7 +84,7 @@ pub struct Dep<T> {
 }
 
 pub type ResolvedDep = Dep<IndexRes>;
-pub type TomlDep = Dep<Option<String>>;
+pub type RawDep = Dep<Option<String>>;
 
 #[derive(Debug, Default)]
 pub struct Indices {
@@ -207,16 +207,16 @@ impl Indices {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct IndexEntry<T, L> {
+pub struct IndexEntry<D, L> {
     pub name: Name,
     pub version: Version,
-    pub dependencies: Vec<Dep<T>>,
+    pub dependencies: Vec<Dep<D>>,
     pub yanked: bool,
     pub location: L,
 }
 
 pub type ResolvedEntry = IndexEntry<IndexRes, DirectRes>;
-pub type TomlEntry = IndexEntry<Option<String>, Option<DirectRes>>;
+pub type RawEntry = IndexEntry<Option<String>, Option<DirectRes>>;
 
 /// Struct `Index` defines a single index.
 ///
@@ -254,7 +254,7 @@ impl Index {
         let r = io::BufReader::new(&file);
 
         for (lix, line) in r.lines().enumerate() {
-            let entry: TomlEntry = serde_json::from_str(&line?).context(format_err!(
+            let entry: RawEntry = serde_json::from_str(&line?).context(format_err!(
                 "index entry {} for package {} is invalid",
                 lix + 1,
                 name
