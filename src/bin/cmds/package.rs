@@ -1,8 +1,11 @@
 use super::{args, get};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
-    cli::index,
-    util::{config::Config, errors::Res},
+    cli::{build, index},
+    util::{
+        config::{Backend, Config},
+        errors::Res,
+    },
 };
 use failure::{format_err, ResultExt};
 use std::env::current_dir;
@@ -19,8 +22,19 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
     ))?;
 
     let ctx = get::build_ctx(c, args);
+    let project = build::find_manifest_root(&project).unwrap();
 
-    let (gz_name, _, _) = index::package(&ctx, &project, !args.is_present("no-verify"))?;
+    if !args.is_present("no-verify") {
+        build::build(
+            &ctx,
+            &project,
+            &(true, false, None, None),
+            true,
+            &Backend::default(),
+        )?;
+    }
+
+    let (gz_name, _) = index::package(&project)?;
 
     Ok(format!(
         "created compressed tarball at `{}`",

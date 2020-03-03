@@ -115,41 +115,32 @@ impl<'cache> Retriever<'cache> {
 
         info!(self.logger, "beginning bulk package retrieval");
 
-        let sources = solve.map(
-            |_, sum| {
-                let loc = match sum.resolution() {
-                    Resolution::Direct(direct) => direct.clone(),
-                    Resolution::Index(_) => self.select(sum).unwrap().into_owned().location,
-                };
+        let sources = solve.map(|_, sum| {
+            let loc = match sum.resolution() {
+                Resolution::Direct(direct) => direct.clone(),
+                Resolution::Index(_) => self.select(sum).unwrap().into_owned().location,
+            };
 
-                if let Some(s) = self.remove(sum.id()) {
-                    // prg += 1;
-                    // pb.set_position(prg);
-                    Ok(s)
-                } else {
-                    let source = self
-                        .cache
-                        .checkout_source(
-                            sum.id(),
-                            &loc,
-                            false,
-                            self.offline_cache.is_some(),
-                            || {
-                                self.shell.println(
-                                    style("Retrieving").cyan(),
-                                    sum.to_string(),
-                                    Verbosity::Normal,
-                                );
-                            },
-                        )
-                        .context(format_err!("unable to retrieve package {}", sum))?;
-                    // prg += 1;
-                    // pb.set_position(prg);
-                    Ok(source.1)
-                }
-            },
-            |_| Ok(()),
-        )?;
+            if let Some(s) = self.remove(sum.id()) {
+                // prg += 1;
+                // pb.set_position(prg);
+                Ok(s)
+            } else {
+                let source = self
+                    .cache
+                    .checkout_source(sum.id(), &loc, false, self.offline_cache.is_some(), || {
+                        self.shell.println(
+                            style("Retrieving").cyan(),
+                            sum.to_string(),
+                            Verbosity::Normal,
+                        );
+                    })
+                    .context(format_err!("unable to retrieve package {}", sum))?;
+                // prg += 1;
+                // pb.set_position(prg);
+                Ok(source.1)
+            }
+        })?;
 
         // pb.finish_and_clear();
         self.shell.println(

@@ -109,9 +109,8 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
 
 mod get {
     use super::*;
-    use elba::{cli::build::BuildCtx, remote::resolution::IndexRes};
+    use elba::cli::build::BuildCtx;
     use slog::Drain;
-    use std::str::FromStr;
 
     pub fn build_ctx(c: &mut Config, args: &ArgMatches) -> BuildCtx {
         let logger = get::logger(c, args);
@@ -188,26 +187,6 @@ mod get {
         }
 
         res
-    }
-
-    pub fn index(c: &mut Config, args: &ArgMatches) -> Res<IndexRes> {
-        if let Some(x) = args.value_of("index") {
-            if let Some(mapped) = c.indices.get(x) {
-                Ok(mapped.clone())
-            } else {
-                IndexRes::from_str(x)
-            }
-        } else {
-            match c.indices.len() {
-                0 => Err(format_err!(
-                    "no indices in configuration and none specified at the CLI"
-                )),
-                1 => Ok(c.indices.get_index(0).unwrap().1.clone()),
-                _ => Err(format_err!(
-                    "> 1 index in configuration and none specified at the CLI"
-                )),
-            }
-        }
     }
 }
 

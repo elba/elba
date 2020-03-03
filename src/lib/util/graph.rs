@@ -14,15 +14,15 @@ use std::{
 ///
 /// This graph is a directed acyclic graph; we always assume that the root node is at node index 0.
 #[derive(Debug, Clone)]
-pub struct Graph<T, E = ()>
+pub struct Graph<T>
 where
     T: Eq,
 {
-    pub inner: petgraph::Graph<T, E>,
+    pub inner: petgraph::Graph<T, ()>,
 }
 
-impl<T: Eq, E> Graph<T, E> {
-    pub fn new(graph: petgraph::Graph<T, E>) -> Self {
+impl<T: Eq> Graph<T> {
+    pub fn new(graph: petgraph::Graph<T, ()>) -> Self {
         Graph { inner: graph }
     }
 
@@ -75,11 +75,10 @@ impl<T: Eq, E> Graph<T, E> {
             .map(move |node_id| (node_id, &self.inner[node_id]))
     }
 
-    pub fn map<U, V, F, G>(&self, mut f: F, mut g: G) -> Res<Graph<U, V>>
+    pub fn map<U, F>(&self, mut f: F) -> Res<Graph<U>>
     where
         U: Eq,
         F: FnMut(NodeIndex, &T) -> Res<U>,
-        G: FnMut(&E) -> Res<V>,
     {
         let mut tree = petgraph::Graph::new();
         let mut node_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();
@@ -92,18 +91,14 @@ impl<T: Eq, E> Graph<T, E> {
 
         // Then, we add all the edges.
         for edge in self.inner.edge_references() {
-            tree.add_edge(
-                node_map[&edge.source()],
-                node_map[&edge.target()],
-                g(edge.weight())?,
-            );
+            tree.add_edge(node_map[&edge.source()], node_map[&edge.target()], ());
         }
 
         Ok(Graph::new(tree))
     }
 }
 
-impl<T, E> Index<NodeIndex> for Graph<T, E>
+impl<T> Index<NodeIndex> for Graph<T>
 where
     T: Eq,
 {
@@ -114,7 +109,7 @@ where
     }
 }
 
-impl<T, E> IndexMut<NodeIndex> for Graph<T, E>
+impl<T> IndexMut<NodeIndex> for Graph<T>
 where
     T: Eq,
 {

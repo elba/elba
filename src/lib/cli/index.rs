@@ -2,14 +2,12 @@
 
 use super::build;
 use crate::{
-    package::{manifest::Manifest, Name},
-    remote::resolution::IndexRes,
+    package::manifest::Manifest,
     retrieve::Cache,
-    util::{config, errors::Res, valid_file},
+    util::{errors::Res, valid_file},
 };
 use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
-use semver::Version;
 use std::{
     env::set_current_dir,
     fs::File,
@@ -19,31 +17,12 @@ use std::{
 };
 use tar;
 
-pub struct RegistryCtx {
-    pub index: IndexRes,
-    pub data_dir: PathBuf,
-}
-
-pub fn package(
-    ctx: &build::BuildCtx,
-    project: &Path,
-    verify: bool,
-) -> Res<(PathBuf, Name, Version)> {
-    if verify {
-        build::build(
-            &ctx,
-            project,
-            &(true, false, None, None),
-            true,
-            &config::Backend::default(),
-        )?;
-    }
-
+pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
     // build succeeded already, so we can unwrap ok!
-    let nproj = build::find_manifest_root(&project).unwrap();
+    let project = build::find_manifest_root(&project).unwrap();
 
     let mut contents = String::new();
-    let mut manifest = File::open(nproj.join("elba.toml"))
+    let mut manifest = File::open(project.join("elba.toml"))
         .context(format_err!("failed to read manifest file (elba.toml)"))?;
     manifest.read_to_string(&mut contents)?;
     let manifest = Manifest::from_str(&contents)?;
@@ -55,31 +34,27 @@ pub fn package(
         manifest.version()
     );
 
-    let tar_gz = File::create(nproj.join(&gz_name))?;
+    let tar_gz = File::create(project.join(&gz_name))?;
     let enc = GzEncoder::new(tar_gz, Compression::default());
     let mut tar = tar::Builder::new(enc);
 
     let walker = manifest
-        .list_files(&nproj, &nproj, |x| {
+        .list_files(&project, &project, |x| {
             x.file_name() != ".git" && x.file_name() != "target"
         })?
         .filter(valid_file);
 
-    set_current_dir(&nproj)?;
+    set_current_dir(&project)?;
 
     for item in walker {
-        let suffix = item.path().strip_prefix(&nproj).unwrap();
+        let suffix = item.path().strip_prefix(&project).unwrap();
         tar.append_path(suffix)?;
     }
 
     // Finish writing to the tarball
     drop(tar);
 
-    Ok((
-        nproj.join(&gz_name),
-        manifest.name().clone(),
-        manifest.version().clone(),
-    ))
+    Ok((project.join(&gz_name), manifest))
 }
 
 pub fn search(bcx: &build::BuildCtx, query: &str) -> Res<String> {
