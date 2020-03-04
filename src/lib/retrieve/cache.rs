@@ -59,7 +59,6 @@ use crate::{
         clear_dir, copy_dir,
         errors::Res,
         graph::Graph,
-        hexify_hash,
         lock::DirLock,
         shell::{Shell, Verbosity},
         valid_file,
@@ -74,8 +73,8 @@ use sha2::{Digest, Sha256};
 use slog::{debug, o, Logger};
 use std::{
     collections::VecDeque,
-    fs,
-    io::{prelude::*, BufReader},
+    fs::{self, File},
+    io::{self, prelude::*, BufReader},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -248,7 +247,7 @@ impl Cache {
         } else {
             hasher.input(loc.to_string().as_bytes());
         }
-        hexify_hash(hasher.result().as_slice())
+        hex::encode(hasher.result())
     }
 
     /// Return the build directory exists, else None.
@@ -732,11 +731,10 @@ impl Source {
 
         let mut hash = Sha256::new();
         for f in walker {
-            let mut file = fs::File::open(f.path())?;
-            let fh = Sha256::digest_reader(&mut file)?;
-            hash.input(&fh);
+            let mut file = File::open(f.path())?;
+            io::copy(&mut file, &mut hash)?;
         }
-        let hash = hexify_hash(hash.result().as_slice());
+        let hash = hex::encode(hash.result());
 
         Ok(Source {
             inner: Arc::new(SourceInner {
@@ -853,7 +851,7 @@ impl BuildHash {
             let bytes: [u8; 5] = t.as_bytes();
             hasher.input(&bytes);
         }
-        let hash = hexify_hash(hasher.result().as_slice());
+        let hash = hex::encode(hasher.result());
 
         BuildHash(hash)
     }

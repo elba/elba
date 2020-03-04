@@ -1,10 +1,11 @@
+use std::io;
+
 use crate::{
     package::Checksum,
     util::{
         clear_dir,
         errors::{ErrorKind, Res},
         git::{clone, fetch, reset, update_submodules},
-        hexify_hash,
         lock::DirLock,
     },
 };
@@ -156,7 +157,7 @@ fn retrieve_tar(url: Url, client: &Client, target: &DirLock, cksum: Option<&Chec
             let mut buf: Vec<u8> = vec![];
             r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
 
-            let hash = hexify_hash(Sha256::digest(&buf[..]).as_slice());
+            let hash = hex::encode(Sha256::digest(&buf[..]).as_slice());
             if let Some(cksum) = cksum {
                 if cksum.hash != hash {
                     return Err(format_err!("tarball checksum doesn't match real checksum"))?;
@@ -198,11 +199,9 @@ impl DirectRes {
                     let mut archive =
                         fs::File::open(target.path()).context(ErrorKind::CannotDownload)?;
 
-                    let hash = hexify_hash(
-                        Sha256::digest_reader(&mut archive)
-                            .context(ErrorKind::CannotDownload)?
-                            .as_slice(),
-                    );
+                    let mut hash = Sha256::new();
+                    io::copy(&mut archive, &mut hash).context(ErrorKind::CannotDownload)?;
+                    let hash = hex::encode(hash.result());
 
                     if let Some(cksum) = cksum {
                         if cksum.hash != hash {

@@ -18,8 +18,7 @@ use std::{
 use tar;
 
 pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
-    // build succeeded already, so we can unwrap ok!
-    let project = build::find_manifest_root(&project).unwrap();
+    let project = build::find_manifest_root(&project)?;
 
     let mut contents = String::new();
     let mut manifest = File::open(project.join("elba.toml"))
