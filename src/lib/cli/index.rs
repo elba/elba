@@ -9,8 +9,7 @@ use crate::{
 use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
 use std::{
-    env::set_current_dir,
-    fs::File,
+    fs::{create_dir_all, File},
     io::Read,
     path::{Path, PathBuf},
     str::{self, FromStr},
@@ -33,6 +32,7 @@ pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
         manifest.version()
     );
 
+    create_dir_all(project.join("target"))?;
     let tar_gz = File::create(project.join(&gz_name))?;
     let enc = GzEncoder::new(tar_gz, Compression::default());
     let mut tar = tar::Builder::new(enc);
@@ -43,11 +43,9 @@ pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
         })?
         .filter(valid_file);
 
-    set_current_dir(&project)?;
-
     for item in walker {
         let suffix = item.path().strip_prefix(&project).unwrap();
-        tar.append_path(suffix)?;
+        tar.append_path_with_name(item.path(), suffix)?;
     }
 
     // Finish writing to the tarball

@@ -136,6 +136,47 @@ impl Manifest {
 
         Ok(walker)
     }
+
+    pub fn validate(&self) -> Res<()> {
+        if self
+            .package
+            .description
+            .as_ref()
+            .filter(|description| description.len() > 244)
+            .is_some()
+        {
+            bail!(format_err!("descrption is over 244 characters"));
+        }
+        if self
+            .package
+            .license
+            .as_ref()
+            .filter(|license| license.len() > 20)
+            .is_some()
+        {
+            bail!(format_err!("license is over 20 characters"));
+        }
+        if self.package.keywords.len() > 5 {
+            bail!(format_err!("keywords should no more than 5"));
+        }
+        if self
+            .package
+            .keywords
+            .iter()
+            .any(|keyword| keyword.trim().is_empty())
+        {
+            bail!(format_err!("one of the keywords is empty"))
+        }
+        if self
+            .package
+            .keywords
+            .iter()
+            .any(|keyword| keyword.split_whitespace().skip(1).next().is_some())
+        {
+            bail!(format_err!("one of the keywords contains whitespace"));
+        }
+        Ok(())
+    }
 }
 
 impl FromStr for Manifest {
@@ -145,7 +186,7 @@ impl FromStr for Manifest {
         let toml: Manifest = toml::from_str(raw)
             .with_context(|e| format_err!("invalid manifest file: {}", e))
             .map_err(Error::from)?;
-
+        toml.validate()?;
         Ok(toml)
     }
 }
