@@ -1,4 +1,4 @@
-use crate::util::errors::Res;
+use crate::util::error::Result;
 use petgraph::{
     self,
     graph::NodeIndex,
@@ -75,10 +75,10 @@ impl<T: Eq> Graph<T> {
             .map(move |node_id| (node_id, &self.inner[node_id]))
     }
 
-    pub fn map<U, F>(&self, mut f: F) -> Res<Graph<U>>
+    pub fn map<U, F>(&self, mut f: F) -> Result<Graph<U>>
     where
         U: Eq,
-        F: FnMut(NodeIndex, &T) -> Res<U>,
+        F: FnMut(NodeIndex, &T) -> Result<U>,
     {
         let mut tree = petgraph::Graph::new();
         let mut node_map: HashMap<NodeIndex, NodeIndex> = HashMap::new();

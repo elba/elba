@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
     package::Spec,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{format_err, ResultExt};
 use std::{env::current_dir, str::FromStr};
@@ -20,7 +20,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::idris_opts())
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
@@ -35,8 +35,9 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
         .map(|spec| {
             Spec::from_str(spec)
                 .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))
+                .map_err(Into::into)
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>>>()?;
 
     build::update(&ctx, &project, Some(&packages))
 }

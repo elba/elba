@@ -56,7 +56,7 @@ mod imp {
             let r = unsafe { libc::poll(fds.as_mut_ptr(), nfds, -1) };
             if r == -1 {
                 let err = io::Error::last_os_error();
-                if err.kind() == io::ErrorKind::Interrupted {
+                if err.kind() == io::Error::Interrupted {
                     continue;
                 }
                 return Err(err);
@@ -70,7 +70,7 @@ mod imp {
             let handle = |res: io::Result<_>| match res {
                 Ok(_) => Ok(true),
                 Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
+                    if e.kind() == io::Error::WouldBlock {
                         Ok(false)
                     } else {
                         Err(e)

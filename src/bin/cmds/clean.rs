@@ -1,12 +1,12 @@
 use clap::{App, ArgMatches, SubCommand};
-use elba::util::{clear_dir, config::Config, errors::Res};
+use elba::util::{clear_dir, config::Config, error::Result};
 use failure::{format_err, ResultExt};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("clean").about("Cleans the global cache")
 }
 
-pub fn exec(c: &mut Config, _args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, _args: &ArgMatches) -> Result<String> {
     let layout = c.layout();
 
     clear_dir(&layout.src).context(format_err!("couldn't clear {}", layout.src.display()))?;

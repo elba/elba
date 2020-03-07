@@ -18,17 +18,17 @@ mod update;
 use clap::{App, ArgMatches};
 use elba::util::{
     config::{Backend, Config},
-    errors::Res,
+    error::Result,
     shell::Verbosity,
 };
-use failure::{format_err, Error, ResultExt};
+use failure::{format_err, ResultExt};
 use itertools::Itertools;
 use slog::{o, Discard, Logger};
 use slog_async;
 use slog_term;
 use std::{env, process::Command};
 
-pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
+pub type Exec = fn(&mut Config, &ArgMatches) -> Result<String>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
@@ -73,7 +73,7 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
     }
 }
 
-pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
+pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String> {
     let ext_args: Vec<&str> = args
         .values_of("")
         .map(|x| x.collect())

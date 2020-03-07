@@ -4,7 +4,7 @@ use elba::{
     build::run_script,
     cli::build::find_manifest_root,
     package::manifest::Manifest,
-    util::{config::Config, errors::Res, fmt_multiple, shell::Verbosity},
+    util::{config::Config, error::Result, fmt_multiple, shell::Verbosity},
 };
 use failure::{format_err, ResultExt};
 use std::{env::current_dir, fs, io::Read, str::FromStr};
@@ -15,7 +15,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(Arg::with_name("script-name").required(true))
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let name = &*args.value_of_lossy("script-name").unwrap();
     let cdir = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."

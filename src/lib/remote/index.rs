@@ -26,11 +26,11 @@ use crate::{
     package::*,
     remote::resolution::{DirectRes, IndexRes, Resolution},
     util::{
-        errors::{ErrorKind, Res},
+        error::{Error, Result},
         lock::DirLock,
     },
 };
-use failure::{format_err, Error, ResultExt};
+use failure::{bail, format_err, ResultExt};
 use indexmap::IndexMap;
 use semver::Version;
 use semver_constraints::Constraint;
@@ -51,12 +51,10 @@ pub struct IndexConfig {
 }
 
 impl FromStr for IndexConfig {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(raw: &str) -> Result<Self, Self::Err> {
-        toml::from_str(raw)
-            .context(format_err!("invalid index config"))
-            .map_err(Error::from)
+    fn from_str(raw: &str) -> Result<Self> {
+        Ok(toml::from_str(raw).context(format_err!("invalid index config"))?)
     }
 }
 
@@ -104,7 +102,7 @@ impl Indices {
         Indices { indices, cache }
     }
 
-    pub fn select_by_spec(&self, spec: &Spec) -> Res<Summary> {
+    pub fn select_by_spec(&self, spec: &Spec) -> Result<Summary> {
         // For simplicity's sake, we don't do any caching here. It's not really necessary.
         let mut res = None;
         for (ir, ix) in &self.indices {
@@ -140,14 +138,14 @@ impl Indices {
             }
         }
 
-        Ok(res.ok_or_else(|| ErrorKind::PackageNotFound)?)
+        Ok(res.ok_or_else(|| Error::PackageNotFound)?)
     }
 
-    pub fn select(&mut self, pkg: &Summary) -> Res<&ResolvedEntry> {
+    pub fn select(&mut self, pkg: &Summary) -> Result<&ResolvedEntry> {
         let entry = self
             .entries(pkg.id())?
             .get(pkg.version())
-            .ok_or_else(|| ErrorKind::PackageNotFound)?;
+            .ok_or_else(|| Error::PackageNotFound)?;
 
         Ok(entry)
     }
@@ -157,7 +155,7 @@ impl Indices {
         self.cache.get(pkg).map(|m| m.len()).unwrap_or(0)
     }
 
-    pub fn entries(&mut self, pkg: &PackageId) -> Res<&IndexMap<Version, ResolvedEntry>> {
+    pub fn entries(&mut self, pkg: &PackageId) -> Result<&IndexMap<Version, ResolvedEntry>> {
         if self.cache.contains_key(pkg) {
             return Ok(&self.cache[pkg]);
         }
@@ -172,14 +170,14 @@ impl Indices {
                 self.cache.insert(pkg.clone(), v);
                 Ok(&self.cache[pkg])
             } else {
-                Err(Error::from(ErrorKind::PackageNotFound))
+                bail!(Error::PackageNotFound)
             }
         } else {
-            Err(Error::from(ErrorKind::PackageNotFound))
+            bail!(Error::PackageNotFound)
         }
     }
 
-    pub fn search(&self, query: &str) -> Res<Vec<(Name, Version, &IndexRes)>> {
+    pub fn search(&self, query: &str) -> Result<Vec<(Name, Version, &IndexRes)>> {
         let mut engine: SimSearch<(&IndexRes, &str)> =
             SimSearch::new_with(SearchOptions::new().stop_words(&["/", "\\"]));
         let x = self
@@ -202,7 +200,7 @@ impl Indices {
 
                 Ok((name, ver, *ir))
             })
-            .collect::<Res<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
     }
 }
 
@@ -233,7 +231,7 @@ pub struct Index {
 
 impl Index {
     /// Creates a new empty package index directly from a Url and a local path.
-    pub fn from_disk(res: DirectRes, path: DirLock) -> Res<Self> {
+    pub fn from_disk(res: DirectRes, path: DirLock) -> Result<Self> {
         let id = IndexRes { res };
         let pn = path.path().join("index.toml");
         let file = fs::File::open(&pn)
@@ -247,10 +245,10 @@ impl Index {
         Ok(Index { id, path, config })
     }
 
-    pub fn entries(&self, name: &Name) -> Res<IndexMap<Version, ResolvedEntry>> {
+    pub fn entries(&self, name: &Name) -> Result<IndexMap<Version, ResolvedEntry>> {
         let mut res = IndexMap::new();
         let path = self.path.path().join(name.as_normalized());
-        let file = fs::File::open(path).context(ErrorKind::PackageNotFound)?;
+        let file = fs::File::open(path).context(Error::PackageNotFound)?;
         let r = io::BufReader::new(&file);
 
         for (lix, line) in r.lines().enumerate() {

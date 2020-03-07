@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::new,
     package::Name,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{format_err, ResultExt};
 use std::{env::current_dir, str::FromStr};
@@ -21,7 +21,7 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let name = &*args.value_of_lossy("name").unwrap();
     let name = Name::from_str(name)
         .with_context(|e| format_err!("the name `{}` is invalid: {}", name, e))?;

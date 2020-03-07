@@ -9,21 +9,10 @@
 pub mod assignment;
 pub mod incompat;
 
-use self::{
-    assignment::{Assignment, AssignmentType},
-    incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
-};
-use crate::{
-    package::{PackageId, Summary},
-    retrieve::Retriever,
-    util::{
-        errors::ErrorKind,
-        graph::Graph,
-        shell::{Shell, Verbosity},
-    },
-};
+use std::{cmp, collections::VecDeque};
+
 use console::style;
-use failure::{bail, Error};
+use failure::bail;
 use indexmap::{indexmap, indexset, IndexMap};
 use petgraph::{
     self,
@@ -33,8 +22,21 @@ use petgraph::{
 use semver::Version;
 use semver_constraints::{Constraint, Relation};
 use slog::{error, info, o, trace, Logger};
-use std::{cmp, collections::VecDeque};
 use textwrap::fill;
+
+use self::{
+    assignment::{Assignment, AssignmentType},
+    incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
+};
+use crate::{
+    package::{PackageId, Summary},
+    retrieve::Retriever,
+    util::{
+        error::{Error, Result},
+        graph::Graph,
+        shell::{Shell, Verbosity},
+    },
+};
 
 #[derive(Debug)]
 pub struct Resolver<'ret, 'cache: 'ret> {
@@ -75,7 +77,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         }
     }
 
-    pub fn solve(self) -> Result<Graph<Summary>, Error> {
+    pub fn solve(self) -> Result<Graph<Summary>> {
         let mut s = self;
 
         info!(s.logger, "beginning dependency resolution");
@@ -90,7 +92,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Graph<Summary>, Error> {
+    fn solve_loop(&mut self) -> Result<Graph<Summary>> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -147,7 +149,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     }
 
     // 1: Unit propagation
-    fn propagate(&mut self, pkg: PackageId) -> Result<(), Error> {
+    fn propagate(&mut self, pkg: PackageId) -> Result<()> {
         let mut changed = indexset!(pkg);
 
         while let Some(package) = changed.pop() {
@@ -230,7 +232,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     // 2: Conflict resolution
     // This function is basically the only reason why we need NLL; we're doing immutable borrows
     // with satisfier, but mutable ones with backtrack & incompatibility.
-    fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
+    fn resolve_conflict(&mut self, inc: usize) -> Result<usize> {
         let mut inc = inc;
         let mut new_incompatibility = false;
         trace!(self.logger, "entering conflict resolution");
@@ -338,7 +340,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             new_incompatibility = true;
         }
 
-        Err(Error::from(ErrorKind::NoConflictRes))
+        bail!(Error::NoConflictRes)
     }
 
     fn backtrack(&mut self, previous_satisfier_level: u16) {

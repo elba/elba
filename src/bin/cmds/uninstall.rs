@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     package::Spec,
     retrieve::cache::Cache,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{format_err, ResultExt};
 use std::str::FromStr;
@@ -16,7 +16,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::debug_log())
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let spec = &*args.value_of_lossy("spec").unwrap();
     let spec = Spec::from_str(spec)
         .with_context(|e| format_err!("the spec `{}` is invalid:\n{}", spec, e))?;

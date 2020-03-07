@@ -15,13 +15,13 @@ use crate::{
     },
     resolve::incompat::{Incompatibility, IncompatibilityCause},
     util::{
-        errors::{ErrorKind, Res},
+        error::{Error, Result},
         graph::Graph,
         shell::{Shell, Verbosity},
     },
 };
 use console::style;
-use failure::{format_err, Error, ResultExt};
+use failure::{format_err, ResultExt};
 use indexmap::{indexmap, IndexMap, IndexSet};
 use itertools::Either::{self, Left, Right};
 use semver::Version;
@@ -107,7 +107,7 @@ impl<'cache> Retriever<'cache> {
     ///
     /// This downloads all the packages into the cache. If we wanted to parallelize downloads
     /// later, this is where we'd deal with all the Tokio stuff.
-    pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Res<Graph<Source>> {
+    pub fn retrieve_packages(&mut self, solve: &Graph<Summary>) -> Result<Graph<Source>> {
         // let mut prg = 0;
         // Until pb.println gets added, we can't use progress bars
         // let pb = ProgressBar::new(solve.inner.raw_nodes().len() as u64);
@@ -155,12 +155,7 @@ impl<'cache> Retriever<'cache> {
     }
 
     /// Chooses the best version of a package given a constraint.
-    pub fn best(
-        &mut self,
-        pkg: &PackageId,
-        con: &Constraint,
-        minimize: bool,
-    ) -> Result<Version, Error> {
+    pub fn best(&mut self, pkg: &PackageId, con: &Constraint, minimize: bool) -> Result<Version> {
         // With stuff from lockfiles, we try to retrieve whatever version was specified in the
         // lockfile. However, if it fails, we don't want to error out; we want to try to find
         // the best version we can otherwise.
@@ -237,7 +232,7 @@ impl<'cache> Retriever<'cache> {
                 Ok(pre.remove(0))
             }
         } else {
-            Err(Error::from(ErrorKind::PackageNotFound))
+            Err(Error::from(Error::PackageNotFound))
         };
 
         debug!(
@@ -247,11 +242,11 @@ impl<'cache> Retriever<'cache> {
             "type" => "index"
         );
 
-        res
+        res.map_err(Into::into)
     }
 
     /// Returns a `Vec<Incompatibility>` corresponding to the package's dependencies.
-    pub fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility>, Error> {
+    pub fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility>> {
         if pkg == &self.root {
             let mut res = vec![];
             for dep in &self.root_deps {
@@ -299,7 +294,7 @@ impl<'cache> Retriever<'cache> {
         let (ix, ver, start_deps) = entries
             .get_full(pkg.version())
             .map(|x| (x.0, x.1, &x.2.dependencies))
-            .ok_or_else(|| ErrorKind::PackageNotFound)?;
+            .ok_or_else(|| Error::PackageNotFound)?;
         let mut res = vec![];
 
         for dep in start_deps {
@@ -403,7 +398,7 @@ impl<'cache> Retriever<'cache> {
         }
     }
 
-    pub fn select(&mut self, sum: &Summary) -> Res<Cow<ResolvedEntry>> {
+    pub fn select(&mut self, sum: &Summary) -> Result<Cow<ResolvedEntry>> {
         if let Some(cache) = self.offline_cache.as_ref() {
             let selected = self.indices.select(sum)?;
             let hash = Cache::get_source_dir(&selected.location, false);
@@ -414,7 +409,7 @@ impl<'cache> Retriever<'cache> {
                 };
                 Ok(Cow::Owned(selected))
             } else {
-                Err(ErrorKind::PackageNotFound)?
+                Err(Error::PackageNotFound)?
             }
         } else {
             let res = self.indices.select(sum);
@@ -428,7 +423,7 @@ impl<'cache> Retriever<'cache> {
         }
     }
 
-    pub fn entries(&mut self, pkg: &PackageId) -> Res<Cow<IndexMap<Version, ResolvedEntry>>> {
+    pub fn entries(&mut self, pkg: &PackageId) -> Result<Cow<IndexMap<Version, ResolvedEntry>>> {
         if let Some(cache) = self.offline_cache.as_ref() {
             let mut entries = self.indices.entries(pkg)?.clone();
             for (_, e) in entries.iter_mut() {
@@ -438,7 +433,7 @@ impl<'cache> Retriever<'cache> {
                         path: self.cache.layout.src.join(&hash),
                     };
                 } else {
-                    return Err(ErrorKind::PackageNotFound)?;
+                    return Err(Error::PackageNotFound)?;
                 }
             }
 
@@ -464,7 +459,7 @@ impl<'cache> Retriever<'cache> {
         pkg: &PackageId,
         og: Option<&DirectRes>,
         eager: bool,
-    ) -> Res<&Source> {
+    ) -> Result<&Source> {
         trace!(
             self.logger, "direct checkout";
             "pkg" => pkg.to_string(),

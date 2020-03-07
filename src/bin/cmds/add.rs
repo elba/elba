@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
     package::Spec,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{format_err, ResultExt};
 use std::{env::current_dir, str::FromStr};
@@ -20,7 +20,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(Arg::with_name("dev").help("Whether to add the package as a dev_dependency"))
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;

@@ -1,6 +1,6 @@
 use crate::{
     package::Name,
-    util::{errors::Res, git},
+    util::{error::Result, git},
 };
 use failure::{bail, format_err, ResultExt};
 use inflector::Inflector;
@@ -15,7 +15,7 @@ pub struct NewCtx {
     pub git: bool,
 }
 
-pub fn new(ctx: NewCtx) -> Res<String> {
+pub fn new(ctx: NewCtx) -> Result<String> {
     let path = &ctx.path;
     if fs::metadata(path).is_ok() {
         bail!(
@@ -30,7 +30,7 @@ pub fn new(ctx: NewCtx) -> Res<String> {
     init(ctx)
 }
 
-pub fn init(ctx: NewCtx) -> Res<String> {
+pub fn init(ctx: NewCtx) -> Result<String> {
     let name = &ctx.name;
     let author = if let Some((author, email)) = ctx.author {
         format!("{} <{}>", author, email)

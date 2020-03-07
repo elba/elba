@@ -4,7 +4,7 @@ use crate::{
     build::context::BuildContext,
     retrieve::cache::Binary,
     util::{
-        errors::Res,
+        error::Result,
         fmt_output,
         shell::{Shell, Verbosity},
     },
@@ -28,7 +28,7 @@ pub async fn invoke_compile<'a>(
     args: &'a [String],
     bcx: &'a BuildContext,
     shell: Shell,
-) -> Res<Output> {
+) -> Result<Output> {
     let mut process = bcx.compiler.process();
     let flavor = bcx.compiler.flavor();
     process.current_dir(&build).arg("--check");
@@ -87,7 +87,7 @@ pub async fn invoke_codegen<'a>(
     args: &'a [String],
     bcx: &'a BuildContext,
     shell: Shell,
-) -> Res<Output> {
+) -> Result<Output> {
     let mut process = bcx.compiler.process();
     let flavor = bcx.compiler.flavor();
 

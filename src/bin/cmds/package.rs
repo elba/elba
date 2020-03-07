@@ -4,7 +4,7 @@ use elba::{
     cli::{build, index},
     util::{
         config::{Backend, Config},
-        errors::Res,
+        error::Result,
     },
 };
 use failure::{format_err, ResultExt};
@@ -16,7 +16,7 @@ pub fn cli() -> App<'static, 'static> {
         .about("Compiles the package and packages it into a nice tarball")
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;

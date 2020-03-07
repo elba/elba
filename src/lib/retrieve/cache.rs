@@ -57,7 +57,7 @@ use crate::{
     },
     util::{
         clear_dir, copy_dir,
-        errors::Res,
+        error::Result,
         graph::Graph,
         lock::DirLock,
         shell::{Shell, Verbosity},
@@ -65,7 +65,7 @@ use crate::{
     },
 };
 use console::style;
-use failure::{bail, format_err, Error, ResultExt};
+use failure::{bail, format_err, ResultExt};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use reqwest::blocking::Client;
@@ -98,7 +98,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Res<Self> {
+    pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Result<Self> {
         layout.init()?;
 
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
@@ -120,7 +120,7 @@ impl Cache {
         eager: bool,
         offline: bool,
         dl_f: impl Fn(),
-    ) -> Result<(Option<DirectRes>, Source), Error> {
+    ) -> Result<(Option<DirectRes>, Source)> {
         let p = self.load_source(pkg, loc, eager, offline, dl_f)?;
 
         Ok((p.0, Source::from_folder(pkg, p.1, loc.clone())?))
@@ -149,7 +149,7 @@ impl Cache {
         eager: bool,
         offline: bool,
         dl_f: impl Fn(),
-    ) -> Result<(Option<DirectRes>, DirLock), Error> {
+    ) -> Result<(Option<DirectRes>, DirLock)> {
         if let DirectRes::Dir { path } = loc {
             debug!(self.logger, "loaded source"; "cause" => "dir", "pkg" => pkg.to_string());
             return Ok((None, DirLock::acquire(&path)?));
@@ -251,7 +251,7 @@ impl Cache {
     }
 
     /// Return the build directory exists, else None.
-    pub fn checkout_build(&self, hash: &BuildHash) -> Res<Option<Binary>> {
+    pub fn checkout_build(&self, hash: &BuildHash) -> Result<Option<Binary>> {
         if let Some(path) = self.check_build(&hash) {
             Ok(Some(Binary::new(DirLock::acquire(&path)?)))
         } else {
@@ -261,7 +261,7 @@ impl Cache {
 
     /// Returns a lock on a temporary build directory.
     /// Note that the format of this directory should be an OutputLayout.
-    pub fn checkout_tmp(&self, hash: &BuildHash) -> Res<OutputLayout> {
+    pub fn checkout_tmp(&self, hash: &BuildHash) -> Result<OutputLayout> {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
         if lock.path().exists() {
@@ -273,7 +273,7 @@ impl Cache {
         OutputLayout::new(lock)
     }
 
-    pub fn store_bins(&self, bins: &[(PathBuf, String)], force: bool) -> Res<()> {
+    pub fn store_bins(&self, bins: &[(PathBuf, String)], force: bool) -> Result<()> {
         // We use a file .bins in the bin directory to keep track of installed bins
         let mut dot_f = fs::OpenOptions::new()
             .create(true)
@@ -321,7 +321,7 @@ impl Cache {
         Ok(())
     }
 
-    fn store_bin(&self, from: &Path, force: bool) -> Res<()> {
+    fn store_bin(&self, from: &Path, force: bool) -> Result<()> {
         let bin_name = from
             .file_name()
             .ok_or_else(|| format_err!("{} isn't a path to a binary", from.display()))?;
@@ -354,7 +354,7 @@ impl Cache {
     }
 
     // If bins is empty, it's assumed to mean "delete all binaries"
-    pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Res<u32> {
+    pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Result<u32> {
         fn contains(sum: &str, query: &Spec) -> bool {
             match (
                 &query.name,
@@ -417,7 +417,7 @@ impl Cache {
         Ok(c)
     }
 
-    pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Res<Binary> {
+    pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Result<Binary> {
         let dest = self.layout.build.join(&hash.0);
 
         if !dest.exists() {
@@ -581,7 +581,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn init(&self) -> Res<()> {
+    pub fn init(&self) -> Result<()> {
         // create_dir_all ignores pre-existing folders
         fs::create_dir_all(&self.bin)?;
         fs::create_dir_all(&self.src)?;
@@ -610,7 +610,7 @@ pub struct OutputLayout {
 }
 
 impl OutputLayout {
-    pub fn new(lock: DirLock) -> Res<Self> {
+    pub fn new(lock: DirLock) -> Result<Self> {
         let root = lock.path().to_path_buf();
 
         let layout = OutputLayout {
@@ -637,7 +637,7 @@ impl OutputLayout {
         Ok(layout)
     }
 
-    pub fn write_hash(&self, hash: &BuildHash) -> Res<()> {
+    pub fn write_hash(&self, hash: &BuildHash) -> Result<()> {
         fs::write(self.root.join("hash"), hash.0.as_bytes())
             .context(format_err!("couldn't write hash"))?;
 
@@ -691,7 +691,7 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
+    pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Result<Self> {
         let mf_path = path.path().join("elba.toml");
 
         let file = fs::File::open(mf_path).context(format_err!(

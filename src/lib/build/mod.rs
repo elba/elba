@@ -12,7 +12,7 @@ use crate::{
     retrieve::cache::{Binary, OutputLayout, Source},
     util::{
         clear_dir, copy_dir, copy_dir_iter,
-        errors::Res,
+        error::Result,
         fmt_multiple, fmt_output, generate_ipkg,
         shell::{OutputGroup, Shell, Verbosity},
         valid_file,
@@ -141,7 +141,7 @@ pub async fn compile_lib<'a>(
     layout: &'a OutputLayout,
     bcx: &'a BuildContext,
     shell: Shell,
-) -> Res<OutputGroup> {
+) -> Result<OutputGroup> {
     let lib_target = source.meta().targets.lib.clone().ok_or_else(|| {
         format_err!(
             "package {} doesn't contain a lib target",
@@ -168,7 +168,7 @@ pub async fn compile_lib<'a>(
                 ))
             }
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>>>()?;
 
     let mut args = vec![];
     args.extend(lib_target.idris_opts.iter().map(|x| x.to_owned()));
@@ -290,7 +290,7 @@ pub async fn compile_bin<'a>(
     layout: &'a OutputLayout,
     bcx: &'a BuildContext,
     shell: Shell,
-) -> Res<(OutputGroup, Option<PathBuf>)> {
+) -> Result<(OutputGroup, Option<PathBuf>)> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build executables")
     }
@@ -428,7 +428,7 @@ pub async fn compile_doc<'a>(
     deps: &'a [Binary],
     layout: &'a OutputLayout,
     bcx: &'a BuildContext,
-) -> Res<OutputGroup> {
+) -> Result<OutputGroup> {
     if bcx.compiler.flavor().is_idris2() {
         bail!("The Idris 2 compiler currently can't build documentation")
     }
@@ -498,7 +498,7 @@ pub async fn compile_doc<'a>(
     Ok(res.into())
 }
 
-pub fn run_script(root: &Path, cmd: &str) -> Res<OutputGroup> {
+pub fn run_script(root: &Path, cmd: &str) -> Result<OutputGroup> {
     let mut process = if cfg!(target_os = "windows") {
         let mut p = Command::new("cmd");
         p.args(&["/C", cmd]);
@@ -524,7 +524,7 @@ pub fn run_script(root: &Path, cmd: &str) -> Res<OutputGroup> {
     Ok(res.into())
 }
 
-pub fn run_prebuild_script(source: &Source, root: &Path, shell: Shell) -> Res<()> {
+pub fn run_prebuild_script(source: &Source, root: &Path, shell: Shell) -> Result<()> {
     if let Some(s) = source.meta().scripts.get("prebuild") {
         shell.println(
             style("Running").dim(),
@@ -537,7 +537,7 @@ pub fn run_prebuild_script(source: &Source, root: &Path, shell: Shell) -> Res<()
     Ok(())
 }
 
-fn make_main_file(module: &str, fun: &str, parent: &Path) -> Res<PathBuf> {
+fn make_main_file(module: &str, fun: &str, parent: &Path) -> Result<PathBuf> {
     let rstr: String = thread_rng().sample_iter(&Alphanumeric).take(8).collect();
     let fname = format!("elba-{}.idr", rstr);
     fs::write(

@@ -17,7 +17,6 @@ use std::{
 };
 use toml;
 use url::Url;
-use url_serde;
 use walkdir::{DirEntry, WalkDir};
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
@@ -77,7 +76,7 @@ impl Manifest {
         &self,
         ixmap: &IndexMap<String, IndexRes>,
         dev_deps: bool,
-    ) -> Res<IndexMap<PackageId, Constraint>> {
+    ) -> Result<IndexMap<PackageId, Constraint>> {
         let mut deps = IndexMap::new();
         for (n, dep) in &self.dependencies {
             let dep = dep.clone();
@@ -101,7 +100,7 @@ impl Manifest {
         pkg_root: &Path,
         search_root: &Path,
         mut p: P,
-    ) -> Res<impl Iterator<Item = DirEntry>>
+    ) -> Result<impl Iterator<Item = DirEntry>>
     where
         P: FnMut(&DirEntry) -> bool,
     {
@@ -137,7 +136,7 @@ impl Manifest {
         Ok(walker)
     }
 
-    pub fn validate(&self) -> Res<()> {
+    pub fn validate(&self) -> Result<()> {
         if self
             .package
             .description
@@ -180,9 +179,9 @@ impl Manifest {
 }
 
 impl FromStr for Manifest {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+    fn from_str(raw: &str) -> Result<Self> {
         let toml: Manifest = toml::from_str(raw)
             .with_context(|e| format_err!("invalid manifest file: {}", e))
             .map_err(Error::from)?;
@@ -220,7 +219,6 @@ pub enum DepReq {
         path: PathBuf,
     },
     Git {
-        #[serde(with = "url_serde")]
         git: Url,
         #[serde(default = "default_tag")]
         tag: String,
@@ -236,7 +234,7 @@ impl DepReq {
         self,
         ixmap: &IndexMap<String, IndexRes>,
         n: Name,
-    ) -> Res<(PackageId, Constraint)> {
+    ) -> Result<(PackageId, Constraint)> {
         match self {
             DepReq::Registry(c) => {
                 let def_index = ixmap

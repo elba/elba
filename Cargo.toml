@@ -1,7 +1,7 @@
 [package]
 name = "elba"
 description = "elba is a package manager for Idris"
-authors = ["David Cao <david@cao.st>"]
+authors = ["David Cao <david@cao.st>", "Andy Lok <andylokandy@hotmail.com>"]
 version = "0.3.2"
 license = "MIT"
 edition = "2018"
@@ -24,14 +24,14 @@ digest = { version = "0.7", features = ["std"]}
 directories = "1"
 failure = "0.1"
 futures-preview = { version = "0.3.0-alpha.17", features = ["compat"] }
-failure_derive = "0.1"
 flate2 = "1.0"
 fs2 = "0.4"
 git2 = "0.12"
+hex = "0.4"
 ignore = "0.4"
 indexmap = { version = "1", features = ["serde-1"] }
 Inflector = "0.11"
-itertools = "0.7"
+itertools = '0.8'
 libc = "0.2"
 nom = "4.0"
 num_cpus = "1"
@@ -42,7 +42,7 @@ scoped_threadpool = "0.1"
 semver = { version = "0.9", features = ["serde"] }
 semver_constraints = { version = "0.1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1.0"
+serde_json = "1"
 sha2 = "0.8"
 shell-escape = "0.1"
 simsearch = "0.2"
@@ -56,10 +56,8 @@ tokio = "0.1.22"
 tokio-process = "0.2"
 toml = "0.5"
 toml_edit = "0.1.5"
-url = "1.7"
-url_serde = "0.2"
+url = { version = "2", features = ["serde"] }
 walkdir = "2"
-hex = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 miow = "0.3.1"

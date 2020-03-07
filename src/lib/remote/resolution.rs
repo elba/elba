@@ -4,12 +4,12 @@ use crate::{
     package::Checksum,
     util::{
         clear_dir,
-        errors::{ErrorKind, Res},
+        error::{Error, Result},
         git::{clone, fetch, reset, update_submodules},
         lock::DirLock,
     },
 };
-use failure::{format_err, Error, ResultExt};
+use failure::{bail, format_err, ResultExt};
 use flate2::read::GzDecoder;
 use git2::{BranchType, Repository, Sort};
 use reqwest::blocking::Client;
@@ -44,9 +44,9 @@ impl From<IndexRes> for Resolution {
 }
 
 impl FromStr for Resolution {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let direct = DirectRes::from_str(s);
         if direct.is_ok() {
             direct.map(Resolution::Direct)
@@ -66,7 +66,7 @@ impl fmt::Display for Resolution {
 }
 
 impl Serialize for Resolution {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -75,7 +75,7 @@ impl Serialize for Resolution {
 }
 
 impl<'de> Deserialize<'de> for Resolution {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
@@ -148,34 +148,35 @@ impl DirectRes {
 }
 
 /// Retrieves a package in the form of a tarball.
-fn retrieve_tar(url: Url, client: &Client, target: &DirLock, cksum: Option<&Checksum>) -> Res<()> {
-    client
+fn retrieve_tar(
+    url: Url,
+    client: &Client,
+    target: &DirLock,
+    cksum: Option<&Checksum>,
+) -> Result<()> {
+    let mut resp = client
         .get(url.as_str())
         .send()
-        .map_err(|_| Error::from(ErrorKind::CannotDownload))
-        .and_then(|mut r| {
-            let mut buf: Vec<u8> = vec![];
-            r.copy_to(&mut buf).context(ErrorKind::CannotDownload)?;
+        .and_then(|resp| resp.error_for_status())?;
 
-            let hash = hex::encode(Sha256::digest(&buf[..]).as_slice());
-            if let Some(cksum) = cksum {
-                if cksum.hash != hash {
-                    return Err(format_err!("tarball checksum doesn't match real checksum"))?;
-                }
-            }
+    let mut buf: Vec<u8> = vec![];
+    resp.copy_to(&mut buf)?;
 
-            let archive = BufReader::new(&buf[..]);
-            let archive = GzDecoder::new(archive);
-            let mut archive = Archive::new(archive);
+    let hash = hex::encode(Sha256::digest(&buf[..]).as_slice());
+    if let Some(cksum) = cksum {
+        if cksum.hash != hash {
+            bail!(format_err!("tarball checksum doesn't match real checksum"));
+        }
+    }
 
-            clear_dir(target.path())?;
+    let archive = GzDecoder::new(&buf[..]);
+    let mut archive = Archive::new(archive);
 
-            archive
-                .unpack(target.path())
-                .context(ErrorKind::CannotDownload)?;
+    clear_dir(target.path())?;
 
-            Ok(())
-        })
+    archive.unpack(target.path())?;
+
+    Ok(())
 }
 
 impl DirectRes {
@@ -184,23 +185,24 @@ impl DirectRes {
         client: &Client,
         target: &DirLock,
         eager: bool,
-        dl_f: impl Fn(bool) -> Res<()>,
-    ) -> Result<Option<DirectRes>, Error> {
+        dl_f: impl Fn(bool) -> Result<()>,
+    ) -> Result<Option<DirectRes>> {
         match self {
             DirectRes::Tar { url, cksum } => match url.scheme() {
                 "http" | "https" => {
                     dl_f(true)?;
-                    retrieve_tar(url.clone(), &client, &target, cksum.as_ref())?;
+                    retrieve_tar(url.clone(), &client, &target, cksum.as_ref())
+                        .context(Error::CannotDownload)?;
 
                     Ok(None)
                 }
                 "file" => {
                     dl_f(false)?;
                     let mut archive =
-                        fs::File::open(target.path()).context(ErrorKind::CannotDownload)?;
+                        fs::File::open(target.path()).context(Error::CannotDownload)?;
 
                     let mut hash = Sha256::new();
-                    io::copy(&mut archive, &mut hash).context(ErrorKind::CannotDownload)?;
+                    io::copy(&mut archive, &mut hash).context(Error::CannotDownload)?;
                     let hash = hex::encode(hash.result());
 
                     if let Some(cksum) = cksum {
@@ -219,7 +221,7 @@ impl DirectRes {
 
                     archive
                         .unpack(target.path())
-                        .context(ErrorKind::CannotDownload)?;
+                        .context(Error::CannotDownload)?;
 
                     Ok(None)
                 }
@@ -320,9 +322,7 @@ impl DirectRes {
                     }
                 };
 
-                let obj = repo
-                    .revparse_single(&tag)
-                    .context(ErrorKind::CannotDownload)?;
+                let obj = repo.revparse_single(&tag).context(Error::CannotDownload)?;
                 reset(&repo, &obj)
                     .with_context(|e| format_err!("couldn't fetch git repo {}:\n{}", url, e))?;
                 update_submodules(&repo).with_context(|e| {
@@ -374,16 +374,16 @@ impl DirectRes {
 }
 
 impl FromStr for DirectRes {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
+    fn from_str(url: &str) -> Result<Self> {
         let mut parts = url.splitn(2, '+');
         let utype = parts.next().unwrap();
-        let rest = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
+        let rest = parts.next().ok_or_else(|| Error::InvalidSourceUrl)?;
 
         match utype {
             "git" => {
-                let mut url = Url::parse(rest).context(ErrorKind::InvalidSourceUrl)?;
+                let mut url = Url::parse(rest).context(Error::InvalidSourceUrl)?;
                 let tag = url.fragment().unwrap_or_else(|| "master").to_owned();
 
                 url.set_fragment(None);
@@ -394,15 +394,15 @@ impl FromStr for DirectRes {
                 Ok(DirectRes::Dir { path })
             }
             "tar" => {
-                let mut url = Url::parse(rest).context(ErrorKind::InvalidSourceUrl)?;
+                let mut url = Url::parse(rest).context(Error::InvalidSourceUrl)?;
                 if url.scheme() != "http" && url.scheme() != "https" && url.scheme() != "file" {
-                    return Err(ErrorKind::InvalidSourceUrl)?;
+                    return Err(Error::InvalidSourceUrl)?;
                 }
                 let cksum = url.fragment().and_then(|x| Checksum::from_str(x).ok());
                 url.set_fragment(None);
                 Ok(DirectRes::Tar { url, cksum })
             }
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
+            _ => Err(Error::InvalidSourceUrl)?,
         }
     }
 }
@@ -447,19 +447,19 @@ impl From<IndexRes> for DirectRes {
 }
 
 impl FromStr for IndexRes {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(url: &str) -> Result<Self, Self::Err> {
+    fn from_str(url: &str) -> Result<Self> {
         let mut parts = url.splitn(2, '+');
         let utype = parts.next().unwrap();
-        let url = parts.next().ok_or_else(|| ErrorKind::InvalidSourceUrl)?;
+        let url = parts.next().ok_or_else(|| Error::InvalidSourceUrl)?;
 
         match utype {
             "index" => {
-                let res = DirectRes::from_str(url).context(ErrorKind::InvalidSourceUrl)?;
+                let res = DirectRes::from_str(url).context(Error::InvalidSourceUrl)?;
                 Ok(IndexRes { res })
             }
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
+            _ => Err(Error::InvalidSourceUrl)?,
         }
     }
 }
@@ -475,7 +475,7 @@ impl fmt::Display for IndexRes {
 }
 
 impl Serialize for DirectRes {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -484,14 +484,14 @@ impl Serialize for DirectRes {
 }
 
 impl<'de> Deserialize<'de> for DirectRes {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
 impl Serialize for IndexRes {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -500,7 +500,7 @@ impl Serialize for IndexRes {
 }
 
 impl<'de> Deserialize<'de> for IndexRes {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }

@@ -4,7 +4,7 @@ use super::build;
 use crate::{
     package::manifest::Manifest,
     retrieve::Cache,
-    util::{errors::Res, valid_file},
+    util::{error::Result, valid_file},
 };
 use failure::{format_err, ResultExt};
 use flate2::{write::GzEncoder, Compression};
@@ -16,7 +16,7 @@ use std::{
 };
 use tar;
 
-pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
+pub fn package(project: &Path) -> Result<(PathBuf, Manifest)> {
     let project = build::find_manifest_root(&project)?;
 
     let mut contents = String::new();
@@ -54,7 +54,7 @@ pub fn package(project: &Path) -> Res<(PathBuf, Manifest)> {
     Ok((project.join(&gz_name), manifest))
 }
 
-pub fn search(bcx: &build::BuildCtx, query: &str) -> Res<String> {
+pub fn search(bcx: &build::BuildCtx, query: &str) -> Result<String> {
     let cache = Cache::from_disk(&bcx.logger, bcx.global_cache.clone(), bcx.shell)?;
     let ixs = bcx
         .indices

@@ -2,7 +2,7 @@ use super::get;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::index,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 
 pub fn cli() -> App<'static, 'static> {
@@ -16,7 +16,7 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let query = args.value_of("query").unwrap();
     let bcx = get::build_ctx(c, args);
 
