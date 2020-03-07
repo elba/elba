@@ -22,7 +22,7 @@ use itertools::Itertools;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use walkdir::{DirEntry, WalkDir};
 
-use crate::util::error::{Error, Result};
+use crate::util::error::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SubPath(pub PathBuf);

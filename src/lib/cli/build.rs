@@ -1,3 +1,22 @@
+use std::{
+    env, fs,
+    io::{prelude::*, Seek, SeekFrom},
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+};
+
+use console::style;
+use crossbeam::queue::MsQueue;
+use failure::{bail, format_err, ResultExt};
+use indexmap::IndexMap;
+use itertools::Either::{self, Left, Right};
+use petgraph::{graph::NodeIndex, visit::Dfs};
+use scoped_threadpool::Pool;
+use slog::Logger;
+use toml;
+use toml_edit;
+
 use crate::{
     build::{
         context::{BuildContext, Compiler},
@@ -24,23 +43,6 @@ use crate::{
         shell::{Shell, Verbosity},
     },
 };
-use console::style;
-use crossbeam::queue::MsQueue;
-use failure::{bail, format_err, ResultExt};
-use indexmap::IndexMap;
-use itertools::Either::{self, Left, Right};
-use petgraph::{graph::NodeIndex, visit::Dfs};
-use scoped_threadpool::Pool;
-use slog::Logger;
-use std::{
-    env, fs,
-    io::{prelude::*, Seek, SeekFrom},
-    path::{Path, PathBuf},
-    process::Command,
-    str::FromStr,
-};
-use toml;
-use toml_edit;
 
 pub struct BuildCtx {
     pub compiler: String,
@@ -816,7 +818,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Result<String>
     };
 
     let deps = manifest
-        .deps(&ctx.indices, true)?
+        .deps(&ctx.indices, &root.id, true)?
         .into_iter()
         .collect::<Vec<_>>();
 

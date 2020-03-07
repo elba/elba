@@ -6,6 +6,16 @@
 
 pub mod cache;
 
+use std::{borrow::Cow, path::Path};
+
+use console::style;
+use failure::{format_err, ResultExt};
+use indexmap::{indexmap, IndexMap, IndexSet};
+use itertools::Either::{self, Left, Right};
+use semver::Version;
+use semver_constraints::{Constraint, Interval, Range, Relation};
+use slog::{debug, info, o, trace, Logger};
+
 pub use self::cache::{Cache, Source};
 use crate::{
     package::{PackageId, Summary},
@@ -20,14 +30,6 @@ use crate::{
         shell::{Shell, Verbosity},
     },
 };
-use console::style;
-use failure::{format_err, ResultExt};
-use indexmap::{indexmap, IndexMap, IndexSet};
-use itertools::Either::{self, Left, Right};
-use semver::Version;
-use semver_constraints::{Constraint, Interval, Range, Relation};
-use slog::{debug, info, o, trace, Logger};
-use std::borrow::Cow;
 
 // TODO: Generalized patching and source replacement
 // Right now, when using the `--offline` flag, we replace all locations of all index entries with
@@ -246,7 +248,11 @@ impl<'cache> Retriever<'cache> {
     }
 
     /// Returns a `Vec<Incompatibility>` corresponding to the package's dependencies.
-    pub fn incompats(&mut self, pkg: &Summary) -> Result<Vec<Incompatibility>> {
+    pub fn incompats(
+        &mut self,
+        pkg: &Summary,
+        parent_pkg: &PackageId,
+    ) -> Result<Vec<Incompatibility>> {
         if pkg == &self.root {
             let mut res = vec![];
             for dep in &self.root_deps {
@@ -270,7 +276,7 @@ impl<'cache> Retriever<'cache> {
             let deps = self
                 .direct_checkout(pkg.id(), None, false)?
                 .meta()
-                .deps(&ixmap, false)?;
+                .deps(&ixmap, parent_pkg, false)?;
 
             let mut res = vec![];
             for dep in deps {

@@ -48,6 +48,26 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
+use std::{
+    collections::VecDeque,
+    fs::{self, File},
+    io::{self, prelude::*, BufReader},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
+
+use console::style;
+use failure::{bail, format_err, ResultExt};
+use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
+use reqwest::blocking::Client;
+use sha2::{Digest, Sha256};
+use slog::{debug, o, Logger};
+use toml;
+use walkdir::WalkDir;
+
 use crate::{
     build::{context::BuildContext, Targets},
     package::{manifest::Manifest, PackageId, Spec},
@@ -64,24 +84,6 @@ use crate::{
         valid_file,
     },
 };
-use console::style;
-use failure::{bail, format_err, ResultExt};
-use indexmap::{IndexMap, IndexSet};
-use itertools::Itertools;
-use reqwest::blocking::Client;
-use sha2::{Digest, Sha256};
-use slog::{debug, o, Logger};
-use std::{
-    collections::VecDeque,
-    fs::{self, File},
-    io::{self, prelude::*, BufReader},
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
-    time::Duration,
-};
-use toml;
-use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
 ///

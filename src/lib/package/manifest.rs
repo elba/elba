@@ -1,23 +1,25 @@
 //! Package manifest files.
 
-use super::*;
-use crate::{
-    remote::resolution::{DirectRes, IndexRes},
-    util::{valid_file, SubPath},
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
 };
+
 use failure::{format_err, Error, ResultExt};
 use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
 use semver_constraints::Constraint;
 use serde::Deserialize;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
 use toml;
 use url::Url;
 use walkdir::{DirEntry, WalkDir};
+
+use super::*;
+use crate::{
+    remote::resolution::{DirectRes, IndexRes},
+    util::{valid_file, SubPath},
+};
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
 //
@@ -75,19 +77,20 @@ impl Manifest {
     pub fn deps(
         &self,
         ixmap: &IndexMap<String, IndexRes>,
+        parent_pkg: &PackageId,
         dev_deps: bool,
     ) -> Result<IndexMap<PackageId, Constraint>> {
         let mut deps = IndexMap::new();
         for (n, dep) in &self.dependencies {
             let dep = dep.clone();
-            let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
+            let (pid, c) = dep.into_dep(ixmap, parent_pkg, n.clone())?;
             deps.insert(pid, c);
         }
 
         if dev_deps {
             for (n, dep) in &self.dev_dependencies {
                 let dep = dep.clone();
-                let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
+                let (pid, c) = dep.into_dep(ixmap, parent_pkg, n.clone())?;
                 deps.insert(pid, c);
             }
         }
@@ -233,6 +236,7 @@ impl DepReq {
     pub fn into_dep(
         self,
         ixmap: &IndexMap<String, IndexRes>,
+        parent_pkg: &PackageId,
         n: Name,
     ) -> Result<(PackageId, Constraint)> {
         match self {
@@ -254,9 +258,22 @@ impl DepReq {
                 }
             }
             DepReq::Local { path } => {
-                let res = DirectRes::Dir { path };
-                let pi = PackageId::new(n, res.into());
-                Ok((pi, Constraint::any()))
+                if let &Resolution::Direct(DirectRes::Dir { path: parent_root }) =
+                    &parent_pkg.resolution()
+                {
+                    let res = DirectRes::Dir {
+                        path: parent_root.join(path),
+                    };
+                    let pi = PackageId::new(n, res.into());
+                    Ok((pi, Constraint::any()))
+                } else {
+                    bail!(format_err!(
+                        "can't resolve local dependency {} because it's \
+                        parent package {} is not local.",
+                        path.display(),
+                        parent_pkg.name()
+                    ))
+                }
             }
             DepReq::Git { git, tag } => {
                 let res = DirectRes::Git { repo: git, tag };

@@ -1,5 +1,16 @@
 use std::io;
 
+use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
+
+use failure::{bail, format_err, ResultExt};
+use flate2::read::GzDecoder;
+use git2::{BranchType, Repository, Sort};
+use reqwest::blocking::Client;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use sha2::{Digest, Sha256};
+use tar::Archive;
+use url::Url;
+
 use crate::{
     package::Checksum,
     util::{
@@ -9,16 +20,6 @@ use crate::{
         lock::DirLock,
     },
 };
-use failure::{bail, format_err, ResultExt};
-use flate2::read::GzDecoder;
-use git2::{BranchType, Repository, Sort};
-use reqwest::blocking::Client;
-
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use sha2::{Digest, Sha256};
-use std::{fmt, fs, io::BufReader, path::PathBuf, str::FromStr};
-use tar::Archive;
-use url::Url;
 
 /// The possible places from which a package can be resolved.
 ///
@@ -339,10 +340,16 @@ impl DirectRes {
             DirectRes::Dir { path } => {
                 // If this package is located on disk, we don't have to do anything...
                 dl_f(false)?;
+                if path.is_relative() {
+                    bail!(format_err!(
+                        "can't retrieve dir resolution by relative path {}",
+                        path.display()
+                    ))
+                }
                 if path.exists() {
                     Ok(None)
                 } else {
-                    Err(format_err!("can't find directory {}", path.display()))?
+                    bail!(format_err!("can't find directory {}", path.display()))
                 }
             }
         }
