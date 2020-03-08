@@ -119,6 +119,7 @@ main = do
             r#"/target
 *.ibc
 *.o
+.dirlock
 "#,
         )?;
     }
