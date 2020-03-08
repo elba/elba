@@ -33,7 +33,7 @@ indexmap = { version = "1", features = ["serde-1"] }
 Inflector = "0.11"
 itertools = '0.8'
 libc = "0.2"
-nom = "4.0"
+nom = "5"
 num_cpus = "1"
 petgraph = "0.4"
 rand = "0.7"

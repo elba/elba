@@ -6,7 +6,7 @@
 
 pub mod cache;
 
-use std::{borrow::Cow, path::Path};
+use std::borrow::Cow;
 
 use console::style;
 use failure::{format_err, ResultExt};

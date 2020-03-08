@@ -30,7 +30,6 @@ use self::{
 };
 use crate::{
     package::{PackageId, Summary},
-    remote::resolution::{DirectRes, Resolution},
     retrieve::Retriever,
     util::{
         error::{Error, Result},

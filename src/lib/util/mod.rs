@@ -5,6 +5,7 @@ pub mod error;
 pub mod git;
 pub mod graph;
 pub mod lock;
+pub mod parser;
 pub mod read2;
 pub mod shell;
 
