@@ -187,9 +187,6 @@ impl JobQueue {
     }
 
     async fn exec_async<'a>(mut self) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
-        // TODO: the threads has no effect now
-        // let threads = bcx.threads;
-
         let root_ol = &self.root_ol;
         let root_hash = self.graph.root().and_then(|x| {
             if let Work::Dirty(_, h) = &x.work {
