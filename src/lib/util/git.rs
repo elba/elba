@@ -92,7 +92,7 @@ fn update_submodule(parent: &git2::Repository, child: &mut git2::Submodule) -> R
         }
         Err(..) => {
             let path = parent.workdir().unwrap().join(child.path());
-            let _ = fs::remove_dir_all(&path);
+            let _ = remove_dir_all::remove_dir_all(&path);
             git2::Repository::init(&path)?
         }
     };
@@ -172,14 +172,14 @@ fn reinitialize(repo: &mut git2::Repository) -> Result<()> {
             continue;
         }
         let path = entry.path();
-        drop(fs::remove_file(&path).or_else(|_| fs::remove_dir_all(&path)));
+        drop(fs::remove_file(&path).or_else(|_| remove_dir_all::remove_dir_all(&path)));
     }
     if bare {
         *repo = git2::Repository::init_bare(path)?;
     } else {
         *repo = git2::Repository::init(path)?;
     }
-    fs::remove_dir_all(&tmp)?;
+    remove_dir_all::remove_dir_all(&tmp)?;
     Ok(())
 }
 

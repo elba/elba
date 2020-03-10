@@ -101,7 +101,7 @@ pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Result<()> {
 
 pub fn clear_dir(dir: &Path) -> Result<()> {
     if dir.exists() {
-        fs::remove_dir_all(dir)?;
+        remove_dir_all::remove_dir_all(dir)?;
     }
     fs::create_dir_all(dir)?;
     Ok(())
