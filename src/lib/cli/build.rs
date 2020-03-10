@@ -940,10 +940,9 @@ pub fn find_manifest(
                 ));
             }
             if ipkgs.len() > 1 {
-                dbg!(ipkgs);
                 return Err(format_err!(
                     "no manifest file (elba.toml) exists in any parent directory and \
-                    multiple ipkg file are found"
+                    multiple ipkg files are found (only one is allowed)"
                 ));
             }
             let mut file = fs::File::open(path.join(ipkgs.get(0).unwrap()))

@@ -277,7 +277,7 @@ mod parse {
         let (i, _) = multispace0(i)?;
         let (i, _) = tag("package")(i)?;
         let (i, _) = space1(i)?;
-        let (i, name) = take_while1(|c: char| c.is_ascii_alphanumeric())(i)?;
+        let (i, name) = take_while1(|c: char| valid_name_char(c))(i)?;
         Ok((i, IpkgItem::PackageName(name.to_owned())))
     }
 
@@ -290,7 +290,7 @@ mod parse {
     fn key(i: &str) -> IResult<&str, String> {
         let (i, _) = many0_count(comment)(i)?;
         let (i, _) = multispace0(i)?;
-        let (i, key) = take_while1(|c: char| c.is_ascii_alphanumeric())(i)?;
+        let (i, key) = take_while1(|c: char| valid_name_char(c))(i)?;
         let (i, _) = space0(i)?;
         let (i, _) = tag("=")(i)?;
         Ok((i, key.to_owned()))
@@ -301,14 +301,14 @@ mod parse {
     }
 
     fn value_quote(i: &str) -> IResult<&str, String> {
-        let (i, _) = space0(i)?;
+        let (i, _) = multispace0(i)?;
         let (i, val) = delimited(tag("\""), is_not("\""), tag("\""))(i)?;
         Ok((i, val.to_owned()))
     }
 
     fn value_plain(i: &str) -> IResult<&str, String> {
-        let (i, _) = space0(i)?;
-        let (i, val) = take_while1(|c: char| c == '.' || c.is_ascii_alphanumeric())(i)?;
+        let (i, _) = multispace0(i)?;
+        let (i, val) = take_while1(|c: char| c == '.' || valid_name_char(c))(i)?;
         Ok((i, val.to_owned()))
     }
 
@@ -317,15 +317,29 @@ mod parse {
     }
 
     fn comment(i: &str) -> IResult<&str, ()> {
+        alt((comment_mutltiline, comment_sigle))(i)
+    }
+
+    fn comment_mutltiline(i: &str) -> IResult<&str, ()> {
         let (i, _) = multispace0(i)?;
         let (i, _) = delimited(tag("{-"), take_until("-}"), tag("-}"))(i)?;
         Ok((i, ()))
     }
 
+    fn comment_sigle(i: &str) -> IResult<&str, ()> {
+        let (i, _) = multispace0(i)?;
+        let (i, _) = delimited(tag("--"), take_until("\n"), tag("\n"))(i)?;
+        Ok((i, ()))
+    }
+
+    fn valid_name_char(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '_' || c == '-'
+    }
+
     #[test]
     fn test_parse() {
         let input = r#"
-package maths 
+package idris-maths 
 
 {- This
     is a
@@ -334,9 +348,10 @@ comment
 {- This is a comment too-}
 
     sourcedir= src
-
-opts="--quiet"
-modules =NumOps
+-- comment
+opts="--quiet"  -- comment
+modules =
+NumOps
         , Test , Test.Test1
 
 tests = Test.testDouble
@@ -345,7 +360,7 @@ tests = Test.testDouble
 
         let (_, items) = parse_items(input).unwrap();
         let expected = vec![
-            IpkgItem::PackageName("maths".to_owned()),
+            IpkgItem::PackageName("idris-maths".to_owned()),
             IpkgItem::Vec("sourcedir".to_owned(), vec!["src".to_owned()]),
             IpkgItem::Vec("opts".to_owned(), vec!["--quiet".to_owned()]),
             IpkgItem::Vec(
