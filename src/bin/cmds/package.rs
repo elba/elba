@@ -1,4 +1,5 @@
-use super::{args, get};
+use std::env::current_dir;
+
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::{build, index},
@@ -8,7 +9,8 @@ use elba::{
     },
 };
 use failure::{format_err, ResultExt};
-use std::env::current_dir;
+
+use super::{args, get};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("package")
@@ -22,7 +24,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     ))?;
 
     let ctx = get::build_ctx(c, args);
-    let project = build::find_manifest_root(&project).unwrap();
+    let (project, _) = build::find_manifest(&project, false, None).unwrap();
 
     if !args.is_present("no-verify") {
         build::build(

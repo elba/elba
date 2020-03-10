@@ -1,29 +1,24 @@
 //! Registry-related commands: publishing, yanking, etc.
 
+use std::{
+    fs::{create_dir_all, File},
+    path::{Path, PathBuf},
+    str::{self},
+};
+
+use flate2::{write::GzEncoder, Compression};
+use tar;
+
 use super::build;
 use crate::{
+    cli::build::find_manifest,
     package::manifest::Manifest,
     retrieve::Cache,
     util::{error::Result, valid_file},
 };
-use failure::{format_err, ResultExt};
-use flate2::{write::GzEncoder, Compression};
-use std::{
-    fs::{create_dir_all, File},
-    io::Read,
-    path::{Path, PathBuf},
-    str::{self, FromStr},
-};
-use tar;
 
 pub fn package(project: &Path) -> Result<(PathBuf, Manifest)> {
-    let project = build::find_manifest_root(&project)?;
-
-    let mut contents = String::new();
-    let mut manifest = File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, false, None)?;
 
     let gz_name = format!(
         "target/{}_{}-{}.tar.gz",

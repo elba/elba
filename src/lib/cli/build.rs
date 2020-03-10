@@ -1,4 +1,5 @@
 use std::{
+    convert::TryInto,
     env, fs,
     io::{prelude::*, Seek, SeekFrom},
     path::{Path, PathBuf},
@@ -24,6 +25,7 @@ use crate::{
         Target, Targets,
     },
     package::{
+        ipkg::Ipkg,
         lockfile::LockfileToml,
         manifest::{BinTarget, Manifest},
         PackageId, Spec, Summary,
@@ -62,12 +64,7 @@ pub fn test(
     backend: &Backend,
     test_threads: u32,
 ) -> Result<String> {
-    let mut contents = String::new();
-    let project = find_manifest_root(project)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, true, None)?;
 
     if manifest.targets.test.is_empty() {
         bail!("at least one test must be defined")
@@ -311,12 +308,7 @@ pub fn repl(
     backend: &Backend,
     interactivity: Interactivity,
 ) -> Result<String> {
-    let mut contents = String::new();
-    let project = find_manifest_root(project)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, true, None)?;
 
     env::set_current_dir(&project)?;
 
@@ -480,12 +472,7 @@ pub fn repl(
 }
 
 pub fn doc(ctx: &BuildCtx, project: &Path) -> Result<String> {
-    let mut contents = String::new();
-    let project = find_manifest_root(project)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, true, None)?;
 
     // By default, we build all lib and bin targets.
     let mut root = vec![];
@@ -546,12 +533,7 @@ pub fn build(
     codegen: bool,
     backend: &Backend,
 ) -> Result<String> {
-    let mut contents = String::new();
-    let project = find_manifest_root(project)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, true, None)?;
 
     // By default, we build all lib and bin targets.
     let mut root = vec![];
@@ -633,7 +615,7 @@ pub fn build(
 }
 
 pub fn update(ctx: &BuildCtx, project: &Path, ignore: Option<&[Spec]>) -> Result<String> {
-    let project = find_manifest_root(project)?;
+    let (project, _) = find_manifest(project, true, None)?;
 
     let op = || -> Result<Graph<Summary>> {
         let mut f = fs::File::open(&project.join("elba.lock"))?;
@@ -696,7 +678,7 @@ pub fn update(ctx: &BuildCtx, project: &Path, ignore: Option<&[Spec]>) -> Result
 
 pub fn add(ctx: &BuildCtx, project: &Path, spec: &Spec, dev: bool) -> Result<String> {
     let mut contents = String::new();
-    let project = find_manifest_root(project)?;
+    let (project, _) = find_manifest(project, true, None)?;
     let mut mf = fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -754,13 +736,7 @@ pub fn solve_local<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Result<String>
     ignore: Option<&[Spec]>,
     mut f: F,
 ) -> Result<String> {
-    let project = find_manifest_root(project)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    let mut contents = String::new();
-    manifest.read_to_string(&mut contents)?;
-
-    let manifest = Manifest::from_str(&contents)?;
+    let (project, manifest) = find_manifest(project, true, Some(ctx.shell))?;
 
     let op = || -> Result<Graph<Summary>> {
         let mut f = fs::File::open(&project.join("elba.lock"))?;
@@ -930,14 +906,68 @@ pub fn solve_remote<F: FnMut(&Cache, Retriever, Graph<Summary>) -> Result<String
     f(&cache, retriever, solve)
 }
 
-pub fn find_manifest_root(path: &Path) -> Result<PathBuf> {
-    for p in path.ancestors() {
-        if p.join("elba.toml").exists() {
-            return Ok(p.to_path_buf());
+pub fn find_manifest(
+    path: &Path,
+    allow_ipkg: bool,
+    shell: Option<Shell>,
+) -> Result<(PathBuf, Manifest)> {
+    let root = path
+        .ancestors()
+        .map(|p| p.join("elba.toml"))
+        .find(|p| p.exists());
+    match root {
+        Some(root) => {
+            let file_path = root.join("elba.toml");
+            let mut file = fs::File::open(&file_path).context(format_err!(
+                "failed to read manifest file ({})",
+                file_path.display()
+            ))?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            let manifest = Manifest::from_str(&contents)?;
+            Ok((root.to_path_buf(), manifest))
         }
-    }
+        None if allow_ipkg => {
+            let ipkgs: Vec<PathBuf> = fs::read_dir(path)?
+                .into_iter()
+                .filter_map(|entry| Some(entry.ok()?.path().to_path_buf()))
+                .filter(|p| p.extension().map(|p| p.to_str()).flatten() == Some("ipkg"))
+                .collect();
+            if ipkgs.len() == 0 {
+                return Err(format_err!(
+                    "no manifest file (elba.toml) exists in any parent directory and \
+                    no ipkg file exists in current directory"
+                ));
+            }
+            if ipkgs.len() > 1 {
+                dbg!(ipkgs);
+                return Err(format_err!(
+                    "no manifest file (elba.toml) exists in any parent directory and \
+                    multiple ipkg file are found"
+                ));
+            }
+            let mut file = fs::File::open(path.join(ipkgs.get(0).unwrap()))
+                .context(format_err!("failed to read ipkg file"))?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            let ipkg = Ipkg::from_str(&contents).context(format_err!("while parsing ipkg file"))?;
+            let manifest: Manifest = ipkg.try_into()?;
 
-    Err(format_err!(
-        "no manifest file (elba.toml) exists in any parent directory"
-    ))
+            if let Some(shell) = shell {
+                shell.println(
+                    style("[warn]").yellow().bold(),
+                    format!(
+                        "Loaded a legacy package {} {} from ipkg file",
+                        &manifest.package.name, &manifest.package.version
+                    ),
+                    Verbosity::Normal,
+                );
+            }
+
+            Ok((path.to_path_buf(), manifest))
+        }
+        None => Err(format_err!(
+            "no manifest file (elba.toml) exists in any parent directory"
+        )),
+    }
 }

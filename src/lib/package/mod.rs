@@ -1,5 +1,6 @@
 //! Data structures related to packages.
 
+pub mod ipkg;
 pub mod lockfile;
 pub mod manifest;
 

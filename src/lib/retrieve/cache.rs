@@ -53,7 +53,6 @@ use std::{
     fs::{self, File},
     io::{self, prelude::*, BufReader},
     path::{Path, PathBuf},
-    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -70,6 +69,7 @@ use walkdir::WalkDir;
 
 use crate::{
     build::{context::BuildContext, Targets},
+    cli::build::find_manifest,
     package::{manifest::Manifest, PackageId, Spec},
     remote::{
         resolution::{DirectRes, Resolution},
@@ -694,27 +694,27 @@ impl Source {
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
     pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Result<Self> {
-        let mf_path = path.path().join("elba.toml");
-
-        let file = fs::File::open(mf_path).context(format_err!(
-            "package {} at {} is missing manifest",
-            pkg,
-            path.path().display()
-        ))?;
-        let mut file = BufReader::new(file);
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-
-        if let Some(x) = Manifest::workspace(&contents) {
-            if let Some(p) = x.get(pkg.name()) {
-                let lock = DirLock::acquire(&path.path().join(&p.0))?;
-                // We immediately release our lock on the parent folder
-                drop(path);
-                return Source::from_folder(pkg, lock, location);
+        let toml_path = path.path().join("elba.toml");
+        if toml_path.exists() {
+            let file = fs::File::open(toml_path).context(format_err!(
+                "package {} at {} is missing manifest",
+                pkg,
+                path.path().display()
+            ))?;
+            let mut file = BufReader::new(file);
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            if let Some(x) = Manifest::workspace(&contents) {
+                if let Some(p) = x.get(pkg.name()) {
+                    let lock = DirLock::acquire(&path.path().join(&p.0))?;
+                    // We immediately release our lock on the parent folder
+                    drop(path);
+                    return Source::from_folder(pkg, lock, location);
+                }
             }
         }
 
-        let manifest = Manifest::from_str(&contents)?;
+        let (_, manifest) = find_manifest(path.path(), true, None)?;
 
         if manifest.name() != pkg.name() {
             bail!(

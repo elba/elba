@@ -199,7 +199,6 @@ pub struct PackageInfo {
     pub name: Name,
     pub version: Version,
     pub authors: Vec<String>,
-    pub build: Option<SubPath>,
     pub description: Option<String>,
     #[serde(default = "Vec::new")]
     pub keywords: Vec<String>,

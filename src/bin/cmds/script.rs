@@ -1,13 +1,13 @@
+use std::env::current_dir;
+
 use clap::{App, Arg, ArgMatches, SubCommand};
 use console::style;
 use elba::{
     build::run_script,
-    cli::build::find_manifest_root,
-    package::manifest::Manifest,
+    cli::build::find_manifest,
     util::{config::Config, error::Result, fmt_multiple, shell::Verbosity},
 };
 use failure::{format_err, ResultExt};
-use std::{env::current_dir, fs, io::Read, str::FromStr};
 
 pub fn cli() -> App<'static, 'static> {
     SubCommand::with_name("script")
@@ -21,12 +21,7 @@ pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;
 
-    let mut contents = String::new();
-    let project = find_manifest_root(&cdir)?;
-    let mut manifest = fs::File::open(project.join("elba.toml"))
-        .context(format_err!("failed to read manifest file (elba.toml)"))?;
-    manifest.read_to_string(&mut contents)?;
-    let manifest = Manifest::from_str(&contents)?;
+    let (_, manifest) = find_manifest(&cdir, true, None)?;
 
     if let Some(s) = manifest.scripts.get(name) {
         c.shell().println(
