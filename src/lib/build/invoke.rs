@@ -10,15 +10,13 @@ use crate::{
     },
 };
 use failure::bail;
-use futures::compat::Future01CompatExt;
 use itertools::Itertools;
 use std::{
     path::{Path, PathBuf},
     process::Output,
-    time::{Duration, Instant},
+    time::Duration,
 };
-use tokio::timer::Delay;
-use tokio_process::CommandExt;
+use tokio::process::Command;
 
 // dealing with ibc stuff
 pub async fn invoke_compile<'a>(
@@ -29,10 +27,13 @@ pub async fn invoke_compile<'a>(
     bcx: &'a BuildContext,
     shell: Shell,
 ) -> Result<Output> {
-    let mut process = bcx.compiler.process();
-    let flavor = bcx.compiler.flavor();
-    process.current_dir(&build).arg("--check");
+    let mut process: Command = bcx.compiler.process().into();
+    process
+        .kill_on_drop(true)
+        .current_dir(&build)
+        .arg("--check");
 
+    let flavor = bcx.compiler.flavor();
     // Include dependencies
     if flavor.is_idris1() {
         for binary in deps {
@@ -52,18 +53,16 @@ pub async fn invoke_compile<'a>(
     process.arg(target);
 
     // Idris sometimes breaks down if multiple modules is being compiled
-    // in parallel. We reties if the stdout contains 'loadable'.
+    // in parallel. We retry if the stdout contains 'loadable'.
     for _ in 0..15usize {
         shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);
 
-        let output = process.output_async().compat().await?;
+        let output = process.output().await?;
 
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if stdout.contains("loadable") {
-                Delay::new(Instant::now() + Duration::from_secs(3))
-                    .compat()
-                    .await?;
+                tokio::time::delay_for(Duration::from_secs(5)).await;
             } else {
                 bail!("> {:#?}\n{}", process, fmt_output(&output))
             }
@@ -88,9 +87,9 @@ pub async fn invoke_codegen<'a>(
     bcx: &'a BuildContext,
     shell: Shell,
 ) -> Result<Output> {
-    let mut process = bcx.compiler.process();
-    let flavor = bcx.compiler.flavor();
+    let mut process: Command = bcx.compiler.process().into();
 
+    let flavor = bcx.compiler.flavor();
     if is_artifact {
         if flavor.is_idris1() {
             process.arg("--interface");
@@ -100,6 +99,7 @@ pub async fn invoke_codegen<'a>(
     }
 
     process
+        .kill_on_drop(true)
         .current_dir(output_dir)
         .args(&["-o", &output])
         .args(&[
@@ -138,7 +138,7 @@ pub async fn invoke_codegen<'a>(
 
     shell.println_plain(format!("> {:#?}", process), Verbosity::Verbose);
 
-    let output = process.output_async().compat().await?;
+    let output = process.output().await?;
 
     // The Idris compiler is stupid, and won't output a non-zero error code if there's no main
     // function in the file, so we manually check if stdout contains a "main not found" error.

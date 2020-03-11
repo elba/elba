@@ -12,7 +12,7 @@ use crate::{
 };
 use console::style;
 use failure::{bail, format_err, ResultExt};
-use futures::future::{self, FutureExt, TryFutureExt};
+use futures::future;
 use petgraph::graph::NodeIndex;
 use slog::{debug, o, Logger};
 use std::{collections::HashSet, future::Future, path::PathBuf};
@@ -183,7 +183,7 @@ impl JobQueue {
     pub fn exec<'a>(self) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
         let mut rt =
             Runtime::new().with_context(|_| format_err!("Couldn't start parallel runtime"))?;
-        rt.block_on(self.exec_async().boxed().compat())
+        rt.block_on(self.exec_async())
     }
 
     async fn exec_async<'a>(mut self) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {

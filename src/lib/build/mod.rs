@@ -4,6 +4,21 @@ pub mod context;
 pub mod invoke;
 pub mod job;
 
+use std::{
+    env,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+use console::style;
+use failure::{bail, format_err, ResultExt};
+use futures::future;
+use itertools::Itertools;
+use rand::{distributions::Alphanumeric, seq::SliceRandom, thread_rng, Rng};
+use walkdir::WalkDir;
+
 use self::{
     context::BuildContext,
     invoke::{invoke_codegen, invoke_compile},
@@ -18,19 +33,6 @@ use crate::{
         valid_file,
     },
 };
-use console::style;
-use failure::{bail, format_err, ResultExt};
-use futures::future;
-use itertools::Itertools;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{
-    env,
-    ffi::OsStr,
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-};
-use walkdir::WalkDir;
 
 /// A type of Target that should be built
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Debug, Eq, Hash)]
@@ -151,7 +153,7 @@ pub async fn compile_lib<'a>(
 
     // We know that lib_target.path will be relative to the package root
     let src_path = source.path().join(&lib_target.path.0);
-    let targets = lib_target
+    let mut targets = lib_target
         .mods
         .iter()
         .map(|mod_name| {
@@ -182,6 +184,13 @@ pub async fn compile_lib<'a>(
     copy_dir_iter(src_walker, &src_path, &layout.build.join("lib"))?;
 
     run_prebuild_script(source, &layout.build.join("lib"), shell)?;
+
+    // shuffle the targets to decreases the prosiblity that complier
+    // overloads because of paralleling
+    {
+        let mut rng = thread_rng();
+        targets.shuffle(&mut rng);
+    }
 
     let mut compilations = targets.iter().map(|target| {
         let module = target

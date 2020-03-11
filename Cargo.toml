@@ -23,7 +23,7 @@ crossbeam = "0.4"
 digest = { version = "0.7", features = ["std"]}
 directories = "1"
 failure = "0.1"
-futures-preview = { version = "0.3.0-alpha.17", features = ["compat"] }
+futures = "0.3"
 flate2 = "1.0"
 fs2 = "0.4"
 git2 = "0.12"
@@ -52,8 +52,7 @@ slog-term = "2"
 symlink = "0.1"
 tar = "0.4"
 textwrap = "0.10"
-tokio = "0.1.22"
-tokio-process = "0.2"
+tokio = { version = "0.2", features = ["process", "time"] }
 toml = "0.5"
 toml_edit = "0.1.5"
 url = { version = "2", features = ["serde"] }
