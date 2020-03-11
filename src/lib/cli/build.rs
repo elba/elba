@@ -911,16 +911,13 @@ pub fn find_manifest(
     allow_ipkg: bool,
     shell: Option<Shell>,
 ) -> Result<(PathBuf, Manifest)> {
-    let root = path
-        .ancestors()
-        .map(|p| p.join("elba.toml"))
-        .find(|p| p.exists());
+    let root = path.ancestors().find(|p| p.join("elba.toml").exists());
     match root {
         Some(root) => {
-            let file_path = root.join("elba.toml");
-            let mut file = fs::File::open(&file_path).context(format_err!(
+            let toml_path = root.join("elba.toml");
+            let mut file = fs::File::open(&toml_path).context(format_err!(
                 "failed to read manifest file ({})",
-                file_path.display()
+                toml_path.display()
             ))?;
             let mut contents = String::new();
             file.read_to_string(&mut contents)?;
