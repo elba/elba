@@ -126,7 +126,7 @@ under ``[dev_dependencies]``. Examples are shown below:
    "index/explicit" = { version = "0.1.5", index = "index+dir+../index" } # uses the index specified
    "directory/only" = { path = "../awesome" } # uses the package in the path specified
    "git/master" = { git = "https://github.com/doesnt/exist" } # uses the master branch
-   "git/explicit" = { git = "https://github.com/doesnt/exist", branch = "beta" } # "branch" can be an arbitrary git ref: a tag, commit, etc.
+   "git/explicit" = { git = "https://github.com/doesnt/exist", tag = "beta" } # "tag" can be an arbitrary git ref: a branch, a tag, commit, etc.
 
 For more information on the syntax regarding specifying and adding
 custom indices, see the chapters on :doc:`../reference/resolutions`
