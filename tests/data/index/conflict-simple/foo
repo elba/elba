@@ -1,1 +1,0 @@
-{ "name": "conflict_simple/foo", "version": "1.0.0", "dependencies": [{ "name": "conflict_simple/bar", "req": "2.0.0" }], "yanked": false, "location": "dir+test" }

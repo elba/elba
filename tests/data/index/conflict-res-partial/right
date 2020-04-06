@@ -1,1 +1,0 @@
-{ "name": "conflict_res_partial/right", "version": "1.0.0", "dependencies": [{ "name": "conflict_res_partial/shared", "req": "< 2.0.0" }], "yanked": false, "location": "dir+test" }
