@@ -2,7 +2,7 @@
 name = "elba"
 description = "elba is a package manager for Idris"
 authors = ["David Cao <david@cao.st>", "Andy Lok <andylokandy@hotmail.com>"]
-version = "0.3.2"
+version = "0.3.3"
 license = "MIT"
 edition = "2018"
 

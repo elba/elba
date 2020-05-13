@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.3]
+
+- Support iPKG manifest (#25)
+
+- Fix indirect local dependency resolution. (#65)
+
+- Add .dirlock to .gitignore
+
+- Fix warning of unable to clean build directory on Windows.
+
+- Allow assigning `--threads` argument.
+
+- Kill compiler on elba exit.
+
 ## [0.3.2]
 
 This release decreases the number of compilation tasks in parallel
