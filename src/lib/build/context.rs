@@ -36,7 +36,7 @@ impl Compiler {
             flavor: CompilerFlavor::Idris1,
         };
 
-        let flavor = if c.version()?.starts_with("Blodwen") {
+        let flavor = if c.version()?.starts_with("Idris 2") {
             CompilerFlavor::Idris2
         } else {
             CompilerFlavor::Idris1
