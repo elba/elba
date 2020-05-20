@@ -20,13 +20,11 @@ pub use self::imp::read2;
 
 #[cfg(unix)]
 mod imp {
-    use libc;
-    use std::{
-        io::{self, prelude::*},
-        mem,
-        os::unix::prelude::*,
-        process::{ChildStderr, ChildStdout},
-    };
+    use std::io;
+    use std::io::prelude::*;
+    use std::mem;
+    use std::os::unix::prelude::*;
+    use std::process::{ChildStderr, ChildStdout};
 
     pub fn read2(
         mut out_pipe: ChildStdout,
@@ -56,7 +54,7 @@ mod imp {
             let r = unsafe { libc::poll(fds.as_mut_ptr(), nfds, -1) };
             if r == -1 {
                 let err = io::Error::last_os_error();
-                if err.kind() == io::Error::Interrupted {
+                if err.kind() == io::ErrorKind::Interrupted {
                     continue;
                 }
                 return Err(err);
@@ -70,7 +68,7 @@ mod imp {
             let handle = |res: io::Result<_>| match res {
                 Ok(_) => Ok(true),
                 Err(e) => {
-                    if e.kind() == io::Error::WouldBlock {
+                    if e.kind() == io::ErrorKind::WouldBlock {
                         Ok(false)
                     } else {
                         Err(e)
@@ -96,18 +94,14 @@ mod imp {
 
 #[cfg(windows)]
 mod imp {
-    use std::{
-        io,
-        os::windows::prelude::*,
-        process::{ChildStderr, ChildStdout},
-        slice,
-    };
+    use std::io;
+    use std::os::windows::prelude::*;
+    use std::process::{ChildStderr, ChildStdout};
+    use std::slice;
 
-    use miow::{
-        iocp::{CompletionPort, CompletionStatus},
-        pipe::NamedPipe,
-        Overlapped,
-    };
+    use miow::iocp::{CompletionPort, CompletionStatus};
+    use miow::pipe::NamedPipe;
+    use miow::Overlapped;
     use winapi::shared::winerror::ERROR_BROKEN_PIPE;
 
     struct Pipe<'a> {
