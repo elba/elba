@@ -1,15 +1,14 @@
 //! Because nothing ever works correctly...
 
-pub use failure::Error;
-use failure_derive::Fail;
+pub use failure::Fail;
 
-pub type Res<T> = Result<T, Error>;
+pub type Result<T> = std::result::Result<T, failure::Error>;
 
 // TODO: More principled error handling.
 // This big enum shouldn't exist; instead, we should have individual structs and enums which
 // implement Fail for each type of error: Index failures, Parsing failures, etc.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
-pub enum ErrorKind {
+pub enum Error {
     #[fail(display = "invalid source resolution specifier")]
     InvalidSourceUrl,
     #[fail(display = "package doesn't exist in index")]

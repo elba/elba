@@ -1,36 +1,29 @@
 //! Utility functions.
 
 pub mod config;
-pub mod errors;
+pub mod error;
 pub mod git;
 pub mod graph;
 pub mod lock;
+pub mod parser;
 pub mod read2;
 pub mod shell;
 
 pub use crate::util::read2::read2;
 
-use crate::util::errors::{Error, Res};
-use failure::{bail, format_err, ResultExt};
-use itertools::Itertools;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fs,
     path::{Component, Path, PathBuf},
     process::Output,
     str::FromStr,
 };
+
+use failure::{bail, format_err, ResultExt};
+use itertools::Itertools;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use walkdir::{DirEntry, WalkDir};
 
-/// Turns an SHA2 hash into a nice hexified string.
-pub fn hexify_hash(hash: &[u8]) -> String {
-    let mut s = String::new();
-    for byte in hash {
-        let p = format!("{:02x}", byte);
-        s.push_str(&p);
-    }
-    s
-}
+use crate::util::error::Result;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SubPath(pub PathBuf);
@@ -40,7 +33,7 @@ impl SubPath {
         p.is_relative() && p.components().all(|x| x != Component::ParentDir)
     }
 
-    pub fn from_path(p: &Path) -> Res<Self> {
+    pub fn from_path(p: &Path) -> Result<Self> {
         if SubPath::is_subpath(&p) {
             Ok(SubPath(p.to_path_buf()))
         } else {
@@ -50,16 +43,16 @@ impl SubPath {
 }
 
 impl FromStr for SubPath {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let path = PathBuf::from(s);
         SubPath::from_path(&path)
     }
 }
 
 impl Serialize for SubPath {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -68,13 +61,13 @@ impl Serialize for SubPath {
 }
 
 impl<'de> Deserialize<'de> for SubPath {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
-pub fn copy_dir_iter(walker: impl Iterator<Item = DirEntry>, from: &Path, to: &Path) -> Res<()> {
+pub fn copy_dir_iter(walker: impl Iterator<Item = DirEntry>, from: &Path, to: &Path) -> Result<()> {
     for entry in walker {
         let to_p = to.join(entry.path().strip_prefix(from).unwrap());
         // Make sure that the file exists before we try copying
@@ -93,7 +86,7 @@ pub fn copy_dir_iter(walker: impl Iterator<Item = DirEntry>, from: &Path, to: &P
     Ok(())
 }
 
-pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Res<()> {
+pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Result<()> {
     let walker = WalkDir::new(from)
         .follow_links(true)
         .into_iter()
@@ -106,9 +99,9 @@ pub fn copy_dir(from: &Path, to: &Path, gitless: bool) -> Res<()> {
     copy_dir_iter(walker, from, to)
 }
 
-pub fn clear_dir(dir: &Path) -> Res<()> {
+pub fn clear_dir(dir: &Path) -> Result<()> {
     if dir.exists() {
-        fs::remove_dir_all(dir)?;
+        remove_dir_all::remove_dir_all(dir)?;
     }
     fs::create_dir_all(dir)?;
     Ok(())

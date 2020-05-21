@@ -2,7 +2,7 @@ use super::{args, get};
 use clap::{App, ArgMatches, SubCommand};
 use elba::{
     cli::build,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{format_err, ResultExt};
 use std::env::current_dir;
@@ -16,7 +16,7 @@ pub fn cli() -> App<'static, 'static> {
         .arg(args::idris_opts())
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let project = current_dir().context(format_err!(
         "couldn't get current dir; doesn't exist or no permissions..."
     ))?;

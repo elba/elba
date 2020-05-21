@@ -5,33 +5,30 @@ mod clean;
 mod doc;
 mod init;
 mod install;
-mod login;
 mod new;
 mod package;
 mod print_config;
-mod publish;
 mod repl;
 mod script;
 mod search;
 mod test;
 mod uninstall;
 mod update;
-mod yank;
 
 use clap::{App, ArgMatches};
 use elba::util::{
     config::{Backend, Config},
-    errors::Res,
+    error::Result,
     shell::Verbosity,
 };
-use failure::{format_err, Error, ResultExt};
+use failure::{format_err, ResultExt};
 use itertools::Itertools;
 use slog::{o, Discard, Logger};
 use slog_async;
 use slog_term;
 use std::{env, process::Command};
 
-pub type Exec = fn(&mut Config, &ArgMatches) -> Res<String>;
+pub type Exec = fn(&mut Config, &ArgMatches) -> Result<String>;
 
 pub fn subcommands() -> Vec<App<'static, 'static>> {
     vec![
@@ -42,18 +39,15 @@ pub fn subcommands() -> Vec<App<'static, 'static>> {
         doc::cli(),
         init::cli(),
         install::cli(),
-        login::cli(),
         new::cli(),
         package::cli(),
         print_config::cli(),
-        publish::cli(),
         repl::cli(),
         script::cli(),
         search::cli(),
         test::cli(),
         uninstall::cli(),
         update::cli(),
-        yank::cli(),
     ]
 }
 
@@ -66,23 +60,20 @@ pub fn execute_internal(cmd: &str) -> Option<Exec> {
         "doc" => Some(doc::exec),
         "init" => Some(init::exec),
         "install" => Some(install::exec),
-        "login" => Some(login::exec),
         "new" => Some(new::exec),
         "package" => Some(package::exec),
         "print-config" => Some(print_config::exec),
-        "publish" => Some(publish::exec),
         "repl" => Some(repl::exec),
         "script" => Some(script::exec),
         "search" => Some(search::exec),
         "test" => Some(test::exec),
         "uninstall" => Some(uninstall::exec),
         "update" => Some(update::exec),
-        "yank" => Some(yank::exec),
         _ => None,
     }
 }
 
-pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
+pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String> {
     let ext_args: Vec<&str> = args
         .values_of("")
         .map(|x| x.collect())
@@ -118,9 +109,8 @@ pub fn execute_external(cmd: &str, args: &ArgMatches) -> Result<String, Error> {
 
 mod get {
     use super::*;
-    use elba::{cli::build::BuildCtx, remote::resolution::IndexRes};
+    use elba::cli::build::BuildCtx;
     use slog::Drain;
-    use std::str::FromStr;
 
     pub fn build_ctx(c: &mut Config, args: &ArgMatches) -> BuildCtx {
         let logger = get::logger(c, args);
@@ -180,9 +170,9 @@ mod get {
     }
 
     pub fn threads(_c: &mut Config, args: &ArgMatches) -> u32 {
-        args.value_of("build-threads")
+        args.value_of("threads")
             .and_then(|s| s.parse().ok())
-            .unwrap_or(num_cpus::get() as u32)
+            .unwrap_or(2)
     }
 
     pub fn idris_opts(_c: &mut Config, args: &ArgMatches) -> Vec<String> {
@@ -197,26 +187,6 @@ mod get {
         }
 
         res
-    }
-
-    pub fn index(c: &mut Config, args: &ArgMatches) -> Res<IndexRes> {
-        if let Some(x) = args.value_of("index") {
-            if let Some(mapped) = c.indices.get(x) {
-                Ok(mapped.clone())
-            } else {
-                IndexRes::from_str(x)
-            }
-        } else {
-            match c.indices.len() {
-                0 => Err(format_err!(
-                    "no indices in configuration and none specified at the CLI"
-                )),
-                1 => Ok(c.indices.get_index(0).unwrap().1.clone()),
-                _ => Err(format_err!(
-                    "> 1 index in configuration and none specified at the CLI"
-                )),
-            }
-        }
     }
 }
 
@@ -248,8 +218,8 @@ mod args {
     }
 
     pub fn build_threads() -> Arg {
-        Arg::with_name("build-threads")
-            .long("build-threads")
+        Arg::with_name("threads")
+            .long("threads")
             .short("j")
             .takes_value(true)
             .number_of_values(1)
@@ -311,12 +281,5 @@ mod args {
         Arg::with_name("no-verify")
             .long("no-verify")
             .help("Skip building the package to test for validity")
-    }
-
-    pub fn index() -> Arg {
-        Arg::with_name("index")
-            .long("index")
-            .takes_value(true)
-            .help("The index which the command should apply to")
     }
 }

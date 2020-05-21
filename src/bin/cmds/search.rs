@@ -1,8 +1,8 @@
 use super::get;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
-    cli::registry,
-    util::{config::Config, errors::Res},
+    cli::index,
+    util::{config::Config, error::Result},
 };
 
 pub fn cli() -> App<'static, 'static> {
@@ -16,11 +16,11 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let query = args.value_of("query").unwrap();
     let bcx = get::build_ctx(c, args);
 
-    println!("{}", registry::search(&bcx, &query)?);
+    println!("{}", index::search(&bcx, &query)?);
 
     Ok("search complete".to_string())
 }

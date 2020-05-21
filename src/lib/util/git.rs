@@ -28,18 +28,18 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::util::errors::Res;
+use crate::util::error::Result;
 use failure::{format_err, ResultExt};
 use git2;
 use std::{env, fs, path::Path};
 use url::Url;
 
-pub fn init(path: &Path) -> Res<()> {
-    git2::Repository::init(path)?;
+pub fn init(path: &Path) -> Result<()> {
+    git2::Repository::discover(path).or_else(|_| git2::Repository::init(path))?;
     Ok(())
 }
 
-pub fn clone(url: &Url, into: &Path) -> Res<git2::Repository> {
+pub fn clone(url: &Url, into: &Path) -> Result<git2::Repository> {
     let git_config = git2::Config::open_default()?;
     with_fetch_options(&git_config, &url, &mut |opts| {
         let repo = git2::build::RepoBuilder::new()
@@ -50,7 +50,7 @@ pub fn clone(url: &Url, into: &Path) -> Res<git2::Repository> {
     })
 }
 
-pub fn update_submodules(repo: &git2::Repository) -> Res<()> {
+pub fn update_submodules(repo: &git2::Repository) -> Result<()> {
     for mut child in repo.submodules()? {
         update_submodule(repo, &mut child).with_context(|_| {
             format!(
@@ -62,7 +62,7 @@ pub fn update_submodules(repo: &git2::Repository) -> Res<()> {
     Ok(())
 }
 
-fn update_submodule(parent: &git2::Repository, child: &mut git2::Submodule) -> Res<()> {
+fn update_submodule(parent: &git2::Repository, child: &mut git2::Submodule) -> Result<()> {
     child.init(false)?;
     let url = child
         .url()
@@ -92,7 +92,7 @@ fn update_submodule(parent: &git2::Repository, child: &mut git2::Submodule) -> R
         }
         Err(..) => {
             let path = parent.workdir().unwrap().join(child.path());
-            let _ = fs::remove_dir_all(&path);
+            let _ = remove_dir_all::remove_dir_all(&path);
             git2::Repository::init(&path)?
         }
     };
@@ -113,7 +113,7 @@ fn update_submodule(parent: &git2::Repository, child: &mut git2::Submodule) -> R
     update_submodules(&repo)
 }
 
-pub fn fetch(repo: &mut git2::Repository, url: &Url, refspec: &str) -> Res<()> {
+pub fn fetch(repo: &mut git2::Repository, url: &Url, refspec: &str) -> Result<()> {
     // The `fetch` operation here may fail spuriously due to a corrupt
     // repository. It could also fail, however, for a whole slew of other
     // reasons (aka network related reasons). We want Cargo to automatically
@@ -151,13 +151,13 @@ pub fn fetch(repo: &mut git2::Repository, url: &Url, refspec: &str) -> Res<()> {
     })
 }
 
-pub fn reset(repo: &git2::Repository, obj: &git2::Object) -> Res<()> {
+pub fn reset(repo: &git2::Repository, obj: &git2::Object) -> Result<()> {
     let mut opts = git2::build::CheckoutBuilder::new();
     repo.reset(obj, git2::ResetType::Hard, Some(&mut opts))?;
     Ok(())
 }
 
-fn reinitialize(repo: &mut git2::Repository) -> Res<()> {
+fn reinitialize(repo: &mut git2::Repository) -> Result<()> {
     // Here we want to drop the current repository object pointed to by `repo`,
     // so we initialize temporary repository in a sub-folder, blow away the
     // existing git folder, and then recreate the git repo. Finally we blow away
@@ -172,20 +172,20 @@ fn reinitialize(repo: &mut git2::Repository) -> Res<()> {
             continue;
         }
         let path = entry.path();
-        drop(fs::remove_file(&path).or_else(|_| fs::remove_dir_all(&path)));
+        drop(fs::remove_file(&path).or_else(|_| remove_dir_all::remove_dir_all(&path)));
     }
     if bare {
         *repo = git2::Repository::init_bare(path)?;
     } else {
         *repo = git2::Repository::init(path)?;
     }
-    fs::remove_dir_all(&tmp)?;
+    remove_dir_all::remove_dir_all(&tmp)?;
     Ok(())
 }
 
-fn with_authentication<T, F>(url: &str, cfg: &git2::Config, mut f: F) -> Res<T>
+fn with_authentication<T, F>(url: &str, cfg: &git2::Config, mut f: F) -> Result<T>
 where
-    F: FnMut(&mut git2::Credentials) -> Res<T>,
+    F: FnMut(&mut git2::Credentials) -> Result<T>,
 {
     let mut cred_helper = git2::CredentialHelper::new(url);
     cred_helper.config(cfg);
@@ -369,8 +369,8 @@ where
 pub fn with_fetch_options<T>(
     git_config: &git2::Config,
     url: &Url,
-    cb: &mut dyn FnMut(git2::FetchOptions) -> Res<T>,
-) -> Res<T> {
+    cb: &mut dyn FnMut(git2::FetchOptions) -> Result<T>,
+) -> Result<T> {
     with_authentication(url.as_str(), git_config, |f| {
         let mut rcb = git2::RemoteCallbacks::new();
         rcb.credentials(f);

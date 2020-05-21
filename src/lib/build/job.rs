@@ -3,7 +3,7 @@ use crate::{
     retrieve::cache::{Binary, BuildHash, OutputLayout, Source},
     util::{
         clear_dir,
-        errors::Res,
+        error::Result,
         fmt_multiple,
         graph::Graph,
         lock::DirLock,
@@ -12,7 +12,7 @@ use crate::{
 };
 use console::style;
 use failure::{bail, format_err, ResultExt};
-use futures::future::{self, FutureExt, TryFutureExt};
+use futures::future;
 use petgraph::graph::NodeIndex;
 use slog::{debug, o, Logger};
 use std::{collections::HashSet, future::Future, path::PathBuf};
@@ -89,7 +89,7 @@ impl JobQueue {
         bcx: BuildContext,
         plog: &Logger,
         shell: Shell,
-    ) -> Res<Self> {
+    ) -> Result<Self> {
         let mut graph = Graph::new(solve.inner.map(|_, _| Job::default(), |_, _| ()));
 
         let mut curr_layer = HashSet::new();
@@ -180,16 +180,13 @@ impl JobQueue {
         })
     }
 
-    pub fn exec<'a>(self) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
+    pub fn exec<'a>(self) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
         let mut rt =
             Runtime::new().with_context(|_| format_err!("Couldn't start parallel runtime"))?;
-        rt.block_on(self.exec_async().boxed().compat())
+        rt.block_on(self.exec_async())
     }
 
-    async fn exec_async<'a>(mut self) -> Res<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
-        // TODO: the threads has no effect now
-        // let threads = bcx.threads;
-
+    async fn exec_async<'a>(mut self) -> Result<(Vec<PathBuf>, Vec<(PathBuf, String)>)> {
         let root_ol = &self.root_ol;
         let root_hash = self.graph.root().and_then(|x| {
             if let Work::Dirty(_, h) = &x.work {
@@ -325,7 +322,8 @@ impl JobQueue {
     fn complete_job(
         &self,
         job_index: NodeIndex,
-    ) -> Res<impl Future<Output = Res<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)>>> {
+    ) -> Result<impl Future<Output = Result<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)>>>
+    {
         if let Work::Dirty(source, build_hash) = &self.graph[job_index].work {
             self.shell.println(
                 style("Building").cyan(),
@@ -384,7 +382,7 @@ impl JobQueue {
         logger: Logger,
         bcx: BuildContext,
         shell: Shell,
-    ) -> Res<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)> {
+    ) -> Result<(NodeIndex, Option<Binary>, Vec<(PathBuf, String)>)> {
         let mut res: Option<Binary> = None;
         let mut bins: Vec<(PathBuf, String)> = Vec::new();
         let has_lib = targets.has_lib();

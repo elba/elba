@@ -1,13 +1,14 @@
 //! Data structures related to packages.
 
+pub mod ipkg;
 pub mod lockfile;
 pub mod manifest;
 
 use crate::{
     remote::resolution::Resolution,
-    util::errors::{ErrorKind, Res},
+    util::error::{Error, Result},
 };
-use failure::{bail, format_err, Error};
+use failure::{bail, format_err};
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -44,7 +45,7 @@ struct NameInner {
 }
 
 impl Name {
-    pub fn new(group: String, name: String) -> Res<Self> {
+    pub fn new(group: String, name: String) -> Result<Self> {
         let group_valid = group
             .chars()
             .all(|x| x.is_alphanumeric() || x == '_' || x == '-');
@@ -136,9 +137,9 @@ impl Hash for NameInner {
 }
 
 impl FromStr for Name {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let v: Vec<&str> = s.split('/').collect();
 
         if v.len() != 2 {
@@ -154,7 +155,7 @@ impl FromStr for Name {
 }
 
 impl Serialize for Name {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -169,7 +170,7 @@ impl fmt::Display for Name {
 }
 
 impl<'de> Deserialize<'de> for Name {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
@@ -216,9 +217,9 @@ impl PackageId {
 }
 
 impl FromStr for PackageId {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let mut s = s.splitn(2, '@');
         let name = s.next().unwrap();
         let url = s.next().ok_or_else(|| {
@@ -245,14 +246,14 @@ impl fmt::Display for PackageId {
 }
 
 impl<'de> Deserialize<'de> for PackageId {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
 impl Serialize for PackageId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -266,12 +267,12 @@ pub enum ChecksumFmt {
 }
 
 impl FromStr for ChecksumFmt {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "sha256" => Ok(ChecksumFmt::Sha256),
-            _ => Err(ErrorKind::InvalidSourceUrl)?,
+            _ => Err(Error::InvalidSourceUrl)?,
         }
     }
 }
@@ -291,15 +292,12 @@ pub struct Checksum {
 }
 
 impl FromStr for Checksum {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let mut s = s.splitn(2, '=');
         let fmt = s.next().unwrap();
-        let hash = s
-            .next()
-            .ok_or_else(|| ErrorKind::InvalidSourceUrl)?
-            .to_string();
+        let hash = s.next().ok_or_else(|| Error::InvalidSourceUrl)?.to_string();
         Ok(Checksum {
             fmt: fmt.parse::<ChecksumFmt>()?,
             hash,
@@ -314,14 +312,14 @@ impl fmt::Display for Checksum {
 }
 
 impl<'de> Deserialize<'de> for Checksum {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
 impl Serialize for Checksum {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -441,9 +439,9 @@ impl fmt::Debug for Spec {
 }
 
 impl FromStr for Spec {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let mut ver_split = s.splitn(2, '|');
         let (pre, ver) = (ver_split.next().unwrap(), ver_split.next());
         let version = if let Some(v) = ver {

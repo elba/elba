@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use elba::{
     cli::build,
     package::Spec,
-    util::{config::Config, errors::Res},
+    util::{config::Config, error::Result},
 };
 use failure::{bail, format_err, ResultExt};
 use itertools::Either::{Left, Right};
@@ -25,7 +25,7 @@ pub fn cli() -> App<'static, 'static> {
         )
 }
 
-pub fn exec(c: &mut Config, args: &ArgMatches) -> Res<String> {
+pub fn exec(c: &mut Config, args: &ArgMatches) -> Result<String> {
     let current = current_dir();
 
     let proj = if let Some(spec) = args.value_of_lossy("spec") {

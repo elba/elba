@@ -20,13 +20,11 @@ pub use self::imp::read2;
 
 #[cfg(unix)]
 mod imp {
-    use libc;
-    use std::{
-        io::{self, prelude::*},
-        mem,
-        os::unix::prelude::*,
-        process::{ChildStderr, ChildStdout},
-    };
+    use std::io;
+    use std::io::prelude::*;
+    use std::mem;
+    use std::os::unix::prelude::*;
+    use std::process::{ChildStderr, ChildStdout};
 
     pub fn read2(
         mut out_pipe: ChildStdout,
@@ -96,18 +94,14 @@ mod imp {
 
 #[cfg(windows)]
 mod imp {
-    use std::{
-        io,
-        os::windows::prelude::*,
-        process::{ChildStderr, ChildStdout},
-        slice,
-    };
+    use std::io;
+    use std::os::windows::prelude::*;
+    use std::process::{ChildStderr, ChildStdout};
+    use std::slice;
 
-    use miow::{
-        iocp::{CompletionPort, CompletionStatus},
-        pipe::NamedPipe,
-        Overlapped,
-    };
+    use miow::iocp::{CompletionPort, CompletionStatus};
+    use miow::pipe::NamedPipe;
+    use miow::Overlapped;
     use winapi::shared::winerror::ERROR_BROKEN_PIPE;
 
     struct Pipe<'a> {

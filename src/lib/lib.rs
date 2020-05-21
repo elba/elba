@@ -1,4 +1,6 @@
 //! A package manager for the Idris language.
+//!
+#![feature(label_break_value)]
 
 pub mod build;
 pub mod cli;

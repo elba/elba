@@ -1,6 +1,6 @@
 use crate::{
     retrieve::cache::Cache,
-    util::{config::Backend, errors::Res, fmt_output},
+    util::{config::Backend, error::Result, fmt_output},
 };
 use failure::{format_err, ResultExt};
 use std::{
@@ -30,13 +30,13 @@ pub struct Compiler {
 
 impl Compiler {
     /// Run the compiler at `path` to learn various pieces of information about it.
-    pub fn new(name: &str) -> Res<Compiler> {
+    pub fn new(name: &str) -> Result<Compiler> {
         let c = Compiler {
             path: PathBuf::from(name),
             flavor: CompilerFlavor::Idris1,
         };
 
-        let flavor = if c.version()?.starts_with("Blodwen") {
+        let flavor = if c.version()?.starts_with("Idris 2") {
             CompilerFlavor::Idris2
         } else {
             CompilerFlavor::Idris1
@@ -59,7 +59,7 @@ impl Compiler {
     }
 
     /// Get the version of the compiler
-    pub fn version(&self) -> Res<String> {
+    pub fn version(&self) -> Result<String> {
         let out = Command::new(&self.path)
             .arg("--version")
             .output()

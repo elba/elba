@@ -42,7 +42,7 @@ from `crates.io <https://crates.io>`__. In order to install elba this
 way, you should have a copy of the Rust toolchain installed on your
 computer first. The process for this is explained on `the Rust
 website <https://www.rust-lang.org/en-US/install.html>`__. The version of
-of Rust elba has successfully been built on is **nightly-2019-09-04**.
+of Rust elba has successfully been built on is **nightly-2020-02-21**.
 
 Once you have Rust installed, installing elba is self-explanatory:
 

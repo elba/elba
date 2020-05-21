@@ -9,21 +9,10 @@
 pub mod assignment;
 pub mod incompat;
 
-use self::{
-    assignment::{Assignment, AssignmentType},
-    incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
-};
-use crate::{
-    package::{PackageId, Summary},
-    retrieve::Retriever,
-    util::{
-        errors::ErrorKind,
-        graph::Graph,
-        shell::{Shell, Verbosity},
-    },
-};
+use std::{cmp, collections::VecDeque};
+
 use console::style;
-use failure::{bail, Error};
+use failure::bail;
 use indexmap::{indexmap, indexset, IndexMap};
 use petgraph::{
     self,
@@ -33,8 +22,21 @@ use petgraph::{
 use semver::Version;
 use semver_constraints::{Constraint, Relation};
 use slog::{error, info, o, trace, Logger};
-use std::{cmp, collections::VecDeque};
 use textwrap::fill;
+
+use self::{
+    assignment::{Assignment, AssignmentType},
+    incompat::{IncompatMatch, Incompatibility, IncompatibilityCause},
+};
+use crate::{
+    package::{PackageId, Summary},
+    retrieve::Retriever,
+    util::{
+        error::{Error, Result},
+        graph::Graph,
+        shell::{Shell, Verbosity},
+    },
+};
 
 #[derive(Debug)]
 pub struct Resolver<'ret, 'cache: 'ret> {
@@ -75,7 +77,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         }
     }
 
-    pub fn solve(self) -> Result<Graph<Summary>, Error> {
+    pub fn solve(self) -> Result<Graph<Summary>> {
         let mut s = self;
 
         info!(s.logger, "beginning dependency resolution");
@@ -90,7 +92,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         }
     }
 
-    fn solve_loop(&mut self) -> Result<Graph<Summary>, Error> {
+    fn solve_loop(&mut self) -> Result<Graph<Summary>> {
         let c: Constraint = self.retriever.root().version().clone().into();
         let pkgs = indexmap!(self.retriever.root().id().clone() => c.complement());
         self.incompatibility(pkgs, IncompatibilityCause::Root);
@@ -98,7 +100,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
         let mut next = Some(self.retriever.root().id().clone());
         while let Some(n) = next {
             self.propagate(n)?;
-            next = self.choose_pkg_version();
+            next = self.choose_pkg_version()?;
         }
 
         // To build the tree, we're gonna go through all our dependencies and get their deps,
@@ -114,7 +116,8 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
 
         while let Some(pid) = q.pop_front() {
             // At this point, we know there has to be dependencies for these packages.
-            let deps = self.retriever.incompats(&tree[pid]).unwrap();
+            let pkg = &tree[pid];
+            let deps = self.retriever.incompats(pkg, &pkg.id).unwrap();
             for inc in deps {
                 let og_pkg = inc.deps.get_index(1).unwrap().0;
                 let new_pkg = {
@@ -147,7 +150,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     }
 
     // 1: Unit propagation
-    fn propagate(&mut self, pkg: PackageId) -> Result<(), Error> {
+    fn propagate(&mut self, pkg: PackageId) -> Result<()> {
         let mut changed = indexset!(pkg);
 
         while let Some(package) = changed.pop() {
@@ -230,7 +233,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     // 2: Conflict resolution
     // This function is basically the only reason why we need NLL; we're doing immutable borrows
     // with satisfier, but mutable ones with backtrack & incompatibility.
-    fn resolve_conflict(&mut self, inc: usize) -> Result<usize, Error> {
+    fn resolve_conflict(&mut self, inc: usize) -> Result<usize> {
         let mut inc = inc;
         let mut new_incompatibility = false;
         trace!(self.logger, "entering conflict resolution");
@@ -338,7 +341,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             new_incompatibility = true;
         }
 
-        Err(Error::from(ErrorKind::NoConflictRes))
+        bail!(Error::NoConflictRes)
     }
 
     fn backtrack(&mut self, previous_satisfier_level: u16) {
@@ -378,7 +381,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
     }
 
     // 3: Decision making
-    fn choose_pkg_version(&mut self) -> Option<PackageId> {
+    fn choose_pkg_version(&mut self) -> Result<Option<PackageId>> {
         let mut unsatisfied = self
             .derivations
             .iter()
@@ -388,7 +391,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             .collect::<Vec<_>>();
 
         if unsatisfied.is_empty() {
-            None
+            Ok(None)
         } else {
             // We want to find the unsatisfied package with the fewest available versions.
             unsatisfied.sort_by(|a, b| {
@@ -402,12 +405,11 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
             let package = unsatisfied.pop().unwrap();
             // TODO: What if we want to minimize our packages?
             let best = self.retriever.best(package.0, package.1, false);
-            let res = Some(package.0.clone());
+            let res = package.0.clone();
             match best {
                 Ok(best) => {
                     let sum = Summary::new(package.0.clone(), best.clone());
-                    // We know the package exists, so unwrapping here is fine
-                    let incompats = self.retriever.incompats(&sum).unwrap();
+                    let incompats = self.retriever.incompats(&sum, package.0)?;
                     let mut conflict = false;
                     for ic in incompats {
                         conflict = conflict
@@ -440,7 +442,7 @@ impl<'ret, 'cache: 'ret> Resolver<'ret, 'cache> {
                     self.incompatibility(pkgs, IncompatibilityCause::Unavailable);
                 }
             }
-            res
+            Ok(Some(res))
         }
     }
 

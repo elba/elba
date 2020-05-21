@@ -26,9 +26,9 @@ pub struct LockedPkg {
 }
 
 impl FromStr for LockfileToml {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+    fn from_str(raw: &str) -> Result<Self> {
         toml::from_str(raw)
             .context(format_err!("invalid lockfile"))
             .map_err(Error::from)

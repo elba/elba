@@ -1,7 +1,7 @@
 //! Utilities for creating and interacting with commands, including prettying up output and
 //! building command-line invocations.
 
-use crate::util::{errors::Res, fmt_output, read2};
+use crate::util::{error::Result, fmt_output, read2};
 use failure::{bail, ResultExt};
 use serde::{
     de::{Deserialize, Deserializer, Error},
@@ -23,7 +23,7 @@ pub enum Verbosity {
 }
 
 impl Serialize for Verbosity {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -37,7 +37,7 @@ impl Serialize for Verbosity {
 }
 
 impl<'de> Deserialize<'de> for Verbosity {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -172,19 +172,19 @@ pub trait CommandExt {
     /// Optionally, output can be passed to errors using `capture_output`.
     fn exec_streaming(
         &mut self,
-        on_stdout_line: &mut impl FnMut(&str) -> Res<()>,
-        on_stderr_line: &mut impl FnMut(&str) -> Res<()>,
+        on_stdout_line: &mut impl FnMut(&str) -> Result<()>,
+        on_stderr_line: &mut impl FnMut(&str) -> Result<()>,
         capture_output: bool,
-    ) -> Res<Output>;
+    ) -> Result<Output>;
 }
 
 impl CommandExt for Command {
     fn exec_streaming(
         &mut self,
-        on_stdout_line: &mut impl FnMut(&str) -> Res<()>,
-        on_stderr_line: &mut impl FnMut(&str) -> Res<()>,
+        on_stdout_line: &mut impl FnMut(&str) -> Result<()>,
+        on_stderr_line: &mut impl FnMut(&str) -> Result<()>,
         capture_output: bool,
-    ) -> Res<Output> {
+    ) -> Result<Output> {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
 

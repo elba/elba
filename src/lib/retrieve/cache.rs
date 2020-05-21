@@ -48,8 +48,28 @@
 //! #### Build caching
 //! If we want to cache builds, we can just have a separate subfolder for ibcs.
 
+use std::{
+    collections::VecDeque,
+    fs::{self, File},
+    io::{self, prelude::*, BufReader},
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
+
+use console::style;
+use failure::{bail, format_err, ResultExt};
+use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
+use reqwest::blocking::Client;
+use sha2::{Digest, Sha256};
+use slog::{debug, o, Logger};
+use toml;
+use walkdir::WalkDir;
+
 use crate::{
     build::{context::BuildContext, Targets},
+    cli::build::find_manifest,
     package::{manifest::Manifest, PackageId, Spec},
     remote::{
         resolution::{DirectRes, Resolution},
@@ -57,32 +77,13 @@ use crate::{
     },
     util::{
         clear_dir, copy_dir,
-        errors::Res,
+        error::Result,
         graph::Graph,
-        hexify_hash,
         lock::DirLock,
         shell::{Shell, Verbosity},
         valid_file,
     },
 };
-use console::style;
-use failure::{bail, format_err, Error, ResultExt};
-use indexmap::{IndexMap, IndexSet};
-use itertools::Itertools;
-use reqwest::blocking::Client;
-use sha2::{Digest, Sha256};
-use slog::{debug, o, Logger};
-use std::{
-    collections::VecDeque,
-    fs,
-    io::{prelude::*, BufReader},
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
-    time::Duration,
-};
-use toml;
-use walkdir::WalkDir;
 
 /// The Cache encapsulates all of the global state required for `elba` to function.
 ///
@@ -99,7 +100,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Res<Self> {
+    pub fn from_disk(plog: &Logger, layout: Layout, shell: Shell) -> Result<Self> {
         layout.init()?;
 
         let client = Client::builder().timeout(Duration::from_secs(10)).build()?;
@@ -121,7 +122,7 @@ impl Cache {
         eager: bool,
         offline: bool,
         dl_f: impl Fn(),
-    ) -> Result<(Option<DirectRes>, Source), Error> {
+    ) -> Result<(Option<DirectRes>, Source)> {
         let p = self.load_source(pkg, loc, eager, offline, dl_f)?;
 
         Ok((p.0, Source::from_folder(pkg, p.1, loc.clone())?))
@@ -150,7 +151,7 @@ impl Cache {
         eager: bool,
         offline: bool,
         dl_f: impl Fn(),
-    ) -> Result<(Option<DirectRes>, DirLock), Error> {
+    ) -> Result<(Option<DirectRes>, DirLock)> {
         if let DirectRes::Dir { path } = loc {
             debug!(self.logger, "loaded source"; "cause" => "dir", "pkg" => pkg.to_string());
             return Ok((None, DirLock::acquire(&path)?));
@@ -248,11 +249,11 @@ impl Cache {
         } else {
             hasher.input(loc.to_string().as_bytes());
         }
-        hexify_hash(hasher.result().as_slice())
+        hex::encode(hasher.result())
     }
 
     /// Return the build directory exists, else None.
-    pub fn checkout_build(&self, hash: &BuildHash) -> Res<Option<Binary>> {
+    pub fn checkout_build(&self, hash: &BuildHash) -> Result<Option<Binary>> {
         if let Some(path) = self.check_build(&hash) {
             Ok(Some(Binary::new(DirLock::acquire(&path)?)))
         } else {
@@ -262,7 +263,7 @@ impl Cache {
 
     /// Returns a lock on a temporary build directory.
     /// Note that the format of this directory should be an OutputLayout.
-    pub fn checkout_tmp(&self, hash: &BuildHash) -> Res<OutputLayout> {
+    pub fn checkout_tmp(&self, hash: &BuildHash) -> Result<OutputLayout> {
         let path = self.layout.tmp.join(&hash.0);
         let lock = DirLock::acquire(&path)?;
         if lock.path().exists() {
@@ -274,7 +275,7 @@ impl Cache {
         OutputLayout::new(lock)
     }
 
-    pub fn store_bins(&self, bins: &[(PathBuf, String)], force: bool) -> Res<()> {
+    pub fn store_bins(&self, bins: &[(PathBuf, String)], force: bool) -> Result<()> {
         // We use a file .bins in the bin directory to keep track of installed bins
         let mut dot_f = fs::OpenOptions::new()
             .create(true)
@@ -322,7 +323,7 @@ impl Cache {
         Ok(())
     }
 
-    fn store_bin(&self, from: &Path, force: bool) -> Res<()> {
+    fn store_bin(&self, from: &Path, force: bool) -> Result<()> {
         let bin_name = from
             .file_name()
             .ok_or_else(|| format_err!("{} isn't a path to a binary", from.display()))?;
@@ -355,7 +356,7 @@ impl Cache {
     }
 
     // If bins is empty, it's assumed to mean "delete all binaries"
-    pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Res<u32> {
+    pub fn remove_bins(&self, query: &Spec, bins: &[&str]) -> Result<u32> {
         fn contains(sum: &str, query: &Spec) -> bool {
             match (
                 &query.name,
@@ -418,7 +419,7 @@ impl Cache {
         Ok(c)
     }
 
-    pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Res<Binary> {
+    pub fn store_build(&self, from: &Path, hash: &BuildHash) -> Result<Binary> {
         let dest = self.layout.build.join(&hash.0);
 
         if !dest.exists() {
@@ -450,17 +451,6 @@ impl Cache {
 
         while let Some(index) = q.pop_front() {
             if seen.contains(&index) {
-                continue;
-            }
-
-            // If we're passed a Registry as a DirectRes, we give up immediately - registries only
-            // make sense as a DirectRes for packages.
-            if let DirectRes::Registry { .. } = &index {
-                self.shell.println(
-                    style("[warn]").yellow().bold(),
-                    format!("Ignoring registry resolution: {}", index),
-                    Verbosity::Quiet,
-                );
                 continue;
             }
 
@@ -593,7 +583,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn init(&self) -> Res<()> {
+    pub fn init(&self) -> Result<()> {
         // create_dir_all ignores pre-existing folders
         fs::create_dir_all(&self.bin)?;
         fs::create_dir_all(&self.src)?;
@@ -622,7 +612,7 @@ pub struct OutputLayout {
 }
 
 impl OutputLayout {
-    pub fn new(lock: DirLock) -> Res<Self> {
+    pub fn new(lock: DirLock) -> Result<Self> {
         let root = lock.path().to_path_buf();
 
         let layout = OutputLayout {
@@ -649,7 +639,7 @@ impl OutputLayout {
         Ok(layout)
     }
 
-    pub fn write_hash(&self, hash: &BuildHash) -> Res<()> {
+    pub fn write_hash(&self, hash: &BuildHash) -> Result<()> {
         fs::write(self.root.join("hash"), hash.0.as_bytes())
             .context(format_err!("couldn't write hash"))?;
 
@@ -703,28 +693,28 @@ impl Source {
     /// Note that the hash stored differs from the hash used to determine if a package needs to be
     /// redownloaded completely; for git repos, if the resolution is to use master, then the same
     /// folder will be used, but will be checked out to the latest master every time.
-    pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Res<Self> {
-        let mf_path = path.path().join("elba.toml");
-
-        let file = fs::File::open(mf_path).context(format_err!(
-            "package {} at {} is missing manifest",
-            pkg,
-            path.path().display()
-        ))?;
-        let mut file = BufReader::new(file);
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-
-        if let Some(x) = Manifest::workspace(&contents) {
-            if let Some(p) = x.get(pkg.name()) {
-                let lock = DirLock::acquire(&path.path().join(&p.0))?;
-                // We immediately release our lock on the parent folder
-                drop(path);
-                return Source::from_folder(pkg, lock, location);
+    pub fn from_folder(pkg: &PackageId, path: DirLock, location: DirectRes) -> Result<Self> {
+        let toml_path = path.path().join("elba.toml");
+        if toml_path.exists() {
+            let file = fs::File::open(toml_path).context(format_err!(
+                "package {} at {} is missing manifest",
+                pkg,
+                path.path().display()
+            ))?;
+            let mut file = BufReader::new(file);
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)?;
+            if let Some(x) = Manifest::workspace(&contents) {
+                if let Some(p) = x.get(pkg.name()) {
+                    let lock = DirLock::acquire(&path.path().join(&p.0))?;
+                    // We immediately release our lock on the parent folder
+                    drop(path);
+                    return Source::from_folder(pkg, lock, location);
+                }
             }
         }
 
-        let manifest = Manifest::from_str(&contents)?;
+        let (_, manifest) = find_manifest(path.path(), true, None)?;
 
         if manifest.name() != pkg.name() {
             bail!(
@@ -743,11 +733,10 @@ impl Source {
 
         let mut hash = Sha256::new();
         for f in walker {
-            let mut file = fs::File::open(f.path())?;
-            let fh = Sha256::digest_reader(&mut file)?;
-            hash.input(&fh);
+            let mut file = File::open(f.path())?;
+            io::copy(&mut file, &mut hash)?;
         }
-        let hash = hexify_hash(hash.result().as_slice());
+        let hash = hex::encode(hash.result());
 
         Ok(Source {
             inner: Arc::new(SourceInner {
@@ -864,7 +853,7 @@ impl BuildHash {
             let bytes: [u8; 5] = t.as_bytes();
             hasher.input(&bytes);
         }
-        let hash = hexify_hash(hasher.result().as_slice());
+        let hash = hex::encode(hasher.result());
 
         BuildHash(hash)
     }

@@ -1,24 +1,25 @@
 //! Package manifest files.
 
-use super::*;
-use crate::{
-    remote::resolution::{DirectRes, IndexRes},
-    util::{valid_file, SubPath},
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
 };
+
 use failure::{format_err, Error, ResultExt};
 use ignore::gitignore::GitignoreBuilder;
 use indexmap::IndexMap;
 use semver::Version;
 use semver_constraints::Constraint;
 use serde::Deserialize;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
 use toml;
 use url::Url;
-use url_serde;
 use walkdir::{DirEntry, WalkDir};
+
+use super::*;
+use crate::{
+    remote::resolution::{DirectRes, IndexRes},
+    util::{valid_file, SubPath},
+};
 
 // TODO: Package aliasing. Have dummy alias files in the root target folder.
 //
@@ -76,19 +77,20 @@ impl Manifest {
     pub fn deps(
         &self,
         ixmap: &IndexMap<String, IndexRes>,
+        parent_pkg: &PackageId,
         dev_deps: bool,
-    ) -> Res<IndexMap<PackageId, Constraint>> {
+    ) -> Result<IndexMap<PackageId, Constraint>> {
         let mut deps = IndexMap::new();
         for (n, dep) in &self.dependencies {
             let dep = dep.clone();
-            let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
+            let (pid, c) = dep.into_dep(ixmap, parent_pkg, n.clone())?;
             deps.insert(pid, c);
         }
 
         if dev_deps {
             for (n, dep) in &self.dev_dependencies {
                 let dep = dep.clone();
-                let (pid, c) = dep.into_dep(&ixmap, n.clone())?;
+                let (pid, c) = dep.into_dep(ixmap, parent_pkg, n.clone())?;
                 deps.insert(pid, c);
             }
         }
@@ -101,7 +103,7 @@ impl Manifest {
         pkg_root: &Path,
         search_root: &Path,
         mut p: P,
-    ) -> Res<impl Iterator<Item = DirEntry>>
+    ) -> Result<impl Iterator<Item = DirEntry>>
     where
         P: FnMut(&DirEntry) -> bool,
     {
@@ -136,16 +138,57 @@ impl Manifest {
 
         Ok(walker)
     }
+
+    pub fn validate(&self) -> Result<()> {
+        if self
+            .package
+            .description
+            .as_ref()
+            .filter(|description| description.len() > 244)
+            .is_some()
+        {
+            bail!(format_err!("descrption is over 244 characters"));
+        }
+        if self
+            .package
+            .license
+            .as_ref()
+            .filter(|license| license.len() > 20)
+            .is_some()
+        {
+            bail!(format_err!("license is over 20 characters"));
+        }
+        if self.package.keywords.len() > 5 {
+            bail!(format_err!("keywords should no more than 5"));
+        }
+        if self
+            .package
+            .keywords
+            .iter()
+            .any(|keyword| keyword.trim().is_empty())
+        {
+            bail!(format_err!("one of the keywords is empty"))
+        }
+        if self
+            .package
+            .keywords
+            .iter()
+            .any(|keyword| keyword.split_whitespace().skip(1).next().is_some())
+        {
+            bail!(format_err!("one of the keywords contains whitespace"));
+        }
+        Ok(())
+    }
 }
 
 impl FromStr for Manifest {
-    type Err = Error;
+    type Err = failure::Error;
 
-    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+    fn from_str(raw: &str) -> Result<Self> {
         let toml: Manifest = toml::from_str(raw)
             .with_context(|e| format_err!("invalid manifest file: {}", e))
             .map_err(Error::from)?;
-
+        toml.validate()?;
         Ok(toml)
     }
 }
@@ -156,7 +199,6 @@ pub struct PackageInfo {
     pub name: Name,
     pub version: Version,
     pub authors: Vec<String>,
-    pub build: Option<SubPath>,
     pub description: Option<String>,
     #[serde(default = "Vec::new")]
     pub keywords: Vec<String>,
@@ -179,7 +221,6 @@ pub enum DepReq {
         path: PathBuf,
     },
     Git {
-        #[serde(with = "url_serde")]
         git: Url,
         #[serde(default = "default_tag")]
         tag: String,
@@ -194,8 +235,9 @@ impl DepReq {
     pub fn into_dep(
         self,
         ixmap: &IndexMap<String, IndexRes>,
+        parent_pkg: &PackageId,
         n: Name,
-    ) -> Res<(PackageId, Constraint)> {
+    ) -> Result<(PackageId, Constraint)> {
         match self {
             DepReq::Registry(c) => {
                 let def_index = ixmap
@@ -215,9 +257,22 @@ impl DepReq {
                 }
             }
             DepReq::Local { path } => {
-                let res = DirectRes::Dir { path };
-                let pi = PackageId::new(n, res.into());
-                Ok((pi, Constraint::any()))
+                if let &Resolution::Direct(DirectRes::Dir { path: parent_root }) =
+                    &parent_pkg.resolution()
+                {
+                    let res = DirectRes::Dir {
+                        path: parent_root.join(path),
+                    };
+                    let pi = PackageId::new(n, res.into());
+                    Ok((pi, Constraint::any()))
+                } else {
+                    bail!(format_err!(
+                        "can't resolve local dependency {} because it's \
+                        parent package {} is not local.",
+                        path.display(),
+                        parent_pkg.name()
+                    ))
+                }
             }
             DepReq::Git { git, tag } => {
                 let res = DirectRes::Git { repo: git, tag };
