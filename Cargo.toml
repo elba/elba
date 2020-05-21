@@ -26,7 +26,7 @@ failure = "0.1"
 futures = "0.3"
 flate2 = "1.0"
 fs2 = "0.4"
-git2 = "0.12"
+git2 = { version = "0.12", features = ["vendored-openssl" ]}
 hex = "0.4"
 ignore = "0.4"
 indexmap = { version = "1", features = ["serde-1"] }
