@@ -11,16 +11,14 @@ can be found at [this blog post](http://cao.st/posts/elba/).
 
 ## Installation
 
-There are three options for installing elba:
+There are two options for installing elba:
 
 1.  Download the pre-built binary corresponding to your platform from
     GitHub Releases and place it in your PATH.
-2.  Install the package from Rust's crates.io repository using
-    `cargo install elba`
 3.  Manually build and install elba yourself using the source code with
-    `git clone https://github.com/elba/elba.git && cd elba && cargo install`.
+    `git clone https://github.com/elba/elba.git && cd elba && cargo install --path .`.
     
-To build, elba requires Rust 1.31 or greater.
+To build, elba requires the latest nightly Rust.
 
 ## Documentation
 
