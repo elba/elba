@@ -1,0 +1,11 @@
+package elba
+
+modules =
+    Elba.System.Git
+
+depends = contrib
+
+sourcedir = "src"
+
+main = Elba.Main
+executable = elba
